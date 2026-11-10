@@ -160,6 +160,18 @@ describe('cutaway', () => {
     expect(material.opacity).toBe(1);
     expect(material.transparent).toBe(false);
   });
+
+  it('leaves translucent materials translucent when their wall is fully shown', () => {
+    const controller = new WallFadeController();
+    controller.setWalls(walls);
+    const glass = { opacity: 0.2, transparent: true, depthWrite: false, visible: true, needsUpdate: false, userData: {} as Record<string, unknown> };
+    const overlay = { opacity: 1, transparent: true, depthWrite: false, visible: true, needsUpdate: false, userData: {} as Record<string, unknown> };
+    controller.register(north[0]!.id, glass as never);
+    controller.register(north[0]!.id, overlay as never);
+    controller.update(true, 6, 14, 0.7, 0.016);
+    expect(glass).toMatchObject({ opacity: 0.2, transparent: true, depthWrite: false, visible: true });
+    expect(overlay).toMatchObject({ opacity: 1, transparent: true, depthWrite: false, visible: true });
+  });
 });
 
 describe('finish textures', () => {

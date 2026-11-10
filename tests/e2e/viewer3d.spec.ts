@@ -290,3 +290,42 @@ test('a GLB entry is loaded and fitted to its catalog dimensions', async ({ page
   await expectCanvasRendered(page.locator('canvas'));
   expect(errors).toEqual([]);
 });
+
+test('auto-furnish adds a room layout as one undo step, with catalog models drawn at their size', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await openSample(page);
+  await ready(page);
+  const bedroom = await roomId(page, 'Bedroom 1');
+
+  // Select the room by clicking its floor, then furnish it from the room panel.
+  await clickPlan(page, 1900, 7200);
+  await expect(page.getByTestId('room-name')).toHaveText('Bedroom 1');
+  await page.getByTestId('room-autofurnish').click();
+  await expect.poll(async () => (await items(page)).length).toBeGreaterThan(2);
+  const placed = await items(page);
+  await expect(count(page)).toHaveAttribute('data-count', String(placed.length));
+  expect(placed.every((i) => i.roomId === bedroom)).toBe(true);
+  expect(placed.every((i) => getEntry(i.catalogId))).toBe(true);
+  expect(await undoSteps(page)).toBe(1);
+
+  // A shipped GLB is drawn at exactly its catalog size: the load-time fit leaves it alone.
+  const model = placed.find((i) => getEntry(i.catalogId)!.model.kind === 'glb' && i.rotationDeg % 90 === 0)!;
+  const { w, d, h } = getEntry(model.catalogId)!.dims;
+  const quarter = (model.rotationDeg / 90) % 2 !== 0;
+  const describe = () => page.evaluate((i) => (window as unknown as Dev).__interio.describeItem(i), model.id);
+  // The stand-in box has one unnamed mesh; the loaded model replaces it.
+  await expect.poll(async () => JSON.stringify((await describe())?.meshes), { timeout: 20_000 }).not.toBe('[""]');
+  const drawn = (await describe())!;
+  expect(drawn.max[0]! - drawn.min[0]!).toBeCloseTo((quarter ? d : w) / 1000, 2);
+  expect(drawn.max[2]! - drawn.min[2]!).toBeCloseTo((quarter ? w : d) / 1000, 2);
+  expect(drawn.max[1]! - drawn.min[1]!).toBeCloseTo(h / 1000, 2);
+  expect(drawn.min[1]).toBeCloseTo(model.z / 1000, 2);
+  expect((drawn.min[0]! + drawn.max[0]!) / 2).toBeCloseTo(model.x / 1000, 2);
+  expect((drawn.min[2]! + drawn.max[2]!) / 2).toBeCloseTo(-model.y / 1000, 2);
+
+  // One undo removes the whole layout.
+  await page.getByRole('button', { name: /^Undo/ }).click();
+  await expect(count(page)).toHaveAttribute('data-count', '0');
+  expect(errors).toEqual([]);
+});

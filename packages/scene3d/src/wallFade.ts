@@ -98,7 +98,12 @@ export class WallFadeController {
   register(wallId: Id, material: THREE.Material): () => void {
     let set = this.materials.get(wallId);
     if (!set) this.materials.set(wallId, (set = new Set()));
-    if (material.userData.baseOpacity === undefined) material.userData.baseOpacity = material.opacity;
+    // Remember how the material was authored, so glass and shading overlays stay translucent at full strength.
+    if (material.userData.baseOpacity === undefined) {
+      material.userData.baseOpacity = material.opacity;
+      material.userData.baseTransparent = material.transparent;
+      material.userData.baseDepthWrite = material.depthWrite;
+    }
     set.add(material);
     this.apply(material, this.opacity(wallId));
     return () => {
@@ -131,13 +136,13 @@ export class WallFadeController {
 
   private apply(material: THREE.Material, f: number): void {
     const base = (material.userData.baseOpacity as number | undefined) ?? 1;
-    const transparent = base < OPAQUE || f < OPAQUE;
+    const transparent = material.userData.baseTransparent === true || base < OPAQUE || f < OPAQUE;
     if (material.transparent !== transparent) {
       material.transparent = transparent;
       material.needsUpdate = true;
     }
     material.opacity = base * f;
-    material.depthWrite = base >= OPAQUE && f > 0.9;
+    material.depthWrite = material.userData.baseDepthWrite !== false && base >= OPAQUE && f > 0.9;
     // Fully faded: skip the draw and the shadow pass.
     material.visible = f > 0.02;
   }

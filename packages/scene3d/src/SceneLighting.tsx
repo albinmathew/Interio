@@ -129,7 +129,7 @@ function Sun({ level, intensity, color, shadows, mapSize }: { level: Level; inte
  */
 export function SceneLighting({ level, mode, envUrl = DEFAULT_ENVIRONMENT_URL, shadows = true, shadowMapSize = 2048 }: SceneLightingProps) {
   const dollhouse = mode === 'dollhouse';
-  const hasEnv = useEnvironment(envUrl, dollhouse ? 0.4 : 0.3);
+  const hasEnv = useEnvironment(envUrl, dollhouse ? 0.4 : 0.22);
   if (dollhouse)
     return (
       <>
@@ -141,8 +141,11 @@ export function SceneLighting({ level, mode, envUrl = DEFAULT_ENVIRONMENT_URL, s
   const y = (level.ceilingHeight - 250) / 1000;
   return (
     <>
-      <ambientLight intensity={hasEnv ? 0.45 : 0.75} />
-      <hemisphereLight args={['#ffffff', '#cfc8bb', hasEnv ? 0.35 : 0.6]} />
+      {/* Little flat fill, so surfaces keep their shading. The warm ground colour lights what faces down: ceilings, door heads. */}
+      <ambientLight intensity={hasEnv ? 0.18 : 0.45} />
+      <hemisphereLight args={['#ffffff', '#efe7da', hasEnv ? 0.75 : 0.9]} />
+      {/* Light bounced off the floor: keeps ceilings, door heads and the undersides of furniture from going grey. */}
+      <directionalLight position={[0, -1, 0]} intensity={0.6} color="#fff4e4" />
       <Sun level={level} intensity={2.6} color="#fff0d8" shadows={shadows} mapSize={shadowMapSize} />
       {selectRooms(level).map((room, i) => {
         const [x, , z] = planToWorld(room.centroid);
@@ -151,9 +154,9 @@ export function SceneLighting({ level, mode, envUrl = DEFAULT_ENVIRONMENT_URL, s
           <pointLight
             key={room.roomId ?? i}
             position={[x, y, z]}
-            intensity={reach * 1.8}
+            intensity={reach * 1.25}
             distance={reach * 1.6 + 2}
-            decay={1.4}
+            decay={1.5}
             color="#fff1dc"
           />
         );

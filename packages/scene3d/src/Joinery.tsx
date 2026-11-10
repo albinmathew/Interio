@@ -2,11 +2,12 @@
  * Doors, windows, railings and skirting boards. Visual only: none of these meshes carry
  * `userData.group`, so pointer tools and collision code can ignore them.
  */
-import { openingFrame, type Level, type LevelMesh, type Opening, type Wall } from '@interio/core';
+import { openingFrame, selectRooms, type Level, type LevelMesh, type Opening, type Wall } from '@interio/core';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { mergeBoxes } from './boxes';
 import { openingParts, railingParts, skirtingBoxes, stubBoxes, type BoxSpec } from './parts';
+import { contactShading, shadeBuffers, type ShadeQuad } from './shading';
 import type { WallFadeController } from './wallFade';
 
 interface Look {
@@ -214,4 +215,65 @@ export function WallStubs({ level }: { level: Level }) {
   );
   if (!built) return null;
   return <mesh name="wall-stubs" geometry={built.geometry} material={built.material} receiveShadow />;
+}
+
+const SHADE_RGB: [number, number, number] = [0.02, 0.018, 0.015];
+
+function shadeGeometry(quads: ShadeQuad[]): THREE.BufferGeometry {
+  const { positions, colors, indices } = shadeBuffers(quads, SHADE_RGB);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  return geometry;
+}
+
+const shadeMaterial = () =>
+  new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+
+/**
+ * Baked contact shading (see `shading.ts`): gradients at the foot and head of walls, in
+ * inside corners and along the edges of floors and ceilings.
+ */
+export function ContactShade({ level, ceilings, fade }: { level: Level; ceilings: boolean; fade?: WallFadeController }) {
+  const { walls, vertices, openings, rooms, ceilingHeight } = level;
+  const built = useMemo(() => {
+    const view = { walls, vertices, openings, rooms, ceilingHeight } as Level;
+    const shading = contactShading(view, selectRooms(level), { ceilings });
+    return {
+      flat: shading.flat.length ? { geometry: shadeGeometry(shading.flat), material: shadeMaterial() } : null,
+      walls: [...shading.walls].map(([wallId, quads]) => ({ wallId, geometry: shadeGeometry(quads), material: shadeMaterial() })),
+    };
+    // `selectRooms` is keyed on the same slices as the dependencies below.
+  }, [walls, vertices, openings, rooms, ceilingHeight, ceilings]);
+  useEffect(
+    () => () => {
+      for (const part of [built.flat, ...built.walls]) {
+        part?.geometry.dispose();
+        part?.material.dispose();
+      }
+    },
+    [built],
+  );
+  useEffect(() => {
+    if (!fade) return;
+    const off = built.walls.map((w) => fade.register(w.wallId, w.material));
+    return () => off.forEach((f) => f());
+  }, [built, fade]);
+  return (
+    <group name="contact-shade">
+      {built.flat && <mesh geometry={built.flat.geometry} material={built.flat.material} renderOrder={1} />}
+      {built.walls.map((w) => (
+        <mesh key={w.wallId} geometry={w.geometry} material={w.material} renderOrder={1} />
+      ))}
+    </group>
+  );
 }

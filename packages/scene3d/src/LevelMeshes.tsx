@@ -10,7 +10,7 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { geometryFromMesh } from './geometry';
-import { OpeningsLayer, RailingsLayer, SkirtingLayer, WallStubs } from './Joinery';
+import { ContactShade, OpeningsLayer, RailingsLayer, SkirtingLayer, WallStubs } from './Joinery';
 import { createSurfaceMaterial } from './materials';
 import { fadeWalls, WallFadeController } from './wallFade';
 
@@ -118,6 +118,7 @@ export function LevelMeshes({ level, showCeilings = false, cutaway = false, door
           <OpeningsLayer level={level} doorsOpen={doorsOpen} fade={fade} />
           <RailingsLayer level={level} />
           <SkirtingLayer level={level} mesh={mesh} />
+          <ContactShade level={level} ceilings={showCeilings} fade={fade} />
         </>
       )}
       {cutaway && <WallStubs level={level} />}
