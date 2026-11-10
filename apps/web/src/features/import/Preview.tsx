@@ -4,6 +4,7 @@
  * overlay share one frame.
  */
 import { deriveRooms, openingFrame, wallFootprints, type OpeningKind, type PlanDraft, type Pt, type RoomType } from '@interio/core';
+import { isDivider } from '@interio/importer';
 import { useEffect, useMemo, useState } from 'react';
 
 const ROOM_TINT: Record<RoomType, string> = {
@@ -111,12 +112,32 @@ export function PlanPreview({ draft, showDrawing, showPlan }: { draft: PlanDraft
             return <path key={i} d={path(r.interior)} fill={ROOM_TINT[room?.type ?? 'other']} fillOpacity={0.38} data-room={room?.name} />;
           })}
           {view.walls.map((f) => {
-            const kind = level.walls[f.wallId]?.kind;
+            const wall = level.walls[f.wallId];
+            const kind = wall?.kind;
+            if (wall && isDivider(wall)) {
+              // Open-plan dividers are floor strips: draw them as a dashed line, not a wall.
+              const a = level.vertices[wall.a];
+              const b = level.vertices[wall.b];
+              if (!a || !b) return null;
+              return (
+                <line
+                  key={f.wallId}
+                  x1={a.x}
+                  y1={-a.y}
+                  x2={b.x}
+                  y2={-b.y}
+                  stroke="#9333a8"
+                  strokeWidth={view.size / 450}
+                  strokeDasharray={`${view.size / 90} ${view.size / 130}`}
+                  data-divider
+                />
+              );
+            }
             return <path key={f.wallId} d={path(f.polygon)} fill={kind === 'railing' ? '#c2410c' : kind === 'low' ? '#4d7c0f' : '#1f2428'} fillOpacity={kind === 'wall' ? 0.72 : 0.8} />;
           })}
           {Object.values(level.openings).map((o) => {
             const f = openingFrame(level, o.id);
-            if (!f) return null;
+            if (!f || isDivider(level.walls[o.wallId])) return null;
             const n = { x: f.normal.x * (f.thickness / 2 + 12), y: f.normal.y * (f.thickness / 2 + 12) };
             const quad = [
               { x: f.left.x + n.x, y: f.left.y + n.y },
@@ -179,6 +200,10 @@ export function Legend() {
       {item('#4d7c0f', 'Low wall')}
       {item('#c2410c', 'Railing')}
       {(Object.keys(OPENING_LABEL) as OpeningKind[]).map((k) => item(OPENING_COLOUR[k], OPENING_LABEL[k]))}
+      <span className="inline-flex items-center gap-1.5">
+        <span className="w-4 border-t-2 border-dashed" style={{ borderColor: '#9333a8' }} />
+        Open-plan divider
+      </span>
     </div>
   );
 }

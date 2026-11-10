@@ -77,7 +77,7 @@ describe.skipIf(pdfs.length === 0)('local PDFs', () => {
     // Rooms with walls all round match their labelled size; allow the odd shaft the drawing leaves ambiguous.
     const wrong = own.filter((c) => !c.ok).map((c) => `${c.name} ${c.labelled?.join('x')} vs ${c.bbox?.join('x')}`);
     expect(wrong.length, wrong.join('; ')).toBeLessThanOrEqual(1);
-    expect(own.length).toBeGreaterThanOrEqual(0.7 * checks.length);
+    expect(own.length).toBeGreaterThanOrEqual(0.9 * checks.length);
   });
 
   for (const pdf of labelled) it(`${pdf}: scale comes from the dimensions and agrees with the wall thickness`, async () => {

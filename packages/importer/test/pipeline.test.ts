@@ -1,6 +1,6 @@
 import { deriveRooms, validateLevel } from '@interio/core';
 import { describe, expect, it } from 'vitest';
-import { ImportError, importExtracted, importPdf } from '../src/index';
+import { ImportError, importExtracted, importPdf, isDivider } from '../src/index';
 import { MM_PER_UNIT, syntheticPlan, syntheticVision } from './synthetic';
 
 const roomByName = (detail: ReturnType<typeof importExtracted>, name: string) => {
@@ -114,6 +114,49 @@ describe('importExtracted on a synthetic plan', () => {
         .sort((x, y) => x - y);
     expect(areas(mirrored)).toEqual(areas(detail));
     expect(Object.values(mirrored.draft.level.rooms).map((r) => r.name).sort()).toEqual(Object.values(level.rooms).map((r) => r.name).sort());
+  });
+});
+
+describe('open-plan spaces', () => {
+  const origin = syntheticVision().rooms[1]!.labelPoint; // centre of the living room
+  const mmY = 20 * 400; // page height in mm at the synthetic scale
+  const at = (dy: number) => ({ x: origin.x, y: origin.y - dy / mmY });
+  const vision = {
+    ...syntheticVision(),
+    rooms: [
+      syntheticVision().rooms[0]!,
+      { name: 'Living', type: 'living' as const, labelPoint: at(700), dims: [3000, 2500] as [number, number] },
+      { name: 'Dining', type: 'dining' as const, labelPoint: at(-1300), dims: [3000, 1500] as [number, number] },
+      syntheticVision().rooms[2]!,
+    ],
+  };
+
+  it('closes each labelled zone with a floor-level divider at its labelled size', () => {
+    const detail = importExtracted(syntheticPlan(), { vision });
+    const level = detail.draft.level;
+    expect(Object.values(level.rooms).map((r) => r.name).sort()).toEqual(['Dining', 'Living', 'Master Bedroom', 'Sit-out']);
+    const living = roomByName(detail, 'Living').geom!;
+    const dining = roomByName(detail, 'Dining').geom!;
+    expect(Math.abs(living.width - 3000)).toBeLessThanOrEqual(15);
+    expect(Math.abs(living.depth - 2500)).toBeLessThanOrEqual(15);
+    expect(Math.abs(dining.depth - 1500)).toBeLessThanOrEqual(15);
+    const dividers = Object.values(level.walls).filter((w) => isDivider(w));
+    expect(dividers).toHaveLength(1);
+    // Open along its length: you walk straight across.
+    const gap = Object.values(level.openings).find((o) => o.wallId === dividers[0]!.id)!;
+    expect(gap.kind).toBe('passage');
+    expect(gap.width).toBeGreaterThan(2800);
+    expect(detail.checks.every((c) => c.ok)).toBe(true);
+    expect(detail.draft.issues.some((i) => i.code === 'room-dividers')).toBe(true);
+  });
+
+  it('keeps the space as one room when asked not to split', () => {
+    const detail = importExtracted(syntheticPlan(), { vision, splitOpenPlan: false });
+    const level = detail.draft.level;
+    expect(Object.keys(level.rooms)).toHaveLength(3);
+    expect(Object.values(level.walls).some((w) => isDivider(w))).toBe(false);
+    expect(Object.values(level.rooms).map((r) => r.name)).toContain('Living / Dining');
+    expect(detail.draft.issues.some((i) => i.code === 'open-plan')).toBe(true);
   });
 });
 

@@ -26,6 +26,7 @@ export { classifyLayer, layerKey, assignRoles, nominalThickness } from './roles'
 export { Dirs, pairStrips, mergeStacked, dominantThickness, pathWinding, type Strip, type EdgeIn } from './strips';
 export { findArcs, findDoors, type DoorSymbol } from './doors';
 export { buildRuns, snapEnds, makeWallSupport, runEnds, type Run, type RunOpening } from './topology';
+export { isDivider, splitOpenPlan, DIVIDER_HEIGHT, DIVIDER_THICKNESS } from './openplan';
 export { chooseScale, clearSpans, dimensionScale, parseScaleText, nearestStandardWall, MM_PER_PT, type ScaleCandidates } from './scale';
 
 export interface ImportOptions {
@@ -44,6 +45,12 @@ export interface ImportOptions {
   raster?: boolean;
   /** Longest side of the raster underlay in pixels. */
   rasterMaxSidePx?: number;
+  /**
+   * Close the labelled zones of an open-plan space ("Living", "Dining", "Foyer"
+   * in one walled area) with floor-level dividers so each is its own room.
+   * Needs `vision`. Default true.
+   */
+  splitOpenPlan?: boolean;
 }
 
 /** Everything the wizard needs to re-run the geometry without re-reading the PDF. */
@@ -62,7 +69,7 @@ export interface ImportDetail {
 function detail(ex: Extracted, opts: ImportOptions): ImportDetail {
   const an = analyse(ex, opts.roleOverrides);
   opts.onProgress?.('Building rooms', 0.8);
-  const built: BuildResult = buildDraft(ex, an, { fileName: opts.fileName, vision: opts.vision, mmPerPdfUnit: opts.mmPerPdfUnit });
+  const built: BuildResult = buildDraft(ex, an, { fileName: opts.fileName, vision: opts.vision, mmPerPdfUnit: opts.mmPerPdfUnit, splitOpenPlan: opts.splitOpenPlan });
   return {
     draft: built.draft,
     checks: built.checks,
@@ -81,7 +88,7 @@ export function importExtracted(ex: Extracted, opts: ImportOptions = {}): Import
     if (e instanceof ImportError) throw e;
     // A bug in a geometry stage must not lose the user's file: fall back to tracing.
     const an = analyse({ ...ex, segs: [], curves: [], paths: [] }, opts.roleOverrides);
-    const built = buildDraft(ex, an, { fileName: opts.fileName, vision: opts.vision, mmPerPdfUnit: opts.mmPerPdfUnit });
+    const built = buildDraft(ex, an, { fileName: opts.fileName, vision: opts.vision, mmPerPdfUnit: opts.mmPerPdfUnit, splitOpenPlan: opts.splitOpenPlan });
     built.draft.issues.unshift({
       severity: 'error',
       code: 'analysis-failed',

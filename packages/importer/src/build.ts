@@ -23,6 +23,7 @@ import {
   type VisionResult,
 } from '@interio/core';
 import type { Analysis } from './analyse';
+import { isDivider, splitOpenPlan } from './openplan';
 import type { Extracted } from './extract';
 import { isKitchenLayer } from './roles';
 import { chooseScale, clearSpans, dimensionScale, polygonSpans, MM_PER_PT, nearestStandardWall, parseScaleText, type ScaleCandidates, type WallSeg } from './scale';
@@ -31,6 +32,8 @@ import { runEnds } from './topology';
 
 export interface BuildOptions {
   fileName?: string;
+  /** Close labelled zones of an open-plan space with floor-level dividers. Default true. */
+  splitOpenPlan?: boolean;
   vision?: VisionResult | null;
   mmPerPdfUnit?: number;
 }
@@ -342,6 +345,22 @@ export function buildDraft(ex: Extracted, an: Analysis, opts: BuildOptions = {})
     }
   }
   ops.reconcileRooms(level);
+  if (vision && opts.splitOpenPlan !== false) {
+    const zones = splitOpenPlan(
+      level,
+      vision.rooms.map((r) => ({ name: r.name, at: toPlan(labelPage(r.labelPoint)), dims: r.dims })),
+      axes,
+    );
+    if (zones.length > 0) {
+      ops.reconcileRooms(level);
+      for (const w of Object.values(level.walls)) if (isDivider(w)) confidence[w.id] = 0.4;
+      issues.push({
+        severity: 'info',
+        code: 'room-dividers',
+        message: `${zones.map((z) => `"${z}"`).join(', ')} ${zones.length === 1 ? 'is' : 'are'} part of an open-plan space. Floor-level dividers were added at the labelled sizes so each is its own room; delete a divider in the editor to merge rooms.`,
+      });
+    }
+  }
   const geoms = deriveRooms(level);
   const geomOf = (roomId: Id): RoomGeom | undefined => geoms.find((g) => g.roomId === roomId);
   const planWalls: WallSeg[] = Object.values(level.walls).map((w) => ({ ...ops.wallEnds(level, w), t: w.thickness }));
@@ -351,7 +370,8 @@ export function buildDraft(ex: Extracted, an: Analysis, opts: BuildOptions = {})
     let total = 0;
     g.polygon.forEach((p, i) => {
       const len = vec.dist(p, g.polygon[(i + 1) % g.polygon.length]!);
-      const kind = level.walls[g.edgeWalls[i]!]?.kind;
+      const wall = level.walls[g.edgeWalls[i]!];
+      const kind = isDivider(wall) ? undefined : wall?.kind;
       total += len;
       if (kind === 'railing') rail += len;
       if (kind === 'low') low += len;
@@ -466,11 +486,14 @@ export function buildDraft(ex: Extracted, an: Analysis, opts: BuildOptions = {})
       else if (x.area >= 7) type = 'bedroom';
       else if (x.area < 2.5) type = 'storage';
       const shaft = Math.min(x.g.width, x.g.depth) < 600;
-      if (shaft) type = 'other';
+      // What is left of an open-plan space once its labelled zones are divided off is circulation.
+      const leftover = x.g.edgeWalls.some((id) => isDivider(level.walls[id]));
+      if (leftover) type = 'corridor';
+      else if (shaft) type = 'other';
       const n = (counters.get(type) ?? 0) + 1;
       counters.set(type, n);
       x.room.type = type;
-      x.room.name = shaft ? `Shaft ${n}` : type === 'living' || type === 'kitchen' ? TYPE_NAMES[type] : `${TYPE_NAMES[type]} ${n}`;
+      x.room.name = leftover ? (n === 1 ? 'Passage' : `Passage ${n}`) : shaft ? `Shaft ${n}` : type === 'living' || type === 'kitchen' ? TYPE_NAMES[type] : `${TYPE_NAMES[type]} ${n}`;
       x.room.floorMaterial = defaultFloorFor(type);
       confidence[x.room.id] = type === 'other' ? 0.3 : 0.5;
     }

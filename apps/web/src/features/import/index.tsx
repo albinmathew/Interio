@@ -9,6 +9,7 @@ import {
   attachPageImage,
   extractPage,
   importExtracted,
+  isDivider,
   renderPdfPage,
   type Extracted,
   type ImportDetail,
@@ -295,7 +296,8 @@ function Review({ detail, ai, roles, userScale, busy, creating, name, view, erro
         .sort((a, b) => b.g.interiorArea - a.g.interiorArea),
     [level],
   );
-  const openings = Object.values(level.openings);
+  // Open-plan dividers carry a passage each; those are not doors.
+  const openings = Object.values(level.openings).filter((o) => !isDivider(level.walls[o.wallId]));
   const count = (kind: string) => openings.filter((o) => o.kind === kind).length;
   const layers = useMemo(
     () => [...draft.layers].sort((a, b) => Number(a.role === 'ignore') - Number(b.role === 'ignore') || b.segments - a.segments),
