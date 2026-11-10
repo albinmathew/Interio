@@ -31,7 +31,12 @@ Interio can ask an AI assistant to read room names, labelled sizes and door tags
 - **Switched on:** rooms arrive with the names printed on the drawing.
 - **Switched off:** the import uses the line work only. Walls, doors and windows are still read, but room names and types are guesses that you can rename in Plan mode. Nothing leaves your computer.
 
-To switch it on, copy `.env.example` to `.env` in the Interio folder, set `ANTHROPIC_API_KEY` to your Anthropic API key, restart `pnpm dev`, and upload the plan again.
+To switch it on, copy `.env.example` to `.env` in the Interio folder and choose one of:
+
+- **An Anthropic API key:** set `ANTHROPIC_API_KEY` to your key.
+- **Your Claude Code login:** set `INTERIO_AI_PROVIDER=claude-code`. This needs no key, but Claude Code must be installed and signed in on the same computer, and each import counts against your Claude plan's usage.
+
+Then restart `pnpm dev` and upload the plan again. With the assistant on, a picture of the page is sent to Anthropic.
 
 ### After the review
 

@@ -1,11 +1,11 @@
 /**
  * Interio API routes.
  *
- *   GET  /api/health        -> { ok, ai, model }
+ *   GET  /api/health        -> { ok, ai, model, provider }
  *   POST /api/analyze-plan  -> AnalyzePlanResponse (see @interio/core)
  *
  * analyze-plan request: { image: base64 PNG|JPEG, mediaType, fileName? }
- *   200 { available: false }                 no key configured; the client imports vector-only
+ *   200 { available: false }                 no provider configured; the client imports vector-only
  *   200 { available: true, result, model }   the reading
  *   400 / 413 / 502 { available: true, error }
  */
@@ -13,12 +13,14 @@ import type { AnalyzePlanResponse } from '@interio/core';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
-import { clientFromEnv, effortFromEnv, fallbacksFromEnv, modelFromEnv, type Env } from './config';
+import { effortFromEnv, fallbacksFromEnv, modelFromEnv, visionFromEnv, type Env, type Provider } from './config';
 import { AnalyzeError, MAX_IMAGE_BYTES, analyzePlan, type VisionSettings } from './vision/analyze';
 
 export interface AppOptions extends Partial<Omit<VisionSettings, 'client'>> {
-  /** Anthropic client. `null` turns AI assist off. Omit to build one from `ANTHROPIC_API_KEY`. */
+  /** Vision client. `null` turns AI assist off. Omit to pick one from the environment (see `config.ts`). */
   client?: VisionSettings['client'] | null;
+  /** Reported by /api/health. Derived from the environment when `client` is omitted. */
+  provider?: Provider;
   /** Source of defaults for anything not passed explicitly. Defaults to `process.env`. */
   env?: Env;
 }
@@ -38,17 +40,20 @@ const REQUEST_ERRORS: Record<string, string> = {
 const failure = (error: string): AnalyzePlanResponse => ({ available: true, error });
 
 export function createApp(options: AppOptions = {}): Hono {
-  const { env = process.env, client = clientFromEnv(env), ...overrides } = options;
-  const model = overrides.model ?? modelFromEnv(env);
+  const { env = process.env, client: given, provider: givenProvider, ...overrides } = options;
+  const fromEnv = given === undefined ? visionFromEnv(env) : null;
+  const client = given === undefined ? fromEnv!.client : given;
+  const provider: Provider = givenProvider ?? fromEnv?.provider ?? (client ? 'api' : 'off');
+  const model = overrides.model ?? modelFromEnv(env, provider);
   const maxImageBytes = overrides.maxImageBytes ?? MAX_IMAGE_BYTES;
   const logger = overrides.logger ?? console.error;
 
   const app = new Hono();
 
-  app.get('/api/health', (c) => c.json({ ok: true, ai: client !== null, model }));
+  app.get('/api/health', (c) => c.json({ ok: true, ai: client !== null, model, provider }));
 
   if (!client) {
-    // Answered without reading the body: with no key there is nothing to validate it for.
+    // Answered without reading the body: with no provider there is nothing to validate it for.
     app.post('/api/analyze-plan', (c) => c.json({ available: false } satisfies AnalyzePlanResponse));
   } else {
     const settings: VisionSettings = {

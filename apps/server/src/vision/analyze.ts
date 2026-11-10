@@ -69,6 +69,20 @@ export class AnalyzeError extends Error {
   }
 }
 
+/**
+ * A failure raised by a client that is not the Anthropic SDK (the Claude Code
+ * adapter). `message` is written for the end user and is safe to show.
+ */
+export class VisionClientError extends Error {
+  constructor(
+    message: string,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = 'VisionClientError';
+  }
+}
+
 /** The Claude API accepts up to 10 MB of base64 per image, which is 7.5 MB decoded. */
 export const MAX_IMAGE_BYTES = 7_500_000;
 /** The API rejects images above this on either side. */
@@ -176,6 +190,9 @@ interface Failure {
 }
 
 function describeFailure(error: unknown): Failure {
+  if (error instanceof VisionClientError) {
+    return { retryable: error.retryable, message: error.message, detail: { kind: error.name } };
+  }
   if (!(error instanceof Anthropic.APIError)) {
     const kind = error instanceof Error ? error.name : typeof error;
     return { retryable: false, message: 'AI analysis failed.', detail: { kind } };

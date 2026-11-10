@@ -29,7 +29,8 @@ export default defineConfig({
     command: 'pnpm dev',
     cwd: '../..',
     url: `http://localhost:${WEB_PORT}`,
-    env: { INTERIO_WEB_PORT: String(WEB_PORT), INTERIO_API_PORT: String(API_PORT) },
+    // AI assist is off for the suite whatever the local .env says: tests answer the route themselves and never call a live model.
+    env: { INTERIO_WEB_PORT: String(WEB_PORT), INTERIO_API_PORT: String(API_PORT), INTERIO_AI_PROVIDER: 'off' },
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },

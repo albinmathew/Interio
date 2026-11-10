@@ -65,13 +65,14 @@ To run on other ports (for example, to run two checkouts side by side), set `INT
 
 The AI assist is optional. Without it, the import still reads walls, doors and windows from the PDF; room names and types are then guesses that you can rename in Plan mode. The review screen says which of the two happened.
 
-To enable it:
+There are two ways to enable it. For either, copy `.env.example` to `.env` in the repository root, edit it, and restart `pnpm dev`.
 
-1. Copy `.env.example` to `.env` in the repository root.
-2. Set `ANTHROPIC_API_KEY` to your Anthropic API key.
-3. Restart `pnpm dev`.
+| Way | Setting in `.env` | Notes |
+|---|---|---|
+| Anthropic API key | `ANTHROPIC_API_KEY=<your key>` | Works anywhere. Billed to the key. Default model `claude-fable-5-2`. |
+| Claude Code login on this computer | `INTERIO_AI_PROVIDER=claude-code` | No key. Needs [Claude Code](https://claude.com/claude-code) installed and signed in on the same machine. Each import is one small call that counts against your Claude plan's usage. Default model `claude-sonnet-5-5`. For local use only: a hosted deployment needs an API key. |
 
-With a key, a PNG of the page being imported is sent to the Anthropic API. Without a key, nothing leaves your computer. `ANTHROPIC_MODEL` and the tuning options are described in `.env.example`.
+With either enabled, a PNG of the page being imported is sent to Anthropic. With neither, nothing leaves your computer. `ANTHROPIC_MODEL` and the tuning options are described in `.env.example`.
 
 ## Commands
 

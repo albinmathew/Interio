@@ -49,18 +49,22 @@ describe('GET /api/health', () => {
   it('reports AI off and the default model without a key', async () => {
     const res = await createApp({ env: {} }).request('/api/health');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, ai: false, model: 'claude-fable-5-2' });
+    expect(await res.json()).toEqual({ ok: true, ai: false, model: 'claude-fable-5-2', provider: 'off' });
   });
 
   it('reports AI on and the configured model with a key', async () => {
     const env = { ANTHROPIC_API_KEY: 'test-key', ANTHROPIC_MODEL: 'claude-opus-5-5' };
     const res = await createApp({ env }).request('/api/health');
-    expect(await res.json()).toEqual({ ok: true, ai: true, model: 'claude-opus-5-5' });
+    expect(await res.json()).toEqual({ ok: true, ai: true, model: 'claude-opus-5-5', provider: 'api' });
   });
 
   it('is served by the default app', async () => {
     const res = await defaultApp.request('/api/health');
-    expect(await res.json()).toMatchObject({ ok: true, ai: Boolean(process.env.ANTHROPIC_API_KEY?.trim()) });
+    // The default app follows the machine it runs on: an API key, a Claude Code login, or neither.
+    const body = (await res.json()) as { ok: boolean; ai: boolean; provider: string };
+    expect(body.ok).toBe(true);
+    expect(body.ai).toBe(body.provider !== 'off');
+    expect(['api', 'claude-code', 'off']).toContain(body.provider);
   });
 });
 

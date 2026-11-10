@@ -1,6 +1,7 @@
 /**
  * Records a `VisionResult` for one plan image, through the same code path as
- * POST /api/analyze-plan. Used to capture fixtures once a key exists.
+ * POST /api/analyze-plan. Used to capture fixtures, through the API key or the
+ * Claude Code login, whichever the environment selects.
  *
  *   pnpm --filter @interio/server analyze <page.png|page.jpg> [out.json]
  *
@@ -10,7 +11,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { clientFromEnv, effortFromEnv, fallbacksFromEnv, modelFromEnv, type Env } from './config';
+import { effortFromEnv, fallbacksFromEnv, modelFromEnv, visionFromEnv, type Env } from './config';
 import { AnalyzeError, analyzePlan, type VisionClient, type VisionSettings } from './vision/analyze';
 
 export interface CliOptions extends Partial<Omit<VisionSettings, 'client'>> {
@@ -25,7 +26,9 @@ const USAGE = 'Usage: pnpm --filter @interio/server analyze <page.png|page.jpg> 
 
 /** Returns the process exit code. */
 export async function runCli(argv: string[], options: CliOptions = {}): Promise<number> {
-  const { env = process.env, client = clientFromEnv(env), print = console.error, cwd, ...overrides } = options;
+  const { env = process.env, client: given, print = console.error, cwd, ...overrides } = options;
+  const vision = given === undefined ? visionFromEnv(env) : { provider: 'api' as const, client: given };
+  const client = vision.client;
   // pnpm sets INIT_CWD to where the user ran the command; the script itself runs in apps/server.
   const base = cwd ?? env.INIT_CWD ?? process.cwd();
   const [input, output] = argv.filter((arg) => arg !== '--');
@@ -39,7 +42,7 @@ export async function runCli(argv: string[], options: CliOptions = {}): Promise<
     return 2;
   }
   if (!client) {
-    print('ANTHROPIC_API_KEY is not set (shell or repo-root .env), so there is nothing to call.');
+    print('No AI provider: set ANTHROPIC_API_KEY, or INTERIO_AI_PROVIDER=claude-code to use the Claude Code login (shell or repo-root .env).');
     return 1;
   }
 
@@ -61,7 +64,7 @@ export async function runCli(argv: string[], options: CliOptions = {}): Promise<
       {
         ...overrides,
         client,
-        model: overrides.model ?? modelFromEnv(env),
+        model: overrides.model ?? modelFromEnv(env, vision.provider),
         effort: overrides.effort ?? effortFromEnv(env),
         fallbacks: overrides.fallbacks ?? fallbacksFromEnv(env),
       },

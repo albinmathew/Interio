@@ -67,7 +67,7 @@ describe('analyze CLI', () => {
     expect(lines).toEqual([
       expect.stringContaining('Usage:'),
       expect.stringContaining('PDF input is not supported'),
-      expect.stringContaining('ANTHROPIC_API_KEY is not set'),
+      expect.stringContaining('No AI provider'),
       expect.stringContaining('Cannot read'),
       'Analysis failed: AI assist is misconfigured on the server: credentials were rejected.',
     ]);

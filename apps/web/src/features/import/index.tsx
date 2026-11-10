@@ -751,13 +751,14 @@ function AssistantStatus({ ai, busy, onRetry }: { ai: AiOutcome; busy: boolean; 
                 Copy <code className={code}>.env.example</code> to <code className={code}>.env</code> in the Interio folder.
               </li>
               <li>
-                Set <code className={code}>ANTHROPIC_API_KEY</code> in that file to your Anthropic API key.
+                In that file, either set <code className={code}>ANTHROPIC_API_KEY</code> to your Anthropic API key, or set{' '}
+                <code className={code}>INTERIO_AI_PROVIDER=claude-code</code> to use the Claude Code login on this computer (no key; it counts against your Claude plan).
               </li>
               <li>
                 Restart <code className={code}>pnpm dev</code> and upload the plan again.
               </li>
             </ol>
-            <p className="mt-1.5 text-xs">With a key, a picture of the page is sent to Anthropic to read room names, labelled sizes and door tags. Without one, nothing leaves your computer.</p>
+            <p className="mt-1.5 text-xs">With the assistant on, a picture of the page is sent to Anthropic to read room names, labelled sizes and door tags. With it off, nothing leaves your computer.</p>
           </details>
         </div>
       ) : (
