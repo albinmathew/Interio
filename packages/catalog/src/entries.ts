@@ -140,13 +140,13 @@ export const ENTRIES: CatalogEntry[] = [
   gen('dresser', 'Chest of drawers', 'storage', ['bedroom'], 'cabinet', [1200, 450, 820], ['dresser', 'drawers', 'commode'], {
     params: { rows: [drawers(2), drawers(2), drawers(2)], legs: 110 },
   }),
-  gen('dresser.tall', 'Tallboy', 'storage', ['bedroom', 'study'], 'cabinet', [600, 450, 1150], ['dresser', 'drawers', 'chest'], {
+  gen('dresser.tall', 'Tallboy', 'storage', ['bedroom', 'study', 'storage'], 'cabinet', [600, 450, 1150], ['dresser', 'drawers', 'chest'], {
     params: { rows: [drawers(1), drawers(1), drawers(1), drawers(1), drawers(1)], legs: 80 },
   }),
   glb('tv.unit', 'TV unit', 'storage', ['living', 'bedroom'], 'tv-unit', ['tv stand', 'media console', 'entertainment unit']),
   glb('tv.unit.doors', 'TV unit with doors', 'storage', ['living', 'bedroom'], 'tv-unit-doors', ['tv stand', 'media console', 'entertainment unit']),
   glb('bookcase.open', 'Open bookcase', 'storage', ['living', 'study', 'bedroom'], 'bookcase-open', ['shelf', 'shelving', 'bookshelf', 'etagere']),
-  glb('bookcase.closed', 'Bookcase', 'storage', ['living', 'study', 'bedroom'], 'bookcase-closed', ['shelf', 'shelving', 'bookshelf']),
+  glb('bookcase.closed', 'Bookcase', 'storage', ['living', 'study', 'bedroom', 'storage'], 'bookcase-closed', ['shelf', 'shelving', 'bookshelf']),
   glb('bookcase.wide', 'Wide bookcase', 'storage', ['living', 'study'], 'bookcase-wide', ['shelf', 'shelving', 'bookshelf', 'display']),
   glb('bookcase.low', 'Low open shelf', 'storage', ['living', 'study', 'bedroom', 'foyer'], 'bookcase-low', ['shelf', 'shelving', 'shoe rack']),
   gen('sideboard', 'Sideboard', 'storage', ['dining', 'living'], 'cabinet', [1600, 450, 780], ['buffet', 'credenza', 'crockery unit'], {

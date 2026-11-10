@@ -130,15 +130,18 @@ export function buildFlushLight(entry: CatalogEntry): Built {
 
 /** Pendant: ceiling rose, cord and a metal shade with a lit diffuser. `params.shade`: palette key. */
 export function buildPendant(entry: CatalogEntry): Built {
-  const { W, H } = size(entry);
+  const { W, D, H } = size(entry);
   const b = new Builder();
   const R = W / 2;
+  const squash = D / W;
   const shadeH = Math.min(H * 0.38, R * 1.25);
+  const disc = (key: PaletteKey, rTop: number, rBottom: number, h: number, y: number) =>
+    b.add(key, new THREE.CylinderGeometry(rTop, rBottom, h, 32).scale(1, 1, squash).translate(0, y + h / 2, 0));
   b.cyl('blackMetal', 0.05, 0.05, 0.02, 0, H - 0.02, 0, 'y', 20);
   b.cyl('blackMetal', 0.004, 0.004, H - 0.02 - shadeH, 0, shadeH, 0, 'y', 8);
-  b.cyl(param<PaletteKey>(entry, 'shade', 'blackMetal'), R * 0.22, R, shadeH - 0.004, 0, 0.004, 0, 'y', 32);
-  b.cyl('glow', R * 0.93, R * 0.93, 0.004, 0, 0, 0, 'y', 32);
-  b.cyl('brushed', R * 0.24, R * 0.24, 0.03, 0, shadeH - 0.004, 0, 'y', 16);
+  disc(param<PaletteKey>(entry, 'shade', 'blackMetal'), R * 0.22, R, shadeH - 0.004, 0.004);
+  disc('glow', R * 0.93, R * 0.93, 0.004, 0);
+  disc('brushed', R * 0.24, R * 0.24, 0.03, shadeH - 0.004);
   return b.build(`pendant:${entry.id}`);
 }
 
