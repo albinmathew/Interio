@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+coverage/
+playwright-report/
+test-results/
+# Third-party drawings used as local test fixtures. Never commit.
+fixtures/local/*
+!fixtures/local/README.md
+*.pdf
+.claude/
