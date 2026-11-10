@@ -1,33 +1,27 @@
 /**
  * Interio API. One job: AI assist for plan import.
  *
- *   GET  /api/health        -> { ok, ai }
+ *   GET  /api/health        -> { ok, ai, model }
  *   POST /api/analyze-plan  -> AnalyzePlanResponse (see @interio/core)
  *
- * Phase 0 ships the route with the no-key behaviour. The vision workstream
- * implements the Claude call.
+ * Routes live in `app.ts`; `createApp({ client })` takes an injected Anthropic
+ * client, and `app` below is the default instance wired from the environment.
  */
 import { serve } from '@hono/node-server';
-import type { AnalyzePlanResponse } from '@interio/core';
-import { Hono } from 'hono';
+import { createApp } from './app';
+import { clientFromEnv } from './config';
 
-export const app = new Hono();
+export { createApp, type AppOptions } from './app';
+export type { VisionClient, VisionMessage } from './vision/analyze';
 
-const hasKey = () => Boolean(process.env.ANTHROPIC_API_KEY);
+const client = clientFromEnv();
 
-app.get('/api/health', (c) => c.json({ ok: true, ai: hasKey() }));
-
-app.post('/api/analyze-plan', (c) => {
-  const body: AnalyzePlanResponse = hasKey()
-    ? { available: false, error: 'AI assist is not implemented yet' }
-    : { available: false };
-  return c.json(body);
-});
+export const app = createApp({ client });
 
 const port = Number(process.env.INTERIO_API_PORT ?? 8787);
 
 if (process.env.VITEST !== 'true') {
   serve({ fetch: app.fetch, port }, () => {
-    console.log(`Interio API on http://localhost:${port} (AI assist ${hasKey() ? 'on' : 'off: no ANTHROPIC_API_KEY'})`);
+    console.log(`Interio API on http://localhost:${port} (AI assist ${client ? 'on' : 'off: no ANTHROPIC_API_KEY'})`);
   });
 }
