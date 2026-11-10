@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { getEntry } from '../../packages/catalog/src';
 import { makeBoxGlb } from '../../packages/scene3d/test/glb';
 import { expectCanvasRendered, expectSaved, openSample } from './helpers';
 
@@ -36,6 +37,10 @@ interface Hook {
 
 type Dev = { __interio: Hook };
 
+// Expected positions follow the catalog's dimensions, so the spec survives catalog edits.
+const SOFA = getEntry('sofa.3seat')!;
+const AC = getEntry('ac.split')!;
+
 async function ready(page: Page): Promise<void> {
   await page.waitForFunction(() => (window as unknown as { __interio?: { ready: boolean } }).__interio?.ready === true);
   await expectCanvasRendered(page.locator('canvas'));
@@ -58,10 +63,12 @@ async function clickPlan(page: Page, x: number, y: number, z = 0): Promise<void>
   await page.mouse.click(p.x, p.y);
 }
 
-async function pickEntry(page: Page, name: string): Promise<void> {
-  const card = page.getByTestId('catalog-entry').filter({ hasText: name });
-  await card.click();
-  await expect(card).toHaveAttribute('aria-pressed', 'true');
+const card = (page: Page, id: string) => page.locator(`[data-testid="catalog-entry"][data-entry-id="${id}"]`);
+
+/** Arms placement of a catalog entry by clicking its card. */
+async function pickEntry(page: Page, id: string): Promise<void> {
+  await card(page, id).click();
+  await expect(card(page, id)).toHaveAttribute('aria-pressed', 'true');
 }
 
 /** The project's items as stored in IndexedDB. */
@@ -93,21 +100,26 @@ test('place from the catalog with wall snapping, move, rotate, delete, undo, and
   const living = await roomId(page, 'Living / Dining');
 
   // Catalog: search narrows the list, and the card arms placement.
-  await page.getByLabel('Search the catalog').fill('sofa');
-  await expect(page.getByTestId('catalog-entry')).toHaveCount(1);
-  await pickEntry(page, 'Three-seat sofa');
-  await expect(page.getByTestId('viewer-hint')).toContainText('Click the floor to place Three-seat sofa');
+  const all = await page.getByTestId('catalog-entry').count();
+  await page.getByLabel('Search the catalog').fill('three-seat');
+  await expect(card(page, 'sofa.3seat')).toBeVisible();
+  await expect(card(page, 'bed.double')).toHaveCount(0);
+  expect(await page.getByTestId('catalog-entry').count()).toBeLessThan(all);
+  await expect(card(page, 'sofa.3seat')).toContainText(SOFA.name);
+  await pickEntry(page, 'sofa.3seat');
+  await expect(page.getByTestId('viewer-hint')).toContainText(`Click the floor to place ${SOFA.name}`);
 
   // Place near the living room's west wall (face at x = 3060) in the south-west corner:
   // the back snaps to the wall, the sofa turns to face the room and slides clear of the corner.
   await clickPlan(page, 3400, 800);
   await expect(count(page)).toHaveAttribute('data-count', '1');
-  await expect(page.getByTestId('item-name')).toHaveText('Three-seat sofa');
-  await expect(page.getByTestId('item-dims')).toHaveText('2200 × 900 × 800 mm');
+  await expect(page.getByTestId('item-name')).toHaveText(SOFA.name);
+  await expect(page.getByTestId('item-dims')).toHaveText(`${SOFA.dims.w} × ${SOFA.dims.d} × ${SOFA.dims.h} mm`);
   await expect(page.getByTestId('item-panel')).toContainText('Living / Dining');
   await expect(page.getByTestId('item-rotation')).toHaveValue('90');
   let [sofa] = await items(page);
-  expect(sofa).toMatchObject({ catalogId: 'sofa.3seat', x: 3510, y: 1200, z: 0, rotationDeg: 90, roomId: living });
+  // West face at x = 3060, south face at y = 100.
+  expect(sofa).toMatchObject({ catalogId: 'sofa.3seat', x: 3060 + SOFA.dims.d / 2, y: 100 + SOFA.dims.w / 2, z: 0, rotationDeg: 90, roomId: living });
   expect(await undoSteps(page)).toBe(1);
   await expect(page.getByTestId('viewer-hint')).toContainText('Drag to move');
 
@@ -156,7 +168,7 @@ test('place from the catalog with wall snapping, move, rotate, delete, undo, and
   // Select the sofa again by clicking it, delete it with the panel button, then undo.
   const now = (await items(page))[0]!;
   await clickPlan(page, now.x, now.y, 400);
-  await expect(page.getByTestId('item-name')).toHaveText('Three-seat sofa');
+  await expect(page.getByTestId('item-name')).toHaveText(SOFA.name);
   await page.getByTestId('item-remove').click();
   await expect(count(page)).toHaveAttribute('data-count', '0');
   expect(await items(page)).toHaveLength(0);
@@ -182,14 +194,14 @@ test('wall-anchored entries, room selection, the room filter and the top view', 
   await ready(page);
 
   // A wall-anchored entry attaches to the nearest wall of the room at its mount height.
-  // Bedroom 1's north wall face is at y = 8900; the unit is 220 deep.
+  // Bedroom 1's north wall face is at y = 8900.
   await page.getByRole('tab', { name: 'Appliances' }).click();
-  await pickEntry(page, 'Split air conditioner');
+  await pickEntry(page, 'ac.split');
   await clickPlan(page, 1900, 8300);
   await expect(count(page)).toHaveAttribute('data-count', '1');
   const [ac] = await items(page);
-  expect(ac).toMatchObject({ catalogId: 'ac.split', x: 1900, y: 8790, z: 2300, rotationDeg: 0, roomId: await roomId(page, 'Bedroom 1') });
-  await expect(page.getByTestId('item-elevation')).toHaveValue('2300');
+  expect(ac).toMatchObject({ catalogId: 'ac.split', x: 1900, y: 8900 - AC.dims.d / 2, z: AC.mountHeight, rotationDeg: 0, roomId: await roomId(page, 'Bedroom 1') });
+  await expect(page.getByTestId('item-elevation')).toHaveValue(String(AC.mountHeight));
 
   // Esc deselects; clicking a floor selects its room (the hook for a finishes panel).
   await page.keyboard.press('Escape');
@@ -203,16 +215,16 @@ test('wall-anchored entries, room selection, the room filter and the top view', 
   const filter = page.getByTestId('catalog-room-filter');
   await expect(page.getByText('Suggested for Kitchen')).toBeVisible();
   await filter.check();
-  await expect(page.getByTestId('catalog-entry').filter({ hasText: 'Double-door refrigerator' })).toHaveCount(1);
-  await expect(page.getByTestId('catalog-entry').filter({ hasText: 'Double bed' })).toHaveCount(0);
+  await expect(card(page, 'fridge.double')).toHaveCount(1);
+  await expect(card(page, 'bed.double')).toHaveCount(0);
   await filter.uncheck();
-  await expect(page.getByTestId('catalog-entry').filter({ hasText: 'Double bed' })).toHaveCount(1);
+  await expect(card(page, 'bed.double')).toHaveCount(1);
 
   // Top view and back: the scene keeps drawing, and placing works looking straight down.
   await page.getByRole('tab', { name: 'Top' }).click();
   await page.waitForTimeout(700);
   await expectCanvasRendered(page.locator('canvas'));
-  await pickEntry(page, 'Coffee table');
+  await pickEntry(page, 'table.coffee');
   await clickPlan(page, 6500, 2100);
   await expect(count(page)).toHaveAttribute('data-count', '2');
   const table = (await items(page)).find((i) => i.catalogId === 'table.coffee')!;

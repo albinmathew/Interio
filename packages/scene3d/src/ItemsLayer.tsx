@@ -116,7 +116,8 @@ function GlbInstance({ scene, entry, yawDeg, appearance }: Omit<GlbProps, 'url'>
       mesh.castShadow = true;
       mesh.receiveShadow = true;
     });
-    const box = new THREE.Box3().setFromObject(instance);
+    // Exact bounds from the vertices: a model that is already baked to `dims` must come out untouched.
+    const box = new THREE.Box3().setFromObject(instance, true);
     const bounds = { min: box.min.toArray(), max: box.max.toArray() };
     return { object: instance, fit: fitModel(bounds, { w, d, h }, yawDeg) };
   }, [scene, w, d, h, yawDeg]);

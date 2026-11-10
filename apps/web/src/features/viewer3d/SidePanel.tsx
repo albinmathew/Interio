@@ -1,9 +1,9 @@
 import { entriesFor } from '@interio/catalog';
 import { MATERIALS, planStore, selectRooms, usePlanStore, type Item, type Level, type Room } from '@interio/core';
-import { Copy, RotateCcw, RotateCw, Trash2, X } from 'lucide-react';
+import { Copy, RotateCcw, RotateCw, Sparkles, Trash2, X } from 'lucide-react';
 import { dims, squareMetres } from '../../lib/format';
-import { Badge, Button, Field, IconButton, NumberInput, Panel, PanelHeader, Select, cn } from '../../ui';
-import { duplicateSelection, removeSelection, replaceEntry, rotateSelection, setElevation, setRotation } from './actions';
+import { Badge, Button, Field, IconButton, NumberInput, Panel, PanelHeader, Select, cn, toast } from '../../ui';
+import { autoFurnishRoom, clearRoom, duplicateSelection, removeSelection, replaceEntry, rotateSelection, setElevation, setRotation } from './actions';
 import type { Overlap } from './placement';
 import { entryOrPlaceholder } from './state';
 
@@ -113,6 +113,27 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
         {row('Walls', MATERIALS[room.wallMaterial ?? '']?.name ?? 'Warm white')}
         {row('Furniture', count === 1 ? '1 item' : `${count} items`)}
       </dl>
+      <div className="flex flex-col gap-2 border-t border-line p-3">
+        <Button
+          variant="primary"
+          size="sm"
+          icon={<Sparkles className="h-4 w-4" />}
+          data-testid="room-autofurnish"
+          title="Adds a suggested layout for this kind of room. Undo removes it in one step."
+          onClick={() => {
+            const added = autoFurnishRoom(room.id);
+            if (added === 0) toast.info(count > 0 ? 'No space left for more furniture here' : 'Nothing to suggest for this room');
+            else toast.success(added === 1 ? 'Added 1 item' : `Added ${added} items`);
+          }}
+        >
+          Auto-furnish room
+        </Button>
+        {count > 0 && (
+          <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} data-testid="room-clear" onClick={() => clearRoom(room.id)}>
+            Clear this room
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

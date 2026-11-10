@@ -1,9 +1,10 @@
 /**
  * Edits the Design view makes to the plan. Each function is one undo step.
  */
+import { autoFurnish } from '@interio/catalog';
 import { planStore, selectLevel, selectRooms, type Id, type Item, type Level } from '@interio/core';
 import { findOverlaps, itemAxes, normalizeDeg, placeEntry, rotateStep, roomIdAt, type Placement, type Pose } from './placement';
-import { entryOrPlaceholder, useViewer } from './state';
+import { entryOrPlaceholder, resolveEntry, useViewer } from './state';
 
 function current(): { level: Level; item: Item } | null {
   const state = planStore.getState();
@@ -124,4 +125,28 @@ export function nudgeSelection(dx: number, dy: number): void {
   // Wall-anchored items slide along their wall and keep facing the room.
   const rotationDeg = entry.anchor === 'wall' ? at.rotationDeg : item.rotationDeg;
   planStore.getState().updateItem(item.id, { x: at.x, y: at.y, rotationDeg, roomId: roomIdAt(rooms, at) ?? at.roomId });
+}
+
+/** Adds the catalog's suggested layout for a room as one undo step. Returns how many items were added. */
+export function autoFurnishRoom(roomId: Id): number {
+  const level = selectLevel(planStore.getState());
+  if (!level) return 0;
+  const items = autoFurnish(level, roomId).filter((item) => resolveEntry(item.catalogId));
+  if (items.length === 0) return 0;
+  const store = planStore.getState();
+  store.transact(() => {
+    for (const item of items) store.addItem({ ...item, roomId: item.roomId ?? roomId });
+  });
+  return items.length;
+}
+
+/** Removes every item in a room as one undo step. Returns how many were removed. */
+export function clearRoom(roomId: Id): number {
+  const level = selectLevel(planStore.getState());
+  const ids = level ? Object.values(level.items).filter((i) => i.roomId === roomId).map((i) => i.id) : [];
+  if (ids.length === 0) return 0;
+  planStore.getState().mutateLevel((l) => {
+    for (const id of ids) delete l.items[id];
+  });
+  return ids.length;
 }
