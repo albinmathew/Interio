@@ -37,6 +37,9 @@ The screenshots show the built-in sample home. The step-by-step guide is in [doc
 - Catalog of furniture and appliances with search and categories; click or drag to place, with wall snapping.
 - Move, turn, duplicate, swap and remove items; overlap warnings.
 - Auto-furnish one room, or the whole home in one step.
+- Finishes per room (floor, wall, ceiling), three lighting presets, and a high-resolution picture of the view.
+- **Assistant**: ask for changes in plain language ("add a sink to the utility", "make the service room a laundry room", "swap the sofa for a corner sofa"). It can change furniture, room names and types, finishes and lighting; each answer is one undo step. Needs AI assist switched on.
+- **Variants**: save the current look (furniture, room looks, lighting) under a name, keep several, and switch between them. The first automatic layout is saved for you.
 
 **Walk**
 - First-person walkthrough with collisions, keyboard, mouse and touch controls, minimap and room list.

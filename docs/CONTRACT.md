@@ -67,6 +67,13 @@ No three.js, runs in Node.
 
 Features render inside a full-size container and read the store themselves. Use the UI kit in `apps/web/src/ui` and the colour tokens in `index.css`.
 
+## Design requests and variants
+
+- `packages/core/src/design.ts`: `DesignOp` (set_room, refurnish_room, clear_room, add_item, remove_item, replace_item, set_lighting) and the request and response of `POST /api/design-edit`. The request carries a summary of the home, the catalog, the finishes and the lighting presets; the server answers with a reply and operations checked against that request. Walls, doors and windows are never changed this way.
+- `apps/web/src/lib/design.ts`: `runDesignRequest` builds the request, calls the route and applies the answer with `applyDesignOps` as one undo step, reporting each operation as done or not done.
+- `@interio/catalog` `placeEntry(level, roomId, catalogId, opts)`: a free spot for one entry in a furnished room; the assistant never gives coordinates.
+- `Project.variants`: saved looks (`items`, per-room name/type/finishes, `settings`, small thumbnail). Store actions `saveVariant`, `applyVariant`, `updateVariant`, `renameVariant`, `deleteVariant`. The variant list is outside undo history; applying a variant is one undo step. Variants share the project's walls.
+
 ## Storage
 
 `lib/storage.ts` (IndexedDB): projects as JSON, assets under `<projectId>/<name>` (`pdf`, `underlay`). `lib/session.ts`: `openProject`, `createFromDraft`, `startAutosave`, `loadUnderlay`, export/import. Exported projects are a single gzipped `.interio` file that carries the project JSON, the underlay and the source PDF; plain project JSON from earlier versions still opens. `lib/useUnderlay.ts` gives the source-drawing underlay to the editor.
