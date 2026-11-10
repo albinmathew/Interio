@@ -1,4 +1,4 @@
-import type { CatalogEntry, Level } from '@interio/core';
+import type { CatalogEntry, Id, Level } from '@interio/core';
 import { ItemsLayer } from './ItemsLayer';
 import { LevelMeshes } from './LevelMeshes';
 
@@ -9,6 +9,8 @@ export interface PlanSceneProps {
   showCeilings?: boolean;
   /** Hinged doors stand open and sliding doors are parked. Default true. */
   doorsOpen?: boolean;
+  /** Openings that stay shut while the others stand open, e.g. the front door when walking. */
+  closedDoors?: readonly Id[];
   /** Fade walls between the camera and a room (dollhouse view). Default false. */
   cutaway?: boolean;
 }
@@ -17,10 +19,10 @@ export interface PlanSceneProps {
  * The furnished level: walls, floors, ceilings, joinery and items. No lights: pair it
  * with <SceneLighting>. Shared by the 3D view and the walkthrough.
  */
-export function PlanScene({ level, resolveEntry, showCeilings, doorsOpen, cutaway }: PlanSceneProps) {
+export function PlanScene({ level, resolveEntry, showCeilings, doorsOpen, closedDoors, cutaway }: PlanSceneProps) {
   return (
     <>
-      <LevelMeshes level={level} showCeilings={showCeilings} doorsOpen={doorsOpen} cutaway={cutaway} />
+      <LevelMeshes level={level} showCeilings={showCeilings} doorsOpen={doorsOpen} closedDoors={closedDoors} cutaway={cutaway} />
       <ItemsLayer level={level} resolveEntry={resolveEntry} />
     </>
   );

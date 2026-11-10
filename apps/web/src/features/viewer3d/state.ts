@@ -3,11 +3,15 @@
  * plan store; nothing here is persisted.
  */
 import { getEntry } from '@interio/catalog';
-import type { CatalogCategory, CatalogEntry, Id } from '@interio/core';
+import { usePlanStore, type CatalogCategory, type CatalogEntry, type Id } from '@interio/core';
+import { lightingFromSettings, type LightingPreset } from '@interio/scene3d';
 import { create } from 'zustand';
 import { normalizeDeg, type Placement } from './placement';
 
 export type ViewMode = 'orbit' | 'top';
+
+/** Sections of the room panel. */
+export type RoomTab = 'furnish' | 'finishes';
 
 export interface Placing {
   catalogId: string;
@@ -42,6 +46,8 @@ export interface ViewerState {
   roomOnly: boolean;
   /** Rendering quality: `low` drops ambient occlusion and the high pixel ratio when frames get slow. */
   quality: 'high' | 'low';
+  /** Section of the room panel that is open; kept while moving from room to room. */
+  roomTab: RoomTab;
 
   setView(view: ViewMode): void;
   toggleCutaway(): void;
@@ -56,6 +62,7 @@ export interface ViewerState {
   setCategory(category: CatalogCategory | 'all'): void;
   setRoomOnly(roomOnly: boolean): void;
   setQuality(quality: 'high' | 'low'): void;
+  setRoomTab(roomTab: RoomTab): void;
 }
 
 export const useViewer = create<ViewerState>((set) => ({
@@ -70,6 +77,7 @@ export const useViewer = create<ViewerState>((set) => ({
   category: 'all',
   roomOnly: false,
   quality: 'high',
+  roomTab: 'furnish',
 
   setView: (view) => set({ view }),
   toggleCutaway: () => set((s) => ({ cutaway: !s.cutaway })),
@@ -85,7 +93,13 @@ export const useViewer = create<ViewerState>((set) => ({
   setCategory: (category) => set({ category }),
   setRoomOnly: (roomOnly) => set({ roomOnly }),
   setQuality: (quality) => set({ quality }),
+  setRoomTab: (roomTab) => set({ roomTab }),
 }));
+
+/** The lighting preset saved with the open project (`project.settings`), daylight by default. */
+export function useLightingPreset(): LightingPreset {
+  return usePlanStore((s) => lightingFromSettings(s.project?.settings));
+}
 
 /** Camera facts the keyboard needs, updated by the camera rig without re-rendering anything. */
 export const cameraState: { heading: () => number } = {

@@ -5,8 +5,9 @@ Lighting and surface assets used by `packages/scene3d`. Everything here is **CC0
 shipped file can be traced to its source.
 
 - Files live under `apps/web/public/textures/<set>/` and `apps/web/public/env/`.
-- 37 files, 9.1 MB in total (36 texture maps, 7.9 MB; one HDRI, 1.2 MB).
-- `packages/scene3d/scripts/fetch-textures.sh` downloads and recompresses the whole set again.
+- 49 files, 9.2 MB in total (36 texture maps, 7.9 MB; 12 palette swatches, 84 KB; one HDRI, 1.2 MB).
+- `packages/scene3d/scripts/fetch-textures.sh` downloads and recompresses the whole set again,
+  then runs `make-swatches.sh`.
 - Which finish id uses which set is in `packages/scene3d/src/materialSpecs.ts`.
 
 ## Processing
@@ -17,6 +18,12 @@ quality 82, roughness map quality 70. The carpet normal map is reduced to 512 x 
 Files are renamed to `color.jpg`, `normal.jpg`, `rough.jpg`. No other edits. The HDRI is
 the unmodified 1k `.hdr`.
 
+`swatch.jpg` is cut from each set's own `color.jpg` by `packages/scene3d/scripts/make-swatches.sh`:
+the central 384 x 384 pixels scaled to 96 x 96, JPEG quality 78. The finishes panel of the
+Design view shows it, tinted towards the finish colour exactly as the 3D view tints the
+texture (`tintToward`), so a swatch matches the surface it stands for. Same source and
+licence as the set it is cut from.
+
 ## Environment map
 
 | Asset | File | Source | Licence |
@@ -25,7 +32,7 @@ the unmodified 1k `.hdr`.
 
 ## Texture sets
 
-Each set is three files: `color.jpg`, `normal.jpg`, `rough.jpg`.
+Each set is four files: `color.jpg`, `normal.jpg`, `rough.jpg` and the derived `swatch.jpg`.
 
 | Set (folder) | Asset | Source | Licence | Used by finishes |
 |---|---|---|---|---|
@@ -45,10 +52,23 @@ Each set is three files: `color.jpg`, `normal.jpg`, `rough.jpg`.
 Paint finishes (`wall.paint.*`) and `ceiling.white` are flat colours and use no texture.
 A finish whose texture cannot be loaded falls back to its flat colour from core's `MATERIALS`.
 
+## Lighting presets
+
+No extra assets: the three presets (`daylight`, `evening`, `night`, see
+`packages/scene3d/src/lighting.ts`) reuse the one HDRI at different strengths and differ
+only in light colours, the sun's direction and the lamps inside the rooms. A project
+stores its preset in `project.settings['viewer3d.lighting']`; `SceneLighting` takes it as
+the `preset` prop in both the Design and the Walk view.
+
+In the evening and night presets every room has a ceiling light, and lamps placed from
+the catalog (category `lighting`) light their rooms: a ceiling lamp or pendant replaces
+the room's default light, floor, table and wall lamps add local pools. At most 12 point
+lights are lit at once (`MAX_INTERIOR_LIGHTS`); each room keeps its main light first.
+
 ## Adding or replacing a set
 
 1. Pick a CC0 material from Poly Haven or ambientCG and add it to `fetch-textures.sh`.
-2. Run the script; it writes the three maps under `apps/web/public/textures/<set>/`.
+2. Run the script; it writes the three maps and the swatch under `apps/web/public/textures/<set>/`.
 3. Point finish ids at the set in `materialSpecs.ts` (`size` is metres per repeat; `avg` is
    the average colour of `color.jpg`, used to tint the texture towards the finish colour).
 4. Add a row to the table above.

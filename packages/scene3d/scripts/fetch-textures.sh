@@ -49,4 +49,7 @@ ambientcg Carpet016 carpet 512
 mkdir -p "$DEST/env"
 curl -sS -f -A "$UA" "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_overcast_puresky_1k.hdr" -o "$DEST/env/kloofendal_overcast_puresky_1k.hdr"
 
+# Palette swatches, cut from the colour maps.
+bash "$(dirname "$0")/make-swatches.sh"
+
 du -sh "$DEST/textures" "$DEST/env"

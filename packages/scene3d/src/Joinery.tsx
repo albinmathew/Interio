@@ -2,7 +2,7 @@
  * Doors, windows, railings and skirting boards. Visual only: none of these meshes carry
  * `userData.group`, so pointer tools and collision code can ignore them.
  */
-import { openingFrame, selectRooms, type Level, type LevelMesh, type Opening, type Wall } from '@interio/core';
+import { openingFrame, selectRooms, type Id, type Level, type LevelMesh, type Opening, type Wall } from '@interio/core';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { mergeBoxes } from './boxes';
@@ -126,15 +126,17 @@ export interface OpeningsLayerProps {
   level: Level;
   /** Hinged doors stand open (about 80 degrees) and sliding doors are parked. Default true. */
   doorsOpen?: boolean;
+  /** Openings that stay shut while the others stand open (the front door when walking). */
+  closedDoors?: readonly Id[];
   fade?: WallFadeController;
 }
 
 /** Door frames and leaves, sliding doors and windows for every opening of the level. */
-export function OpeningsLayer({ level, doorsOpen = true, fade }: OpeningsLayerProps) {
+export function OpeningsLayer({ level, doorsOpen = true, closedDoors, fade }: OpeningsLayerProps) {
   return (
     <group name="openings">
       {Object.values(level.openings).map((o) => (
-        <OpeningObject key={o.id} level={level} opening={o} doorsOpen={doorsOpen} fade={fade} />
+        <OpeningObject key={o.id} level={level} opening={o} doorsOpen={doorsOpen && !closedDoors?.includes(o.id)} fade={fade} />
       ))}
     </group>
   );

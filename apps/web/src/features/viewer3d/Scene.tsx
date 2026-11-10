@@ -3,15 +3,16 @@
  * their selection and warning states, the placement ghost, and the camera.
  */
 import { planStore, selectLevelMesh, usePlanStore, type Item, type Level } from '@interio/core';
-import { ItemObject, LevelMeshes, SceneLighting, type ItemAppearance } from '@interio/scene3d';
+import { ItemObject, LevelMeshes, SceneLighting, lightingRig, type ItemAppearance } from '@interio/scene3d';
 import { Line, OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react';
 import * as THREE from 'three';
+import { captureBridge, capturePng } from './capture';
 import { Effects, HELPER_LAYER } from './Effects';
 import { clampTarget, fitOrbit, fitTop, freeView, type Box, type CameraPose } from './camera';
 import { findOverlaps, itemSize, type Overlap } from './placement';
-import { cameraState, entryOrPlaceholder, registerEntry, useViewer, type ViewMode } from './state';
+import { cameraState, entryOrPlaceholder, registerEntry, resolveEntry, useLightingPreset, useViewer, type ViewMode } from './state';
 import { HANDLE_RADIUS, handlePosition, usePointerTool } from './tool';
 
 const ACCENT = '#0f766e';
@@ -32,6 +33,8 @@ export function useOverlaps(level: Level, items: Record<string, Item>): Map<stri
   const { walls, vertices, openings } = level;
   return useMemo(() => findOverlaps({ items, walls, vertices, openings }, entryOrPlaceholder), [items, walls, vertices, openings]);
 }
+
+const GHOST_NAME = 'placement-ghost';
 
 const WARNING: ItemAppearance = { emissive: WARN, emissiveIntensity: 0.55 };
 
@@ -123,11 +126,26 @@ function Ghost({ level }: { level: Level }) {
   const appearance = useMemo<ItemAppearance>(() => ({ opacity: 0.62, emissive: blocked ? WARN : ACCENT, emissiveIntensity: blocked ? 0.6 : 0.25 }), [blocked]);
   if (!item) return null;
   return (
-    <>
+    <group name={GHOST_NAME}>
       <ItemObject item={item} entry={entryOrPlaceholder(item.catalogId)} appearance={appearance} />
       <Outline item={item} color={blocked ? WARN : ACCENT} handle={false} />
-    </>
+    </group>
   );
+}
+
+/** Lets the toolbar take a picture of the view: no outlines, handles or placement ghost. */
+function CaptureBridge() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  useEffect(() => {
+    const capture = (scale = 2) => capturePng(gl, scene, camera, { scale, hideLayers: [HELPER_LAYER], hideObjects: [GHOST_NAME] });
+    captureBridge.capture = capture;
+    return () => {
+      if (captureBridge.capture === capture) captureBridge.capture = null;
+    };
+  }, [gl, scene, camera]);
+  return null;
 }
 
 /** A soft shadow catcher around the home, so the outer walls sit on something. */
@@ -337,6 +355,7 @@ export function Scene({ level }: { level: Level }) {
   usePointerTool();
   const view = useViewer((s) => s.view);
   const cutaway = useViewer((s) => s.cutaway);
+  const lighting = useLightingPreset();
   const items = useLiveItems(level);
   const overlaps = useOverlaps(level, items);
   const bounds = selectLevelMesh(level).bounds;
@@ -345,8 +364,8 @@ export function Scene({ level }: { level: Level }) {
   const box = useMemo<Box>(() => ({ min: [x0, 0, z0], max: [x1, y1, z1] }), [x0, z0, x1, y1, z1]);
   return (
     <>
-      <color attach="background" args={['#f4f2ee']} />
-      <SceneLighting level={level} mode="dollhouse" />
+      <color attach="background" args={[lightingRig(lighting, 'dollhouse').background]} />
+      <SceneLighting level={level} mode="dollhouse" preset={lighting} resolveEntry={resolveEntry} />
       <LevelMeshes level={level} cutaway={cutaway && view === 'orbit'} />
       <Ground box={box} />
       <Items items={items} overlaps={overlaps} />
@@ -354,6 +373,7 @@ export function Scene({ level }: { level: Level }) {
       <Selection items={items} overlaps={overlaps} />
       <CameraRig box={box} />
       <Effects box={box} />
+      <CaptureBridge />
       <DebugHook />
     </>
   );

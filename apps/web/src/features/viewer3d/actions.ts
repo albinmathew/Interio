@@ -3,6 +3,7 @@
  */
 import { autoFurnish } from '@interio/catalog';
 import { planStore, selectLevel, selectRooms, type Id, type Item, type Level } from '@interio/core';
+import { applyFinishes, currentFinish, finishPatch, resetPatch, type ApplyScope, type Surface } from './finishes';
 import { findOverlaps, itemAxes, normalizeDeg, placeEntry, rotateStep, roomIdAt, type Placement, type Pose } from './placement';
 import { entryOrPlaceholder, resolveEntry, useViewer } from './state';
 
@@ -149,4 +150,30 @@ export function clearRoom(roomId: Id): number {
     for (const id of ids) delete l.items[id];
   });
   return ids.length;
+}
+
+/** Gives one surface of a room a finish. One undo step; picking the current finish again does nothing. */
+export function setFinish(roomId: Id, surface: Surface, finishId: string): void {
+  const room = selectLevel(planStore.getState())?.rooms[roomId];
+  if (!room || currentFinish(room, surface) === finishId) return;
+  planStore.getState().setRoomProps(roomId, finishPatch(surface, finishId));
+}
+
+/** Copies a room's finishes to every room, or to the rooms of its type, as one undo step. Returns how many rooms changed. */
+export function applyFinishesFrom(roomId: Id, scope: ApplyScope): number {
+  const level = selectLevel(planStore.getState());
+  if (!level) return 0;
+  const patches = Object.entries(applyFinishes(level.rooms, roomId, scope));
+  if (patches.length === 0) return 0;
+  const store = planStore.getState();
+  store.transact(() => {
+    for (const [id, patch] of patches) store.setRoomProps(id, patch);
+  });
+  return patches.length;
+}
+
+/** Puts a room back on the finishes its type starts with. One undo step. */
+export function resetFinishes(roomId: Id): void {
+  const room = selectLevel(planStore.getState())?.rooms[roomId];
+  if (room) planStore.getState().setRoomProps(roomId, resetPatch(room));
 }

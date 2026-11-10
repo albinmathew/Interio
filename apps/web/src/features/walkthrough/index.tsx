@@ -8,7 +8,7 @@
  */
 import { getEntry } from '@interio/catalog';
 import { selectLevelMesh, selectRooms, useLevel, usePlanStore, type Pt } from '@interio/core';
-import { PlanScene, SceneLighting } from '@interio/scene3d';
+import { PlanScene, SceneLighting, lightingFromSettings, lightingRig } from '@interio/scene3d';
 import { Canvas } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState, cn, toast } from '../../ui';
@@ -48,6 +48,8 @@ function download(dataUrl: string, name: string): void {
 export default function Walkthrough() {
   const level = useLevel();
   const projectId = usePlanStore((s) => s.project?.id);
+  // The lighting preset is picked in Design mode and saved with the project.
+  const lighting = usePlanStore((s) => lightingFromSettings(s.project?.settings));
   const container = useRef<HTMLDivElement>(null);
   const bridge = useRef<SceneBridge | null>(null);
   const fadeEl = useRef<HTMLDivElement>(null);
@@ -58,6 +60,8 @@ export default function Walkthrough() {
     [level],
   );
   const walkable = useMemo(() => world !== null && startPose(world) !== null, [world]);
+  // The front door stays shut: its open leaf would stand in the foyer, right where the walk starts.
+  const frontDoors = useMemo(() => world?.graph.entrances.map((e) => e.openingId), [world]);
 
   // One controller per project; a changed level is handed to it rather than starting over.
   const held = useRef<{ projectId: string; controller: WalkController } | null>(null);
@@ -176,9 +180,9 @@ export default function Walkthrough() {
         camera={{ position: [start.x / 1000, walkUi.get().eyeHeight / 1000, -start.y / 1000], fov, near: 0.05, far: 200 }}
         onCreated={({ gl }) => setCanvas(gl.domElement)}
       >
-        <color attach="background" args={['#dfe9f1']} />
-        <SceneLighting level={level} mode="interior" />
-        <PlanScene level={level} resolveEntry={getEntry} showCeilings />
+        <color attach="background" args={[lightingRig(lighting, 'interior').background]} />
+        <SceneLighting level={level} mode="interior" preset={lighting} resolveEntry={getEntry} />
+        <PlanScene level={level} resolveEntry={getEntry} showCeilings closedDoors={frontDoors} />
         <CameraRig controller={controller} />
         <TargetMarker controller={controller} />
         <Bridge target={bridge} />
