@@ -1,6 +1,6 @@
-import { deriveRooms, validateLevel } from '@interio/core';
+import { buildLevel, deriveRooms, validateLevel } from '@interio/core';
 import { describe, expect, it } from 'vitest';
-import { ImportError, importExtracted, importPdf, isDivider } from '../src/index';
+import { ImportError, importExtracted, importPdf, isDivider, splitOpenPlan } from '../src/index';
 import { MM_PER_UNIT, syntheticPlan, syntheticVision } from './synthetic';
 
 const roomByName = (detail: ReturnType<typeof importExtracted>, name: string) => {
@@ -148,6 +148,34 @@ describe('open-plan spaces', () => {
     expect(gap.width).toBeGreaterThan(2800);
     expect(detail.checks.every((c) => c.ok)).toBe(true);
     expect(detail.draft.issues.some((i) => i.code === 'room-dividers')).toBe(true);
+  });
+
+  it('divides an entry lobby off a room that is labelled smaller than its walls', () => {
+    // Main part 4000 x 3000 clear, with a 1100 x 1200 lobby opening off its lower right corner.
+    const outline = [
+      { x: 0, y: 0 },
+      { x: 5200, y: 0 },
+      { x: 5200, y: 1300 },
+      { x: 4100, y: 1300 },
+      { x: 4100, y: 3100 },
+      { x: 0, y: 3100 },
+    ];
+    const level = buildLevel({ walls: outline.map((a, i) => ({ a, b: outline[(i + 1) % outline.length]!, thickness: 100 })) });
+    expect(deriveRooms(level)).toHaveLength(1);
+    const axes: [{ x: number; y: number }, { x: number; y: number }] = [{ x: 1, y: 0 }, { x: 0, y: 1 }];
+    const label = { name: 'Bedroom', at: { x: 2000, y: 1500 }, dims: [4000, 3000] as [number, number] };
+
+    // Nothing to do when the room already has its labelled size.
+    expect(splitOpenPlan(level, [label], axes, () => true)).toEqual([]);
+
+    const zones = splitOpenPlan(level, [label], axes, () => false);
+    expect(zones).toEqual([{ name: 'Bedroom', alone: true }]);
+    const rooms = deriveRooms(level).sort((a, b) => b.interiorArea - a.interiorArea);
+    expect(rooms).toHaveLength(2);
+    expect(Math.abs(rooms[0]!.width - 4000)).toBeLessThanOrEqual(10);
+    expect(Math.abs(rooms[0]!.depth - 3000)).toBeLessThanOrEqual(10);
+    expect(rooms[1]!.interiorArea / 1e6).toBeCloseTo(1.32, 1);
+    expect(Object.values(level.walls).filter((w) => isDivider(w))).toHaveLength(1);
   });
 
   it('keeps the space as one room when asked not to split', () => {

@@ -345,19 +345,23 @@ export function buildDraft(ex: Extracted, an: Analysis, opts: BuildOptions = {})
     }
   }
   ops.reconcileRooms(level);
+  const entries = new Set<string>();
   if (vision && opts.splitOpenPlan !== false) {
-    const zones = splitOpenPlan(
+    const split = splitOpenPlan(
       level,
       vision.rooms.map((r) => ({ name: r.name, at: toPlan(labelPage(r.labelPoint)), dims: r.dims })),
       axes,
+      (labelled, measured) => sizesMatch(labelled, measured),
     );
+    const zones = split.map((z) => z.name);
+    for (const z of split) if (z.alone) entries.add(z.name);
     if (zones.length > 0) {
       ops.reconcileRooms(level);
       for (const w of Object.values(level.walls)) if (isDivider(w)) confidence[w.id] = 0.4;
       issues.push({
         severity: 'info',
         code: 'room-dividers',
-        message: `${zones.map((z) => `"${z}"`).join(', ')} ${zones.length === 1 ? 'is' : 'are'} part of an open-plan space. Floor-level dividers were added at the labelled sizes so each is its own room; delete a divider in the editor to merge rooms.`,
+        message: `${zones.map((z) => `"${z}"`).join(', ')} ${zones.length === 1 ? 'is' : 'are'} only part of a larger walled space. Floor-level dividers were added at the labelled sizes so each is its own room, and the rest became a passage. Delete a divider in the editor to merge rooms.`,
       });
     }
   }
@@ -476,6 +480,12 @@ export function buildDraft(ex: Extracted, an: Analysis, opts: BuildOptions = {})
     const hasLiving = Object.values(level.rooms).some((r) => named.has(r.id) && r.type === 'living');
     const largest = [...info].filter((x) => x.edges.rail < 0.15 && x.edges.low < 0.15).sort((m, n) => n.area - m.area)[0];
     const counters = new Map<RoomType, number>();
+    let passageRooms = 0;
+    const doorWalls = new Set(
+      Object.values(level.openings)
+        .filter((o) => o.kind !== 'window')
+        .map((o) => o.wallId),
+    );
     for (const x of info.sort((m, n) => n.area - m.area)) {
       let type: RoomType = 'other';
       if (x.edges.rail >= 0.15) type = 'balcony';
@@ -493,8 +503,24 @@ export function buildDraft(ex: Extracted, an: Analysis, opts: BuildOptions = {})
       const n = (counters.get(type) ?? 0) + 1;
       counters.set(type, n);
       x.room.type = type;
-      x.room.name = leftover ? (n === 1 ? 'Passage' : `Passage ${n}`) : shaft ? `Shaft ${n}` : type === 'living' || type === 'kitchen' ? TYPE_NAMES[type] : `${TYPE_NAMES[type]} ${n}`;
-      x.room.floorMaterial = defaultFloorFor(type);
+      // A leftover that borders a single room is that room's entry.
+      const borders = new Set<string>();
+      if (leftover) {
+        const mine = new Set(x.g.edgeWalls.filter((id) => isDivider(level.walls[id])));
+        for (const g of geoms) {
+          const other = g.roomId && g !== x.g ? level.rooms[g.roomId] : undefined;
+          if (other && named.has(other.id) && g.edgeWalls.some((id) => mine.has(id))) borders.add(other.name);
+        }
+      }
+      const only = borders.size === 1 ? [...borders][0]! : null;
+      // With a door it is the way in; without one it is a recess of the room.
+      const hasDoor = x.g.edgeWalls.some((id) => !isDivider(level.walls[id]) && doorWalls.has(id));
+      const entry = only && entries.has(only) ? `${only} ${hasDoor ? 'entry' : 'alcove'}` : null;
+      if (leftover && !entry) passageRooms += 1;
+      const passage = entry ?? (passageRooms === 1 ? 'Passage' : `Passage ${passageRooms}`);
+      x.room.name = leftover ? passage : shaft ? `Shaft ${n}` : type === 'living' || type === 'kitchen' ? TYPE_NAMES[type] : `${TYPE_NAMES[type]} ${n}`;
+      const parent = entry && only ? Object.values(level.rooms).find((r) => r.name === only && named.has(r.id)) : undefined;
+      x.room.floorMaterial = parent?.floorMaterial ?? defaultFloorFor(type);
       confidence[x.room.id] = type === 'other' ? 0.3 : 0.5;
     }
     // The room a utility opens from is the kitchen.

@@ -8,7 +8,7 @@
  * A zone is the rectangle of its labelled size that contains the label and
  * has as much of its outline on the surrounding walls as possible.
  */
-import { deriveRooms, ops, vec, type Level, type Pt, type Wall } from '@interio/core';
+import { deriveRooms, ops, vec, type Id, type Level, type Pt, type Wall } from '@interio/core';
 import type { P2 } from './strips';
 
 export const DIVIDER_THICKNESS = 10;
@@ -51,6 +51,13 @@ function distToBoundary(p: Pt, poly: Pt[]): number {
   return best;
 }
 
+/** Where a divider stops: `straight` ends the divider itself, `tie` is a short link from there to a wall. */
+interface End {
+  straight: Pt;
+  tie?: Pt;
+  tieWall?: Id;
+}
+
 interface Rect {
   x0: number;
   x1: number;
@@ -65,7 +72,7 @@ const STEP = 40;
  * Finds the zone rectangle for a label inside `interior` (the clear floor of
  * the room it shares). Coordinates are in the axes frame, relative to the label.
  */
-function fitZone(dims: [number, number], local: Pt[], toPlan: (u: number, v: number) => Pt, interior: Pt[], firstAlongU: boolean): Rect | null {
+function fitZone(dims: [number, number], local: Pt[], toPlan: (u: number, v: number) => Pt, interior: Pt[], firstAlongU: boolean, minShare: number): Rect | null {
   const us = [...new Set(local.map((p) => Math.round(p.x / 5) * 5))];
   const vs = [...new Set(local.map((p) => Math.round(p.y / 5) * 5))];
   /** Positions that put one edge of the zone on a wall line and keep the label inside. */
@@ -109,7 +116,7 @@ function fitZone(dims: [number, number], local: Pt[], toPlan: (u: number, v: num
         if (leaves || total === 0) continue;
         const share = contact / total;
         // Floating free in the room, or already walled all round.
-        if (share < 0.3 || share > 0.97) continue;
+        if (share < minShare || share > 0.97) continue;
         const offCentre = Math.abs(x0 + x1) + Math.abs(y0 + y1);
         const score = contact * 150 + asWritten * 200 - offCentre * 0.05;
         if (!best || score > best.score) best = { rect: { x0, x1, y0, y1 }, score };
@@ -120,10 +127,18 @@ function fitZone(dims: [number, number], local: Pt[], toPlan: (u: number, v: num
 }
 
 /**
- * Adds dividers around labelled zones that share a closed room with other
- * labels. Returns the names of the zones that were closed.
+ * Adds dividers around labelled zones that are only part of a closed room:
+ * zones that share the room with other labels, and a single label whose room
+ * is larger than its labelled size (a bedroom with an entry lobby). `fits`
+ * says whether a labelled size already matches a room's bounding size.
+ * Returns the zones that were closed, and whether each stood alone in its room.
  */
-export function splitOpenPlan(level: Level, labels: ZoneLabel[], axes: [P2, P2]): string[] {
+export function splitOpenPlan(
+  level: Level,
+  labels: ZoneLabel[],
+  axes: [P2, P2],
+  fits: (labelled: [number, number], measured: [number, number]) => boolean = () => true,
+): { name: string; alone: boolean }[] {
   const rooms = deriveRooms(level);
   const groups = new Map<number, ZoneLabel[]>();
   for (const label of labels) {
@@ -133,11 +148,18 @@ export function splitOpenPlan(level: Level, labels: ZoneLabel[], axes: [P2, P2])
   }
   const [ax, ay] = axes;
   const half = DIVIDER_THICKNESS / 2;
-  const closed: string[] = [];
+  const closed: { name: string; alone: boolean }[] = [];
 
   for (const [index, list] of groups) {
-    if (list.length < 2) continue;
     const face = rooms[index]!;
+    const alone = list.length === 1;
+    if (alone) {
+      // One label in a room that is bigger than the label says: divide off the labelled part.
+      const only = list[0]!;
+      if (!only.dims || fits(only.dims, [face.width, face.depth])) continue;
+      const rest = face.interiorArea - only.dims[0] * only.dims[1];
+      if (rest < 400_000 || rest > 0.45 * face.interiorArea) continue;
+    }
     // Small zones first, so a larger zone can end on the dividers of the ones inside it.
     const ordered = list.filter((l) => l.dims).sort((a, b) => a.dims![0] * a.dims![1] - b.dims![0] * b.dims![1]);
     for (const label of ordered) {
@@ -146,7 +168,7 @@ export function splitOpenPlan(level: Level, labels: ZoneLabel[], axes: [P2, P2])
         x: (p.x - label.at.x) * ax.x + (p.y - label.at.y) * ax.y,
         y: (p.x - label.at.x) * ay.x + (p.y - label.at.y) * ay.y,
       }));
-      const r = fitZone(label.dims!, local, toPlan, face.interior, Math.abs(ax.x) >= Math.abs(ax.y));
+      const r = fitZone(label.dims!, local, toPlan, face.interior, Math.abs(ax.x) >= Math.abs(ax.y), alone ? 0.6 : 0.3);
       if (!r) continue;
       // Divider lines sit just outside the zone so its clear size is the labelled size.
       const x0 = r.x0 - half;
@@ -196,27 +218,42 @@ export function splitOpenPlan(level: Level, labels: ZoneLabel[], axes: [P2, P2])
        * wall it runs into, plus a short tie where that point is past the wall's
        * end; at a wall corner, a tie across to the nearest wall.
        */
-      const anchor = (end: Pt, from: Pt, dir: P2): { straight: Pt; tie?: Pt } | null => {
+      const anchor = (end: Pt, from: Pt, dir: P2): End | null => {
         const s = castToWall(level, from, dir);
         if (s !== null && s <= 500 + INSET) {
           const on = { x: from.x + dir.x * s, y: from.y + dir.y * s };
           const near = ops.findWallNear(level, on, 200);
-          return near && near.distance > 5 ? { straight: on, tie: near.point } : { straight: on };
+          return near && near.distance > 5 ? { straight: on, tie: near.point, tieWall: near.wallId } : { straight: on };
         }
         const near = ops.findWallNear(level, end, 300);
-        return near ? { straight: end, tie: near.point } : null;
+        return near ? { straight: end, tie: near.point, tieWall: near.wallId } : null;
       };
-      const lines: { a: Pt; b: Pt }[] = [];
+      /**
+       * A tie that simply carries a wall on to the divider (it finishes a wall
+       * corner) is built as that wall, so the room's clear outline stays square.
+       */
+      const tieLine = (e: End): { a: Pt; b: Pt; like?: Wall } => {
+        const wall = e.tieWall ? level.walls[e.tieWall] : undefined;
+        const line = { a: e.straight, b: e.tie! };
+        if (!wall || isDivider(wall)) return line;
+        const w = ops.wallEnds(level, wall);
+        const wl = vec.dist(w.a, w.b);
+        const tl = vec.dist(line.a, line.b);
+        if (wl < 1 || tl < 1 || tl > wall.thickness) return line;
+        const sin = Math.abs((w.b.x - w.a.x) * (line.b.y - line.a.y) - (w.b.y - w.a.y) * (line.b.x - line.a.x)) / (wl * tl);
+        return sin < 0.05 ? { ...line, like: wall } : line;
+      };
+      const lines: { a: Pt; b: Pt; like?: Wall }[] = [];
       let ok = true;
       sides.forEach((side, i) => {
         const back = { x: -side.dir.x, y: -side.dir.y };
         for (const [a, b] of side.pieces) {
           const [lowCorner, highCorner] = neighbour[i]!;
-          const head: { straight: Pt; tie?: Pt } | null =
+          const head: End | null =
             atStart(a) && touches(lowCorner[0], lowCorner[1])
               ? { straight: side.p0 }
               : anchor(atStart(a) ? side.p0 : side.point(a), side.point(a + INSET), back);
-          const tail: { straight: Pt; tie?: Pt } | null =
+          const tail: End | null =
             atEnd(b, side.len) && touches(highCorner[0], highCorner[1])
               ? { straight: side.p1 }
               : anchor(atEnd(b, side.len) ? side.p1 : side.point(b), side.point(b - INSET), side.dir);
@@ -225,13 +262,37 @@ export function splitOpenPlan(level: Level, labels: ZoneLabel[], axes: [P2, P2])
             return;
           }
           lines.push({ a: head.straight, b: tail.straight });
-          if (head.tie) lines.push({ a: head.straight, b: head.tie });
-          if (tail.tie) lines.push({ a: tail.straight, b: tail.tie });
+          if (head.tie) lines.push(tieLine(head));
+          if (tail.tie) lines.push(tieLine(tail));
         }
       });
       if (!ok || lines.length === 0) continue;
-      for (const line of lines) ops.addWall(level, line.a, line.b, { kind: 'low', thickness: DIVIDER_THICKNESS, height: DIVIDER_HEIGHT });
-      closed.push(label.name);
+      for (const line of lines) {
+        // Two zones that meet share one divider: slide a line onto a divider that already runs beside it.
+        const len = vec.dist(line.a, line.b);
+        if (len < 1) continue;
+        if (line.like) {
+          ops.addWall(level, line.a, line.b, { kind: line.like.kind, thickness: line.like.thickness, height: line.like.height });
+          continue;
+        }
+        const d = { x: (line.b.x - line.a.x) / len, y: (line.b.y - line.a.y) / len };
+        for (const w of Object.values(level.walls)) {
+          if (!isDivider(w)) continue;
+          const e = ops.wallEnds(level, w);
+          const wl = vec.dist(e.a, e.b);
+          if (wl < 100 || Math.abs(d.x * (e.b.y - e.a.y) - d.y * (e.b.x - e.a.x)) / wl > 0.02) continue;
+          const off = (e.a.x - line.a.x) * -d.y + (e.a.y - line.a.y) * d.x;
+          if (Math.abs(off) < 0.5 || Math.abs(off) > 40) continue;
+          const ta = (e.a.x - line.a.x) * d.x + (e.a.y - line.a.y) * d.y;
+          const tb = (e.b.x - line.a.x) * d.x + (e.b.y - line.a.y) * d.y;
+          if (Math.min(Math.max(ta, tb), len) - Math.max(Math.min(ta, tb), 0) < 100) continue;
+          line.a = { x: line.a.x - d.y * off, y: line.a.y + d.x * off };
+          line.b = { x: line.b.x - d.y * off, y: line.b.y + d.x * off };
+          break;
+        }
+        ops.addWall(level, line.a, line.b, { kind: 'low', thickness: DIVIDER_THICKNESS, height: DIVIDER_HEIGHT });
+      }
+      closed.push({ name: label.name, alone });
     }
   }
 
