@@ -6,7 +6,7 @@
  * running the importer on the same file outside the browser.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
@@ -166,6 +166,12 @@ test.describe('real floor plans', () => {
       await expect(other.getByTestId('total-rooms')).toHaveText(String(rooms));
       expect(otherErrors).toEqual([]);
       await context.close();
+
+      // Numbers for the run report, next to the screenshots in the test output folder (never committed).
+      await writeFile(
+        test.info().outputPath('summary.json'),
+        JSON.stringify({ label, rooms, labelled: labelled.length, items: added, furnishedRooms: furnishedRooms.size, lowConfidence: unsure, tourStops: tour.visited.length, exportBytes: exported.byteLength, pdfBytes: assets.pdfBytes }),
+      );
 
       expect(errors).toEqual([]);
     });
