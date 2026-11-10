@@ -320,6 +320,10 @@ function DebugHook() {
         });
         return { min: box.min.toArray(), max: box.max.toArray(), meshes };
       },
+      /** Cost of the last frame: draw calls and triangles (shadow and contact-shadow passes included). */
+      stats(): { calls: number; triangles: number } {
+        return { calls: gl.info.render.calls, triangles: gl.info.render.triangles };
+      },
     };
     window.__interio = hook;
     return () => {
@@ -364,6 +368,7 @@ declare global {
       registerEntry: typeof registerEntry;
       project(x: number, y: number, z?: number): { x: number; y: number };
       describeItem(id: string): { min: number[]; max: number[]; meshes: string[] } | null;
+      stats(): { calls: number; triangles: number };
     };
   }
 }

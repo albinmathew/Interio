@@ -46,6 +46,24 @@ describe('camera framing', () => {
     expect(pose.position[2]).toBeGreaterThan(pose.target[2]);
   });
 
+  it.each([
+    ['the sample', box],
+    ['a long narrow plan', { min: [0, 0, -24], max: [7, 3, 0] } as Box],
+    ['a wide shallow plan', { min: [-15, 0, -4], max: [15, 3, 0] } as Box],
+  ])('fitOrbit is tight on %s: the plan fills the view instead of floating in it', (_name, plan) => {
+    const fov = 38;
+    const aspect = 1.4;
+    const pose = fitOrbit(plan, fov, aspect);
+    const { v, h } = halfAngles(fov, aspect);
+    const used = corners(plan).map((c) => {
+      const a = offAxis(pose, c);
+      return Math.max(Math.tan(a.h) / Math.tan(h), Math.tan(a.v) / Math.tan(v));
+    });
+    // Everything is inside, and the outermost corner is within the margin of the edge.
+    expect(Math.max(...used)).toBeLessThan(1);
+    expect(Math.max(...used)).toBeGreaterThan(0.9);
+  });
+
   it('fitTop looks straight down with north up and fits the plan rectangle', () => {
     const pose = fitTop(box, 15, 1.5);
     const { v, h } = halfAngles(15, 1.5);

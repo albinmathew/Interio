@@ -24,19 +24,33 @@ export function halfAngles(fovDeg: number, aspect: number): { v: number; h: numb
 }
 
 /**
- * A dollhouse pose that keeps the whole box in view from `direction`: the camera backs
- * off until the box's bounding sphere fits the narrower half-angle.
+ * A dollhouse pose that keeps the whole box in view from `direction`: the camera looks
+ * at the middle of the plan and backs off just far enough for every corner of the box
+ * to be inside the frustum. Exact, so long or narrow plans still fill the view.
  */
-export function fitOrbit(box: Box, fovDeg: number, aspect: number, direction: Vec3 = DOLLHOUSE_DIRECTION, margin = 1.05): CameraPose {
+export function fitOrbit(box: Box, fovDeg: number, aspect: number, direction: Vec3 = DOLLHOUSE_DIRECTION, margin = 1.08): CameraPose {
   const target: Vec3 = [(box.min[0] + box.max[0]) / 2, 0, (box.min[2] + box.max[2]) / 2];
-  const radius = Math.hypot(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]) / 2;
   const { v, h } = halfAngles(fovDeg, aspect);
-  const distance = (Math.max(radius, 1) * margin) / Math.sin(Math.min(v, h));
   const l = Math.hypot(...direction) || 1;
-  return {
-    position: [target[0] + (direction[0] / l) * distance, target[1] + (direction[1] / l) * distance, target[2] + (direction[2] / l) * distance],
-    target,
-  };
+  const back: Vec3 = [direction[0] / l, direction[1] / l, direction[2] / l];
+  // Camera axes: it looks along -back; right = forward x up, up = right x forward.
+  const rl = Math.hypot(back[2], back[0]) || 1;
+  const right: Vec3 = [back[2] / rl, 0, -back[0] / rl];
+  const up: Vec3 = [-back[1] * right[2], back[0] * right[2] - back[2] * right[0], back[1] * right[0]];
+  let distance = 1;
+  for (const x of [box.min[0], box.max[0]]) {
+    for (const y of [box.min[1], box.max[1]]) {
+      for (const z of [box.min[2], box.max[2]]) {
+        const c: Vec3 = [x - target[0], y - target[1], z - target[2]];
+        const along = c[0] * back[0] + c[1] * back[1] + c[2] * back[2];
+        const across = Math.abs(c[0] * right[0] + c[2] * right[2]);
+        const upward = Math.abs(c[0] * up[0] + c[1] * up[1] + c[2] * up[2]);
+        // A corner at depth (distance - along) is in view when its offsets fit the half-angles there.
+        distance = Math.max(distance, along + (across * margin) / Math.tan(h), along + (upward * margin) / Math.tan(v));
+      }
+    }
+  }
+  return { position: [target[0] + back[0] * distance, target[1] + back[1] * distance, target[2] + back[2] * distance], target };
 }
 
 /** A straight-down pose with plan north at the top of the screen that keeps the plan rectangle in view. */
