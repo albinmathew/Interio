@@ -7,7 +7,7 @@ import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { createProject } from './migrate';
 import * as ops from './ops';
-import type { Id, Item, Level, Opening, PlanDraft, Project, Pt, Room, Wall } from './schema';
+import type { Id, Item, Level, Opening, PlanDraft, Project, Pt, Room, Variant, Wall } from './schema';
 
 export type Selection =
   | { kind: 'wall'; id: Id }
@@ -61,6 +61,16 @@ export interface PlanState {
 
   select(selection: Selection | null): void;
 
+  /* variants: saved looks of the home. The list itself is not part of undo history. */
+  /** Saves the current furniture, room looks and settings as a new variant. Returns its id. */
+  saveVariant(input: { name: string; note?: string; thumbnail?: string }): Id | null;
+  /** Makes the home look like the variant again. One undo step. Rooms that no longer exist are skipped. */
+  applyVariant(id: Id): void;
+  /** Overwrites a variant with the current look (and optionally a new thumbnail). */
+  updateVariant(id: Id, input?: { thumbnail?: string }): void;
+  renameVariant(id: Id, name: string): void;
+  deleteVariant(id: Id): void;
+
   /* history */
   /** Runs several edits as a single undo step. */
   transact(fn: () => void): void;
@@ -74,6 +84,11 @@ export interface PlanState {
 }
 
 export type PlanStore = StoreApi<PlanState>;
+
+/** A history snapshot carrying the variant list of the project as it is now. */
+function withVariants(snapshot: Project, current: Project | null): Project {
+  return !current || current.variants === snapshot.variants ? snapshot : { ...snapshot, variants: current.variants };
+}
 
 export function createPlanStore(): PlanStore {
   let depth = 0; // open transactions/gestures
@@ -104,6 +119,31 @@ export function createPlanStore(): PlanStore {
       });
       commit(next);
       return result;
+    };
+
+    /** The current look of the home, as a variant body. */
+    const capture = (project: Project, level: Level): Pick<Variant, 'items' | 'rooms' | 'settings'> => ({
+      items: structuredClone(level.items),
+      rooms: Object.fromEntries(
+        Object.values(level.rooms).map((r) => [
+          r.id,
+          {
+            name: r.name,
+            type: r.type,
+            floorMaterial: r.floorMaterial,
+            ...(r.wallMaterial ? { wallMaterial: r.wallMaterial } : {}),
+            ...(r.ceilingMaterial ? { ceilingMaterial: r.ceilingMaterial } : {}),
+          },
+        ]),
+      ),
+      settings: structuredClone(project.settings),
+    });
+
+    /** Changes the variant list without touching undo history. */
+    const setVariants = (fn: (variants: Variant[]) => Variant[]) => {
+      const cur = get().project;
+      if (!cur) return;
+      set({ project: { ...cur, variants: fn(cur.variants), updatedAt: Date.now() } });
     };
 
     const open = () => {
@@ -226,6 +266,58 @@ export function createPlanStore(): PlanStore {
         set({ selection });
       },
 
+      saveVariant({ name, note, thumbnail }) {
+        const project = get().project;
+        const level = project?.levels[get().levelIndex];
+        if (!project || !level) return null;
+        const variant: Variant = {
+          id: ops.newId('var'),
+          name: name.trim() || `Variant ${project.variants.length + 1}`,
+          createdAt: Date.now(),
+          ...(note ? { note } : {}),
+          ...(thumbnail ? { thumbnail } : {}),
+          ...capture(project, level),
+        };
+        setVariants((list) => [...list, variant]);
+        return variant.id;
+      },
+      applyVariant(id) {
+        const variant = get().project?.variants.find((v) => v.id === id);
+        if (!variant) return;
+        edit((l, p) => {
+          const items = structuredClone(variant.items);
+          // Furniture of rooms that were since removed from the plan has nowhere to go.
+          for (const item of Object.values(items)) if (item.roomId && !l.rooms[item.roomId]) delete items[item.id];
+          l.items = items;
+          for (const [roomId, look] of Object.entries(variant.rooms)) {
+            const room = l.rooms[roomId];
+            if (!room) continue;
+            room.name = look.name;
+            room.type = look.type;
+            room.floorMaterial = look.floorMaterial;
+            room.wallMaterial = look.wallMaterial;
+            room.ceilingMaterial = look.ceilingMaterial;
+          }
+          p.settings = structuredClone(variant.settings);
+        });
+        set({ selection: null });
+      },
+      updateVariant(id, input) {
+        const project = get().project;
+        const level = project?.levels[get().levelIndex];
+        if (!project || !level) return;
+        setVariants((list) =>
+          list.map((v) => (v.id === id ? { ...v, ...capture(project, level), ...(input?.thumbnail ? { thumbnail: input.thumbnail } : {}) } : v)),
+        );
+      },
+      renameVariant(id, name) {
+        const next = name.trim();
+        if (next) setVariants((list) => list.map((v) => (v.id === id ? { ...v, name: next } : v)));
+      },
+      deleteVariant(id) {
+        setVariants((list) => list.filter((v) => v.id !== id));
+      },
+
       transact(fn) {
         open();
         try {
@@ -238,21 +330,23 @@ export function createPlanStore(): PlanStore {
       endGesture: close,
       cancelGesture() {
         const before = snapshot;
+        const current = get().project;
         depth = 0;
         snapshot = null;
-        if (before) set({ project: before });
+        if (before) set({ project: withVariants(before, current) });
       },
       undo() {
         const { past, project, future } = get();
         const prev = past[past.length - 1];
         if (!prev || !project || depth > 0) return;
-        set({ project: prev, past: past.slice(0, -1), future: [project, ...future], selection: null });
+        // Saved variants are a library, not an edit: they survive undo.
+        set({ project: withVariants(prev, project), past: past.slice(0, -1), future: [project, ...future], selection: null });
       },
       redo() {
         const { past, project, future } = get();
         const next = future[0];
         if (!next || !project || depth > 0) return;
-        set({ project: next, past: [...past, project], future: future.slice(1), selection: null });
+        set({ project: withVariants(next, project), past: [...past, project], future: future.slice(1), selection: null });
       },
     };
   });

@@ -6,6 +6,7 @@ export { newId, emptyLevel, buildLevel, wallEnds, wallLength, reconcileRooms } f
 export * from './store';
 export * from './sample';
 export * from './validate';
+export * from './design';
 export * as vec from './geometry/vec';
 export * from './geometry/frames';
 export { deriveFaces, insetPolygon, type Face } from './geometry/faces';

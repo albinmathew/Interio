@@ -7,6 +7,7 @@
  * - `buildParametric`, `registerGenerator`: parametric models.
  * - `fitToDims`: applies the model conventions to a loaded GLB.
  * - `autoFurnish`: proposes a layout for one room.
+ * - `placeEntry`: finds a free spot for one entry in a room.
  */
 import './generators';
 
@@ -16,3 +17,4 @@ export { fitToDims } from './fit';
 export { PALETTE, type MaterialSpec, type PaletteKey } from './palette';
 export { MODELS, PACKS, type ModelId, type ModelSpec, type SourcePack } from './models';
 export { autoFurnish, type AutoFurnishOptions } from './autofurnish';
+export { placeEntry, type PlaceEntryOptions } from './autofurnish/placeEntry';

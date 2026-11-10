@@ -25,5 +25,6 @@ export function createProject(name: string, level?: Level): Project {
     updatedAt: now,
     levels: [level ?? emptyLevel()],
     settings: {},
+    variants: [],
   };
 }

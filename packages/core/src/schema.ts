@@ -138,6 +138,36 @@ export const ProjectSourceSchema = z.object({
 });
 export type ProjectSource = z.infer<typeof ProjectSourceSchema>;
 
+/**
+ * A saved look of the home: the furniture, the room names, types and finishes,
+ * and the view settings, captured so the user can come back to it. The walls are
+ * not part of a variant: every variant of a project shares the same plan.
+ */
+export const VariantSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  createdAt: z.number(),
+  /** What produced it, e.g. the request given to the assistant. */
+  note: z.string().optional(),
+  items: z.record(z.string(), ItemSchema),
+  /** Room look by room id. Rooms that no longer exist are ignored when the variant is applied. */
+  rooms: z.record(
+    z.string(),
+    z.object({
+      name: z.string(),
+      type: RoomTypeSchema,
+      floorMaterial: z.string(),
+      wallMaterial: z.string().optional(),
+      ceilingMaterial: z.string().optional(),
+    }),
+  ),
+  /** Copy of `project.settings` (lighting preset and the like). */
+  settings: z.record(z.string(), z.unknown()).default({}),
+  /** Small preview image as a data URL. */
+  thumbnail: z.string().optional(),
+});
+export type Variant = z.infer<typeof VariantSchema>;
+
 export const SCHEMA_VERSION = 1 as const;
 
 export const ProjectSchema = z.object({
@@ -150,6 +180,8 @@ export const ProjectSchema = z.object({
   source: ProjectSourceSchema.optional(),
   /** Scene-wide settings owned by the 3D features (lighting preset, time of day...). */
   settings: z.record(z.string(), z.unknown()).default({}),
+  /** Saved looks of this home. Kept outside undo history: undoing an edit never loses a saved variant. */
+  variants: z.array(VariantSchema).default([]),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
