@@ -1,4 +1,5 @@
 import { buildLevel, createSampleLevel, deriveRooms, ops, vec, wallFootprints, type Level, type Pt } from '@interio/core';
+import { getEntry } from '@interio/catalog';
 import { describe, expect, it } from 'vitest';
 import { arcPath, polyPath } from '../layers/style';
 import { hitTest } from './hit';
@@ -193,15 +194,17 @@ describe('hit testing', () => {
 
 describe('items', () => {
   it('rotates the catalog footprint about the item centre', () => {
+    const { w, d } = getEntry('bed.double')!.dims; // expectations follow the catalog, whatever the bed's size
     const item = { id: 'i', catalogId: 'bed.double', x: 1000, y: 2000, z: 0, rotationDeg: 0 };
     const flat = itemFootprint(item);
     expect(flat.name).toBe('Double bed');
-    near(flat.corners[0], { x: 200, y: 950 }); // front-left: front faces -y
-    near(flat.corners[2], { x: 1800, y: 3050 });
+    near(flat.corners[0], { x: 1000 - w / 2, y: 2000 - d / 2 }); // front-left: front faces -y
+    near(flat.corners[2], { x: 1000 + w / 2, y: 2000 + d / 2 });
     const turned = itemFootprint({ ...item, rotationDeg: 90 });
-    near(turned.corners[0], { x: 2050, y: 1200 });
-    expect(pointInItem({ ...item, rotationDeg: 90 }, { x: 1950, y: 2000 })).toBe(true);
-    expect(pointInItem(item, { x: 1950, y: 2000 })).toBe(false);
+    near(turned.corners[0], { x: 1000 + d / 2, y: 2000 - w / 2 });
+    const probe = { x: 1000 + (w + d) / 4, y: 2000 }; // beyond the half width, within the half depth
+    expect(pointInItem({ ...item, rotationDeg: 90 }, probe)).toBe(true);
+    expect(pointInItem(item, probe)).toBe(false);
     expect(itemFootprint({ ...item, catalogId: 'nope' }).w).toBe(600);
   });
 });
