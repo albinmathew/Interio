@@ -70,7 +70,7 @@ There are two ways to enable it. For either, copy `.env.example` to `.env` in th
 | Way | Setting in `.env` | Notes |
 |---|---|---|
 | Anthropic API key | `ANTHROPIC_API_KEY=<your key>` | Works anywhere. Billed to the key. Default model `claude-fable-5-2`. |
-| Claude Code login on this computer | `INTERIO_AI_PROVIDER=claude-code` | No key. Needs [Claude Code](https://claude.com/claude-code) installed and signed in on the same machine. Each import is one small call that counts against your Claude plan's usage. Default model `claude-sonnet-5-5`. For local use only: a hosted deployment needs an API key. |
+| Claude Code login on this computer | `INTERIO_AI_PROVIDER=claude-code` | No key. Needs [Claude Code](https://claude.com/claude-code) installed and signed in on the same machine. Each import is one small call that counts against your Claude plan's usage. Default model `claude-opus-5-5`. For local use only: a hosted deployment needs an API key. |
 
 With either enabled, a PNG of the page being imported is sent to Anthropic. With neither, nothing leaves your computer. `ANTHROPIC_MODEL` and the tuning options are described in `.env.example`.
 

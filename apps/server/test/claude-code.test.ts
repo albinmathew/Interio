@@ -49,7 +49,7 @@ const events = (result: Record<string, unknown>) =>
   [
     JSON.stringify({ type: 'system', subtype: 'init' }),
     JSON.stringify({ type: 'assistant', message: { content: [] } }),
-    JSON.stringify({ type: 'result', subtype: 'success', is_error: false, modelUsage: { 'claude-sonnet-5-5': {} }, ...result }),
+    JSON.stringify({ type: 'result', subtype: 'success', is_error: false, modelUsage: { 'claude-opus-5-5': {} }, ...result }),
   ].join('\n') + '\n';
 
 const body = { image: png(2000, 1400), mediaType: 'image/png', fileName: 'unit-a.pdf' };
@@ -72,12 +72,12 @@ describe('Claude Code provider', () => {
     const { status, body: out } = await post();
     expect(status).toBe(200);
     expect(out.available).toBe(true);
-    expect(out.model).toBe('claude-sonnet-5-5');
+    expect(out.model).toBe('claude-opus-5-5');
     expect(out.result!.rooms).toHaveLength(1);
     expect(out.result!.rooms[0]).toMatchObject({ name: 'Bedroom 1', type: 'bedroom', dims: [3400, 3960], labelPoint: { x: 0.25, y: 0.25 } });
     expect(out.result!.tags).toHaveLength(1);
     expect(out.result!.scaleText).toBe('1:50');
-    expect(await (await app.request('/api/health')).json()).toEqual({ ok: true, ai: true, model: 'claude-sonnet-5-5', provider: 'claude-code' });
+    expect(await (await app.request('/api/health')).json()).toEqual({ ok: true, ai: true, model: 'claude-opus-5-5', provider: 'claude-code' });
 
     expect(calls).toHaveLength(1);
     const { command, args, env, stdin } = calls[0]!;
@@ -86,7 +86,7 @@ describe('Claude Code provider', () => {
     expect(args).toEqual(expect.arrayContaining(['-p', '--verbose', '--safe-mode', '--no-session-persistence']));
     expect(flag('--input-format')).toBe('stream-json');
     expect(flag('--output-format')).toBe('stream-json');
-    expect(flag('--model')).toBe('claude-sonnet-5-5');
+    expect(flag('--model')).toBe('claude-opus-5-5');
     expect(flag('--tools')).toBe(''); // a single model call: no tools
     expect(flag('--system-prompt')).toContain('floor-plan importer');
     expect(JSON.parse(flag('--json-schema')!)).toMatchObject({ type: 'object', required: ['rooms', 'tags', 'scale'] });
@@ -100,11 +100,11 @@ describe('Claude Code provider', () => {
   });
 
   it('names the model that read the plan, not the housekeeping model listed beside it', async () => {
-    const usage = { 'claude-haiku-5-5': { outputTokens: 12 }, 'claude-sonnet-5-5[1m]': { outputTokens: 900 } };
+    const usage = { 'claude-haiku-5-5': { outputTokens: 12 }, 'claude-opus-5-5[1m]': { outputTokens: 900 } };
     const { post } = appWith({ stdout: events({ structured_output: READING, modelUsage: usage }) });
-    expect((await post()).body.model).toBe('claude-sonnet-5-5');
-    const other = { 'claude-haiku-5-5': { outputTokens: 12 }, 'claude-opus-5-5': { outputTokens: 900 } };
-    expect((await appWith({ stdout: events({ structured_output: READING, modelUsage: other }) }).post()).body.model).toBe('claude-opus-5-5');
+    expect((await post()).body.model).toBe('claude-opus-5-5');
+    const other = { 'claude-haiku-5-5': { outputTokens: 12 }, 'claude-fable-5-2': { outputTokens: 900 } };
+    expect((await appWith({ stdout: events({ structured_output: READING, modelUsage: other }) }).post()).body.model).toBe('claude-fable-5-2');
   });
 
   it('falls back to the result text when no structured output is reported', async () => {
@@ -160,8 +160,8 @@ describe('provider selection', () => {
     expect(visionFromEnv({ ...installed, INTERIO_AI_PROVIDER: 'claude-code', ANTHROPIC_API_KEY: 'k' }).provider).toBe('claude-code');
   });
 
-  it('defaults to Sonnet through Claude Code and to Fable on the API, unless a model is set', () => {
-    expect(modelFromEnv({}, 'claude-code')).toBe('claude-sonnet-5-5');
+  it('defaults to Opus through Claude Code and to Fable on the API, unless a model is set', () => {
+    expect(modelFromEnv({}, 'claude-code')).toBe('claude-opus-5-5');
     expect(modelFromEnv({}, 'api')).toBe('claude-fable-5-2');
     expect(modelFromEnv({ ANTHROPIC_MODEL: 'claude-opus-5-5' }, 'claude-code')).toBe('claude-opus-5-5');
   });

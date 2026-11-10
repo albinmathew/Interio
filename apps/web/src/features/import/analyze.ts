@@ -29,7 +29,8 @@ function toBase64(blob: Blob): Promise<string> {
   });
 }
 
-export async function analyzePlan(image: Blob, fileName: string, timeoutMs = 120_000): Promise<AiOutcome> {
+// Longer than the server's own per-attempt limit (180 s): larger models can take over a minute on a dense sheet.
+export async function analyzePlan(image: Blob, fileName: string, timeoutMs = 200_000): Promise<AiOutcome> {
   if (image.size > MAX_IMAGE_BYTES) return { status: 'failed', vision: null, detail: 'The page image is too large to send.' };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

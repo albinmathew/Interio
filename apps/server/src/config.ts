@@ -8,8 +8,8 @@
  *                         machine that merely has Claude Code installed has not agreed to that.
  *   ANTHROPIC_API_KEY     key for the API provider
  *   ANTHROPIC_MODEL       model id for either provider. Default: claude-fable-5-2 on the API;
- *                         claude-sonnet-5-5 through Claude Code, where every call counts against
- *                         the signed-in plan's usage limits and Sonnet reads these sheets accurately
+ *                         claude-opus-5-5 through Claude Code, where every call counts against
+ *                         the signed-in plan's usage limits
  *   INTERIO_CLAUDE_COMMAND  path of the `claude` executable, when it is not on PATH
  *   INTERIO_AI_EFFORT     optional: low | medium | high | xhigh | max (model default when unset)
  *   INTERIO_AI_FALLBACKS  optional: "off" stops asking the API to re-run a declined request on a fallback model
@@ -19,7 +19,7 @@ import type { Effort, VisionClient } from './vision/analyze';
 import { createClaudeCodeClient, findClaudeCommand } from './vision/claudeCode';
 
 export const DEFAULT_MODEL = 'claude-fable-5-2';
-export const DEFAULT_CLAUDE_CODE_MODEL = 'claude-sonnet-5-5';
+export const DEFAULT_CLAUDE_CODE_MODEL = 'claude-opus-5-5';
 
 export type Env = Record<string, string | undefined>;
 
