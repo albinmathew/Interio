@@ -8,11 +8,11 @@ import { Line, OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react';
 import * as THREE from 'three';
-import { captureBridge, capturePng } from './capture';
+import { captureBridge, capturePng, captureThumbnail } from './capture';
 import { Effects, HELPER_LAYER } from './Effects';
 import { clampTarget, fitOrbit, fitTop, freeView, type Box, type CameraPose } from './camera';
 import { findOverlaps, itemSize, type Overlap } from './placement';
-import { cameraState, entryOrPlaceholder, registerEntry, resolveEntry, useLightingPreset, useViewer, type ViewMode } from './state';
+import { DOCK_WIDTH, cameraState, entryOrPlaceholder, registerEntry, resolveEntry, useLightingPreset, useViewer, type ViewMode } from './state';
 import { HANDLE_RADIUS, handlePosition, usePointerTool } from './tool';
 
 const ACCENT = '#0f766e';
@@ -133,18 +133,28 @@ function Ghost({ level }: { level: Level }) {
   );
 }
 
-/** Lets the toolbar take a picture of the view: no outlines, handles or placement ghost. */
+/** Lets the toolbar and the variants take a picture of the view: no outlines, handles or placement ghost. */
 function CaptureBridge() {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   useEffect(() => {
-    const capture = (scale = 2) => capturePng(gl, scene, camera, { scale, hideLayers: [HELPER_LAYER], hideObjects: [GHOST_NAME] });
+    const hide = { hideLayers: [HELPER_LAYER], hideObjects: [GHOST_NAME] };
+    const capture = (scale = 2) => capturePng(gl, scene, camera, { scale, ...hide });
+    const thumbnail = () => captureThumbnail(gl, scene, camera, hide);
     captureBridge.capture = capture;
+    captureBridge.thumbnail = thumbnail;
+    captureBridge.frames = 0;
     return () => {
       if (captureBridge.capture === capture) captureBridge.capture = null;
+      if (captureBridge.thumbnail === thumbnail) captureBridge.thumbnail = null;
     };
   }, [gl, scene, camera]);
+  // Lets `sceneSettled` tell when the view has drawn and gone quiet.
+  useFrame(() => {
+    captureBridge.frames += 1;
+    captureBridge.lastFrameAt = performance.now();
+  });
   return null;
 }
 
@@ -168,13 +178,13 @@ interface Viewport {
   height: number;
 }
 
-/** Canvas area hidden by the catalog (left), toolbar (top) and hint (bottom). */
-function insetsFor(size: Viewport) {
-  return { left: size.width > 900 ? 304 : 0, right: 8, top: 58, bottom: 44 };
+/** Canvas area hidden by the catalog (left), toolbar (top), hint (bottom) and the assistant or variants panel (right) when one is open. */
+function insetsFor(size: Viewport, docked: boolean) {
+  return { left: size.width > 900 ? 304 : 0, right: docked && size.width > 900 ? DOCK_WIDTH + 20 : 8, top: 58, bottom: 44 };
 }
 
 function poseFor(view: ViewMode, box: Box, size: Viewport): CameraPose {
-  const free = freeView(size.width, size.height, FOV[view], insetsFor(size));
+  const free = freeView(size.width, size.height, FOV[view], insetsFor(size, useViewer.getState().dock !== null));
   return view === 'top' ? fitTop(box, free.fov, free.aspect) : fitOrbit(box, free.fov, free.aspect);
 }
 
@@ -186,6 +196,7 @@ function CameraRig({ box }: { box: Box }) {
   const invalidate = useThree((s) => s.invalidate);
   const view = useViewer((s) => s.view);
   const fitRequest = useViewer((s) => s.fitRequest);
+  const docked = useViewer((s) => s.dock !== null);
   const anim = useRef<{
     from: THREE.Spherical;
     to: THREE.Spherical;
@@ -214,11 +225,11 @@ function CameraRig({ box }: { box: Box }) {
 
   // Shift the image so the home is centred in the area the panels leave free.
   useLayoutEffect(() => {
-    const free = freeView(size.width, size.height, lens.fov, insetsFor(size));
+    const free = freeView(size.width, size.height, lens.fov, insetsFor(size, docked));
     lens.setViewOffset(size.width, size.height, -free.offsetX, -free.offsetY, size.width, size.height);
     invalidate();
     return () => lens.clearViewOffset();
-  }, [lens, size, invalidate]);
+  }, [lens, size, docked, invalidate]);
 
   useLayoutEffect(() => {
     const c = controls.current;
