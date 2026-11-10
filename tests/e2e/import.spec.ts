@@ -88,11 +88,47 @@ test.describe('import wizard', () => {
     await page.waitForURL(/\/p\/[^/]+\/plan$/);
     await expect(page.getByTestId('feature-plan').getByText(first).first()).toBeVisible();
   });
+});
 
+/** A valid one-page PDF with nothing drawn on it: what a scan looks like to the importer. */
+function blankPdf(): Buffer {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 300] /Contents 4 0 R /Resources << >> >>',
+    '<< /Length 3 >>\nstream\nq Q\nendstream',
+  ];
+  let body = '%PDF-1.5\n';
+  const offsets: number[] = [];
+  objects.forEach((obj, i) => {
+    offsets.push(body.length);
+    body += `${i + 1} 0 obj\n${obj}\nendobj\n`;
+  });
+  const xref = body.length;
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) body += `${String(off).padStart(10, '0')} 00000 n \n`;
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(body, 'latin1');
+}
+
+test.describe('import wizard without fixtures', () => {
   test('rejects a file that is not a PDF', async ({ page }) => {
     await page.goto('/import');
     await page.getByTestId('pdf-input').setInputFiles({ name: 'notes.pdf', mimeType: 'application/pdf', buffer: Buffer.from('plain text, not a pdf') });
     await expect(page.getByRole('alert')).toContainText(/not a PDF/i);
     await expect(page.getByTestId('drop-zone')).toBeVisible();
+  });
+
+  test('offers tracing for a PDF with no line work', async ({ page }) => {
+    await page.route('**/api/analyze-plan', (route) => route.abort());
+    await page.goto('/import');
+    await page.getByTestId('pdf-input').setInputFiles({ name: 'scan.pdf', mimeType: 'application/pdf', buffer: blankPdf() });
+    await expect(page.getByTestId('import-review')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('room-count')).toHaveText('0');
+    await expect(page.getByTestId('ai-status')).toHaveAttribute('data-status', 'failed');
+    await expect(page.getByTestId('issue-list')).toContainText(/trace the plan/i);
+    await page.getByTestId('create-project').click();
+    await page.waitForURL(/\/p\/[^/]+\/plan$/);
+    await expect(page.getByTestId('feature-plan')).toBeVisible();
   });
 });
