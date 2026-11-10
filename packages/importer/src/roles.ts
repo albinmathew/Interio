@@ -1,6 +1,6 @@
 /**
  * Stage 2: what each CAD layer means. Layer names survive PDF export as
- * optional-content groups ("TYPE D2$0$a-160 strl"); xref prefixes vary inside
+ * optional-content groups ("UNIT A$0$a-160 strl"); xref prefixes vary inside
  * one file, so only the part after the last `$` is classified.
  */
 import type { LayerRole } from '@interio/core';

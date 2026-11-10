@@ -33,26 +33,26 @@ const byDir = (strips: Strip[], dir: number) => strips.filter((s) => s.dir === d
 
 describe('layer roles', () => {
   it('classifies on the part after the last $', () => {
-    expect(classifyLayer('TYPE D2$0$a-160 strl')).toBe('wall');
-    expect(classifyLayer('TYPE F2$0$a-door')).toBe('door');
-    expect(classifyLayer('TYPE D2$0$a-door 1')).toBe('door');
-    expect(classifyLayer('TYPE D2$0$a-window')).toBe('window');
-    expect(classifyLayer('TYPE D2$0$ALUFRAME')).toBe('window');
-    expect(classifyLayer('TYPE D2$0$a-railing')).toBe('lowWall');
+    expect(classifyLayer('UNIT A$0$a-160 strl')).toBe('wall');
+    expect(classifyLayer('UNIT B$0$a-door')).toBe('door');
+    expect(classifyLayer('UNIT A$0$a-door 1')).toBe('door');
+    expect(classifyLayer('UNIT A$0$a-window')).toBe('window');
+    expect(classifyLayer('UNIT A$0$ALUFRAME')).toBe('window');
+    expect(classifyLayer('UNIT A$0$a-railing')).toBe('lowWall');
     expect(classifyLayer('a-ledge wall')).toBe('lowWall');
-    expect(classifyLayer('TYPE D2$0$A-LHWALL')).toBe('lowWall');
-    expect(classifyLayer('TYPE D2$0$a-furniture')).toBe('furniture');
+    expect(classifyLayer('UNIT A$0$A-LHWALL')).toBe('lowWall');
+    expect(classifyLayer('UNIT A$0$a-furniture')).toBe('furniture');
     expect(classifyLayer('Furniture-print')).toBe('furniture');
-    expect(classifyLayer('TYPE D2$0$a-kitchen fixtures')).toBe('fixture');
-    expect(classifyLayer('TYPE D2$0$a-granite counter')).toBe('fixture');
+    expect(classifyLayer('UNIT A$0$a-kitchen fixtures')).toBe('fixture');
+    expect(classifyLayer('UNIT A$0$a-granite counter')).toBe('fixture');
     expect(classifyLayer('a-dim int s')).toBe('dimension');
     expect(classifyLayer('a-textm')).toBe('text');
     expect(classifyLayer('a-dw sch cir')).toBe('tag');
     expect(classifyLayer('a-tile anti skid ceramic')).toBe('hatch');
     expect(classifyLayer('A-HVAC')).toBe('overhead');
-    expect(classifyLayer('TYPE D2$0$a-chajja line')).toBe('overhead');
-    expect(classifyLayer('TYPE D2$0$a-ac ledge railing')).toBe('overhead');
-    expect(classifyLayer('TYPE D2$0$a-rcc beam line')).toBe('overhead');
+    expect(classifyLayer('UNIT A$0$a-chajja line')).toBe('overhead');
+    expect(classifyLayer('UNIT A$0$a-ac ledge railing')).toBe('overhead');
+    expect(classifyLayer('UNIT A$0$a-rcc beam line')).toBe('overhead');
     expect(classifyLayer('A-TITLE')).toBe('ignore');
     expect(classifyLayer('0')).toBe('ignore');
     expect(classifyLayer('something unknown')).toBe('ignore');
@@ -60,7 +60,7 @@ describe('layer roles', () => {
 
   it('applies overrides by full layer name and reads a nominal thickness', () => {
     expect(assignRoles(['a-misc', 'a-wall'], { 'a-misc': 'wall' })).toEqual(['wall', 'wall']);
-    expect(nominalThickness('TYPE D2$0$a-160 strl')).toBe(160);
+    expect(nominalThickness('UNIT A$0$a-160 strl')).toBe(160);
     expect(nominalThickness('A-WALL-230')).toBe(230);
     expect(nominalThickness('a-wall')).toBeNull();
   });
