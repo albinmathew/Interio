@@ -181,6 +181,27 @@ export function analyse(ex: Extracted, overrides?: Record<string, LayerRole>): A
   if (mode === 'layers') {
     for (const strip of lineStrips(byRole('window').filter((s) => inBox(s, crop)), 0.45 * T, 2 * T)) glazing.push({ strip, kind: 'window' });
     for (const strip of lineStrips(doorSegs, 0.6 * T, 4 * T)) glazing.push({ strip, kind: 'glazed' });
+  } else {
+    // No layers: light lines that start at a wall end and run on along the wall's line are glazing.
+    const heavy = new Set(wallSegs);
+    const inGap = ex.segs.filter((s) => {
+      if (heavy.has(s) || !inBox(s, crop)) return false;
+      const len = segLen(s);
+      if (len < 1.5 * T) return false;
+      const dir = dirs.index(s.x2 - s.x1, s.y2 - s.y1);
+      const c = dirs.c(dir, { x: (s.x1 + s.x2) / 2, y: (s.y1 + s.y2) / 2 });
+      const ua = dirs.u(dir, { x: s.x1, y: s.y1 });
+      const ub = dirs.u(dir, { x: s.x2, y: s.y2 });
+      const lo = Math.min(ua, ub);
+      const hi = Math.max(ua, ub);
+      return walls.some(
+        (w) =>
+          w.dir === dir &&
+          Math.abs(w.c - c) <= w.t / 2 + 0.25 * T &&
+          ((lo >= w.u2 - 0.5 * T && lo <= w.u2 + 1.5 * T) || (hi <= w.u1 + 0.5 * T && hi >= w.u1 - 1.5 * T)),
+      );
+    });
+    for (const strip of lineStrips(inGap, 0.45 * T, 2 * T)) glazing.push({ strip, kind: 'window' });
   }
 
   const doorCurves = (mode === 'layers' ? ex.curves.filter((c) => roles[c.layer] === 'door') : ex.curves).filter((c) => curveInBox(c, crop));
