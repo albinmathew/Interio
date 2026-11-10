@@ -40,7 +40,16 @@ export interface DesignOutcome {
   reply: string;
   changes: AppliedOp[];
   model?: string;
+  /** True when the request was abandoned through its `signal`: nothing was applied. */
+  cancelled?: boolean;
 }
+
+export interface DesignRequestOptions {
+  /** Abandons the request when aborted: the answer, if it still arrives, is not applied. */
+  signal?: AbortSignal;
+}
+
+const CANCELLED = 'The request was cancelled.';
 
 const ROOM_TYPE_LABEL: Record<RoomType, string> = {
   living: 'living room',
@@ -227,11 +236,15 @@ export async function requestDesign(
   instruction: string,
   history: DesignTurn[] = [],
   timeoutMs = 240_000,
-): Promise<{ status: 'ok' | 'unavailable' | 'failed'; reply: string; ops: DesignOp[]; model?: string }> {
+  signal?: AbortSignal,
+): Promise<{ status: 'ok' | 'unavailable' | 'failed'; reply: string; ops: DesignOp[]; model?: string; cancelled?: boolean }> {
   const body = buildDesignRequest(instruction, history);
   if (!body) return { status: 'failed', reply: 'Open a project first.', ops: [] };
+  if (signal?.aborted) return { status: 'failed', reply: CANCELLED, ops: [], cancelled: true };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const cancel = () => controller.abort();
+  signal?.addEventListener('abort', cancel, { once: true });
   try {
     const res = await fetch('/api/design-edit', {
       method: 'POST',
@@ -240,22 +253,27 @@ export async function requestDesign(
       signal: controller.signal,
     });
     const parsed = DesignEditResponseSchema.safeParse(await res.json());
+    if (signal?.aborted) return { status: 'failed', reply: CANCELLED, ops: [], cancelled: true };
     if (!parsed.success) return { status: 'failed', reply: 'The assistant sent an answer that could not be read.', ops: [] };
     const data = parsed.data;
     if (!data.available) return { status: 'unavailable', reply: 'The assistant is switched off.', ops: [] };
     if (data.error || !res.ok) return { status: 'failed', reply: data.error ?? 'The assistant could not complete the request.', ops: [] };
     return { status: 'ok', reply: data.reply ?? '', ops: data.ops ?? [], model: data.model };
   } catch (e) {
+    if (signal?.aborted) return { status: 'failed', reply: CANCELLED, ops: [], cancelled: true };
     const aborted = e instanceof DOMException && e.name === 'AbortError';
     return { status: 'failed', reply: aborted ? 'The assistant took too long.' : 'The assistant could not be reached.', ops: [] };
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', cancel);
   }
 }
 
 /** Asks the assistant and applies its answer. The whole change is one undo step. */
-export async function runDesignRequest(instruction: string, history: DesignTurn[] = []): Promise<DesignOutcome> {
-  const answer = await requestDesign(instruction, history);
+export async function runDesignRequest(instruction: string, history: DesignTurn[] = [], options: DesignRequestOptions = {}): Promise<DesignOutcome> {
+  const answer = await requestDesign(instruction, history, undefined, options.signal);
+  // A request abandoned while its answer was on the way changes nothing.
+  if (answer.cancelled || options.signal?.aborted) return { status: 'failed', reply: CANCELLED, changes: [], cancelled: true };
   if (answer.status !== 'ok') return { status: answer.status, reply: answer.reply, changes: [] };
   const changes = applyDesignOps(answer.ops);
   const done = changes.some((c) => c.ok);

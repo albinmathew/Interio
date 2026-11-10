@@ -10,6 +10,12 @@ import { normalizeDeg, type Placement } from './placement';
 
 export type ViewMode = 'orbit' | 'top';
 
+/** Panels that dock on the right: the design assistant and the saved variants. One at a time. */
+export type Dock = 'assistant' | 'variants';
+
+/** Width of the docked panel, in CSS pixels. */
+export const DOCK_WIDTH = 304;
+
 /** Sections of the room panel. */
 export type RoomTab = 'furnish' | 'finishes';
 
@@ -48,6 +54,8 @@ export interface ViewerState {
   quality: 'high' | 'low';
   /** Section of the room panel that is open; kept while moving from room to room. */
   roomTab: RoomTab;
+  /** The docked panel that is open, if any. */
+  dock: Dock | null;
 
   setView(view: ViewMode): void;
   toggleCutaway(): void;
@@ -63,6 +71,9 @@ export interface ViewerState {
   setRoomOnly(roomOnly: boolean): void;
   setQuality(quality: 'high' | 'low'): void;
   setRoomTab(roomTab: RoomTab): void;
+  setDock(dock: Dock | null): void;
+  /** Opens the panel, or closes it when it is the one showing. */
+  toggleDock(dock: Dock): void;
 }
 
 export const useViewer = create<ViewerState>((set) => ({
@@ -78,6 +89,7 @@ export const useViewer = create<ViewerState>((set) => ({
   roomOnly: false,
   quality: 'high',
   roomTab: 'furnish',
+  dock: null,
 
   setView: (view) => set({ view }),
   toggleCutaway: () => set((s) => ({ cutaway: !s.cutaway })),
@@ -94,6 +106,8 @@ export const useViewer = create<ViewerState>((set) => ({
   setRoomOnly: (roomOnly) => set({ roomOnly }),
   setQuality: (quality) => set({ quality }),
   setRoomTab: (roomTab) => set({ roomTab }),
+  setDock: (dock) => set({ dock }),
+  toggleDock: (dock) => set((s) => ({ dock: s.dock === dock ? null : dock })),
 }));
 
 /** The lighting preset saved with the open project (`project.settings`), daylight by default. */
