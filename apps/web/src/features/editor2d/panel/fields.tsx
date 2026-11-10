@@ -90,7 +90,8 @@ export function CommitNumber({ value, onCommit, min = 0, max = 1_000_000, step =
 export function NumField({ label, hint, ...rest }: CommitNumberProps & { label: string; hint?: string }) {
   return (
     <Field label={label} hint={hint}>
-      <CommitNumber {...rest} />
+      {/* The explicit name keeps the unit and hint out of the input's accessible name. */}
+      <CommitNumber ariaLabel={label} {...rest} />
     </Field>
   );
 }
@@ -111,6 +112,7 @@ export function TextField({ label, value, onCommit, placeholder, hint, allowEmpt
     <Field label={label} hint={hint}>
       <input
         type="text"
+        aria-label={label}
         className={INPUT}
         placeholder={placeholder}
         value={text ?? value}

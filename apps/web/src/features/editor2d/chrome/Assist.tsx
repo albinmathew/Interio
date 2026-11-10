@@ -218,7 +218,7 @@ export function EmptyHint({ hasUnderlay }: { hasUnderlay: boolean }) {
             </li>
             <li className="flex items-center gap-2">
               <Kbd>3400</Kbd>
-              <Kbd>Enter</Kbd> Type an exact length while drawing
+              <Kbd>Enter</Kbd> Type a length while drawing
             </li>
             <li className="flex items-center gap-2">
               <Kbd>D</Kbd>

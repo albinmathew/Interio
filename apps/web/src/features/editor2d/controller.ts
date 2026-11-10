@@ -249,8 +249,8 @@ export function createController(deps: ControllerDeps) {
 
   /**
    * Finishes Set scale: the two picked points become `realMm` apart. The level
-   * and the underlay factor change in one undo step, and the camera compensates
-   * so the drawing does not jump.
+   * and the underlay factor change in one undo step. The camera follows the
+   * factor (see `followRescale`), so the drawing does not jump.
    */
   function applyScale(realMm: number, opts: RescaleOptions = {}): boolean {
     const d = draftOf('scale');
@@ -264,11 +264,7 @@ export function createController(deps: ControllerDeps) {
       s.mutateLevel((l) => rescaleLevel(l, k, opts), { reconcileRooms: true });
       s.setProjectSettings({ [UNDERLAY_SCALE_KEY]: prev * k });
     });
-    const view = ui.getState().view;
-    const next = view.scale / k;
     ui.setState({ draft: null, snap: null, guides: [], tool: 'select' });
-    if (next >= MIN_SCALE && next <= MAX_SCALE) ui.setState({ view: { ...view, scale: next } });
-    else fit();
     return true;
   }
 
@@ -649,10 +645,27 @@ export function createController(deps: ControllerDeps) {
     return false;
   }
 
+  /**
+   * Keeps the picture still when the plan is rescaled: by Set scale, and equally
+   * by undoing or redoing it. Plan coordinates grew by `ratio`, so the view shrinks by it.
+   */
+  function followRescale(ratio: number) {
+    const view = ui.getState().view;
+    const next = view.scale / ratio;
+    if (next >= MIN_SCALE && next <= MAX_SCALE) ui.setState({ view: { ...view, scale: next } });
+    else fit();
+  }
+
   /** Subscribes to the plan store. Returns the disconnect function (call it when the editor unmounts). */
   function connect(): () => void {
-    // Undo while drawing a chain steps the chain back with the plan.
     const unsubscribe = plan.subscribe((s, prev) => {
+      if (s.project === prev.project) return;
+      if (s.project && prev.project && s.project.id === prev.project.id) {
+        const k = underlayScaleOf(s.project.settings);
+        const k0 = underlayScaleOf(prev.project.settings);
+        if (k !== k0) followRescale(k / k0);
+      }
+      // Undo while drawing a chain steps the chain back with the plan.
       const d = draftOf('wall');
       if (d && d.chain.length > 1 && s.future.length > prev.future.length && s.project !== prev.project)
         ui.setState({ draft: { ...d, chain: d.chain.slice(0, -1), typed: '' } });

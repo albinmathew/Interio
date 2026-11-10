@@ -449,6 +449,13 @@ describe('split, measure and scale', () => {
 
     t.plan.getState().undo();
     expect(JSON.stringify(t.plan.getState().project)).toBe(before);
+    // Undo and redo move the camera back and forth with the plan.
+    const undone = planToScreen(t.ui.getState().view, { x: 12000, y: 9000 });
+    expect(undone.x).toBeCloseTo(screenBefore.x, 6);
+    expect(undone.y).toBeCloseTo(screenBefore.y, 6);
+    t.plan.getState().redo();
+    const redone = planToScreen(t.ui.getState().view, { x: 6000, y: 4500 });
+    expect(redone.x).toBeCloseTo(screenBefore.x, 6);
   });
 });
 
