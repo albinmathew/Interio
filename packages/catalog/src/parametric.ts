@@ -14,6 +14,10 @@ export function registerGenerator(name: string, fn: Generator): void {
   generators.set(name, fn);
 }
 
+export function hasGenerator(name: string): boolean {
+  return generators.has(name);
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   seating: '#7d8fa3',
   tables: '#a98462',

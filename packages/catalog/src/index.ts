@@ -1,38 +1,18 @@
 /**
  * Furniture and appliance catalog.
  *
- * Phase 0 ships placeholder entries rendered as boxes so placement can be built
- * and tested. The catalog workstream replaces `entries.ts` with the real set
- * (GLB models under apps/web/public/catalog, parametric appliances, thumbnails,
- * licence records) and implements `autoFurnish`.
+ * - `CATALOG`, `getEntry`, `entriesFor`: the entries. GLB entries point at CC0
+ *   models under `apps/web/public/catalog/models` (see `docs/assets/catalog.md`);
+ *   parametric entries are built by the generators registered here.
+ * - `buildParametric`, `registerGenerator`: parametric models.
+ * - `fitToDims`: applies the model conventions to a loaded GLB.
+ * - `autoFurnish`: proposes a layout for one room.
  */
-import type { CatalogCategory, CatalogEntry, Item, Level, RoomType } from '@interio/core';
-import { PLACEHOLDER_ENTRIES } from './entries';
+import './generators';
 
-export { buildParametric, registerGenerator, type Generator } from './parametric';
-
-export const CATALOG: CatalogEntry[] = PLACEHOLDER_ENTRIES;
-
-const byId = new Map(CATALOG.map((e) => [e.id, e]));
-
-export function getEntry(id: string): CatalogEntry | undefined {
-  return byId.get(id);
-}
-
-export function entriesFor(filter: { category?: CatalogCategory; roomType?: RoomType; query?: string }): CatalogEntry[] {
-  const q = filter.query?.trim().toLowerCase();
-  return CATALOG.filter(
-    (e) =>
-      (!filter.category || e.category === filter.category) &&
-      (!filter.roomType || e.roomTypes.length === 0 || e.roomTypes.includes(filter.roomType)) &&
-      (!q || e.name.toLowerCase().includes(q) || e.tags?.some((t) => t.includes(q))),
-  );
-}
-
-/**
- * Proposes a furniture layout for one room. Returns items to add (never mutates).
- * Stub: the catalog workstream implements templates per room type.
- */
-export function autoFurnish(_level: Level, _roomId: string): Omit<Item, 'id'>[] {
-  return [];
-}
+export { CATALOG, entriesFor, getEntry } from './catalog';
+export { buildParametric, hasGenerator, registerGenerator, type Generator } from './parametric';
+export { fitToDims } from './fit';
+export { PALETTE, type MaterialSpec, type PaletteKey } from './palette';
+export { MODELS, PACKS, type ModelId, type ModelSpec, type SourcePack } from './models';
+export { autoFurnish, type AutoFurnishOptions } from './autofurnish';

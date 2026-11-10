@@ -309,6 +309,9 @@ importers:
       '@types/three':
         specifier: ^0.187.0
         version: 0.187.0
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
 
   packages/core:
     dependencies:
