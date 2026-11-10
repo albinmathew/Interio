@@ -2,8 +2,8 @@
  * Open-plan areas. A drawing can label several rooms inside one walled space
  * ("Living", "Dining", "Foyer" with nothing between them). A room in the plan
  * model is a closed face of the wall graph, so each labelled zone is closed
- * with dividers: floor-level strips, 10 mm wide and 5 mm high, open along their
- * whole length. They separate rooms without standing in anyone's way.
+ * with dividers: walls of kind `divider`, which bound rooms but have no 3D
+ * geometry and do not block movement.
  *
  * A zone is the rectangle of its labelled size that contains the label and
  * has as much of its outline on the surrounding walls as possible.
@@ -14,8 +14,7 @@ import type { P2 } from './strips';
 export const DIVIDER_THICKNESS = 10;
 export const DIVIDER_HEIGHT = 5;
 
-export const isDivider = (wall: Pick<Wall, 'kind' | 'thickness' | 'height'> | undefined): boolean =>
-  !!wall && wall.kind === 'low' && wall.thickness === DIVIDER_THICKNESS && wall.height === DIVIDER_HEIGHT;
+export const isDivider = (wall: Pick<Wall, 'kind'> | undefined): boolean => wall?.kind === 'divider';
 
 export interface ZoneLabel {
   name: string;
@@ -290,17 +289,11 @@ export function splitOpenPlan(
           line.b = { x: line.b.x - d.y * off, y: line.b.y + d.x * off };
           break;
         }
-        ops.addWall(level, line.a, line.b, { kind: 'low', thickness: DIVIDER_THICKNESS, height: DIVIDER_HEIGHT });
+        ops.addWall(level, line.a, line.b, { kind: 'divider', thickness: DIVIDER_THICKNESS, height: DIVIDER_HEIGHT });
       }
       closed.push({ name: label.name, alone });
     }
   }
 
-  for (const w of Object.values(level.walls)) {
-    if (!isDivider(w)) continue;
-    const length = ops.wallLength(level, w);
-    if (length < 320) continue;
-    ops.addOpening(level, { wallId: w.id, offset: length / 2, width: length - 100, height: DIVIDER_HEIGHT, sill: 0, kind: 'passage' });
-  }
   return closed;
 }

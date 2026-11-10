@@ -101,7 +101,9 @@ describe.skipIf(pdfs.length === 0)('local PDFs', () => {
       const room = g.roomId ? level.rooms[g.roomId] : undefined;
       if (!room || /^(Shaft|Store|Room)/.test(room.name)) continue;
       const kinds = g.edgeWalls.flatMap((id) => byWall.get(id) ?? []);
-      expect(kinds.some((k) => k !== 'window'), `${room.name} has no way in`).toBe(true);
+      // A room is entered through a door, sliding door or passage, or across an open-plan divider.
+      const open = g.edgeWalls.some((id) => level.walls[id]?.kind === 'divider');
+      expect(open || kinds.some((k) => k !== 'window'), `${room.name} has no way in`).toBe(true);
       if (room.type === 'bedroom') expect(kinds.some((k) => k === 'window' || k === 'sliding'), `${room.name} has no daylight`).toBe(true);
       if (room.type === 'balcony') expect(kinds.some((k) => k === 'sliding' || k === 'door'), `${room.name} has no door`).toBe(true);
     }

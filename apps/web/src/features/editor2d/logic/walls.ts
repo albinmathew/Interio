@@ -44,6 +44,7 @@ export function incidentWalls(level: Level, vertexId: Id): Wall[] {
 export function wallKindDefaults(kind: WallKind, ceilingHeight: number): Pick<Wall, 'kind' | 'height' | 'thickness'> {
   if (kind === 'railing') return { kind, height: DEFAULTS.railingHeight, thickness: DEFAULTS.railingThickness };
   if (kind === 'low') return { kind, height: DEFAULTS.lowWallHeight, thickness: DEFAULTS.partitionThickness };
+  if (kind === 'divider') return { kind, height: DEFAULTS.dividerHeight, thickness: DEFAULTS.dividerThickness };
   return { kind, height: ceilingHeight, thickness: DEFAULTS.wallThickness };
 }
 

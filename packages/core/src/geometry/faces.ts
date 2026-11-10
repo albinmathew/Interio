@@ -124,7 +124,7 @@ export function insetPolygon(polygon: Pt[], offsets: number[]): Pt[] {
 }
 
 /** All bounded faces of the wall graph with area of at least `minArea` mm^2. */
-export function deriveFaces(level: Level, minArea = 200_000): Face[] {
+export function deriveFaces(level: Level, minArea = 500_000): Face[] {
   const { nodes, edges: raw } = planarize(level);
   const edges = pruneDangling(raw);
   if (edges.length < 3) return [];

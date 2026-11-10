@@ -39,6 +39,7 @@ function compute(level: Level): WallFootprint[] {
     return a && b && dist(a, b) >= 1;
   });
   for (const w of walls) {
+    if (w.kind === 'divider') continue; // dividers have no body: they must not shape the joins of real walls
     const a = level.vertices[w.a]!;
     const b = level.vertices[w.b]!;
     const d = norm(sub(b, a));
@@ -80,7 +81,17 @@ function compute(level: Level): WallFootprint[] {
     const a = level.vertices[w.a]!;
     const b = level.vertices[w.b]!;
     const dir = norm(sub(b, a));
-    const { sa, sb } = ends.get(w.id)!;
+    const own = ends.get(w.id);
+    if (!own) {
+      // Divider: a plain strip of its own (nominal) thickness, for 2D drawing and hit testing only.
+      const n = scale(perp(dir), w.thickness / 2);
+      const aL = add(a, n);
+      const aR = sub(a, n);
+      const bL = add(b, n);
+      const bR = sub(b, n);
+      return { wallId: w.id, dir, normal: perp(dir), length: dist(a, b), aL, aR, bL, bR, polygon: [aR, bR, b, bL, aL, a], degreeA: 1, degreeB: 1 };
+    }
+    const { sa, sb } = own;
     // At b the spoke points backwards, so its left is the wall's right.
     const aL = sa.left!;
     const aR = sa.right!;
@@ -96,8 +107,8 @@ function compute(level: Level): WallFootprint[] {
       bL,
       bR,
       polygon: [aR, bR, b, bL, aL, a],
-      degreeA: spokes.get(w.a)!.length,
-      degreeB: spokes.get(w.b)!.length,
+      degreeA: spokes.get(w.a)?.length ?? 1,
+      degreeB: spokes.get(w.b)?.length ?? 1,
     };
   });
 }

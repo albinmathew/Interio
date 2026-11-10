@@ -1,4 +1,4 @@
-import { buildLevel, deriveRooms, validateLevel } from '@interio/core';
+import { buildLevel, buildLevelMesh, deriveRooms, roomGraph, validateLevel } from '@interio/core';
 import { describe, expect, it } from 'vitest';
 import { ImportError, importExtracted, importPdf, isDivider, splitOpenPlan } from '../src/index';
 import { MM_PER_UNIT, syntheticPlan, syntheticVision } from './synthetic';
@@ -142,10 +142,11 @@ describe('open-plan spaces', () => {
     expect(Math.abs(dining.depth - 1500)).toBeLessThanOrEqual(15);
     const dividers = Object.values(level.walls).filter((w) => isDivider(w));
     expect(dividers).toHaveLength(1);
-    // Open along its length: you walk straight across.
-    const gap = Object.values(level.openings).find((o) => o.wallId === dividers[0]!.id)!;
-    expect(gap.kind).toBe('passage');
-    expect(gap.width).toBeGreaterThan(2800);
+    // A divider has no body: you walk straight across, and the two rooms are connected through it.
+    expect(dividers[0]!.kind).toBe('divider');
+    expect(Object.values(level.openings).some((o) => o.wallId === dividers[0]!.id)).toBe(false);
+    expect(buildLevelMesh(level).groups.some((g) => g.wallId === dividers[0]!.id)).toBe(false);
+    expect(roomGraph(level).edges.filter((e) => e.via === 'divider')).toHaveLength(1);
     expect(detail.checks.every((c) => c.ok)).toBe(true);
     expect(detail.draft.issues.some((i) => i.code === 'room-dividers')).toBe(true);
   });

@@ -176,7 +176,13 @@ export class Planner {
         dir,
         normal: vec.perp(dir),
         len: vec.dist(a, b),
-        kind: current.some((e) => e.wall?.kind === 'railing') ? 'railing' : current.some((e) => e.wall?.kind === 'low') ? 'low' : 'wall',
+        kind: current.some((e) => e.wall?.kind === 'divider')
+          ? 'divider'
+          : current.some((e) => e.wall?.kind === 'railing')
+            ? 'railing'
+            : current.some((e) => e.wall?.kind === 'low')
+              ? 'low'
+              : 'wall',
         height: Math.min(...current.map((e) => e.wall?.height ?? this.level.ceilingHeight)),
         openings: [],
       };
@@ -208,7 +214,9 @@ export class Planner {
       current = [];
     };
     for (const e of ordered) {
-      if (current.length > 0 && !sameLine(current[current.length - 1]!, e)) flush();
+      const prev = current[current.length - 1];
+      // An open-plan divider is never part of the same run as a real wall, even when collinear.
+      if (prev && (!sameLine(prev, e) || (prev.wall?.kind === 'divider') !== (e.wall?.kind === 'divider'))) flush();
       current.push(e);
     }
     flush();
@@ -216,6 +224,12 @@ export class Planner {
 
   private buildZones(): void {
     for (const run of this.runs) {
+      if (run.kind === 'divider') {
+        // The room is open to its neighbour along a divider: keep it clear like a wide passage.
+        this.zones.push({ rect: this.stripRect(run, 0, run.len, APPROACH), zMin: 0, zMax: PERSON, kind: 'door' });
+        this.doorPoints.push(vec.add(run.a, vec.scale(run.dir, run.len / 2)));
+        continue;
+      }
       for (const o of run.openings) {
         const mid = vec.add(run.a, vec.scale(run.dir, (o.s0 + o.s1) / 2));
         if (o.kind === 'window') {

@@ -45,6 +45,7 @@ const WALL_KIND_OPTIONS: { value: WallKind; label: string }[] = [
   { value: 'wall', label: 'Wall' },
   { value: 'low', label: 'Low' },
   { value: 'railing', label: 'Railing' },
+  { value: 'divider', label: 'Divider' },
 ];
 
 function WallPanel({ level, wall }: { level: Level; wall: Wall }) {

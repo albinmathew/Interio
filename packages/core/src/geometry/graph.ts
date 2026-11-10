@@ -1,12 +1,16 @@
 import type { Id, Level, Pt } from '../schema';
 import { openingFrame } from './footprints';
 import { deriveRooms, type RoomGeom } from './rooms';
-import { add, dist, pointInPolygon, scale } from './vec';
+import { add, dist, mid, norm, perp, pointInPolygon, scale, sub } from './vec';
 
 export interface RoomGraph {
   nodes: { roomId: Id; centroid: Pt }[];
-  /** A walkable connection between two rooms through a door, sliding door or passage. */
-  edges: { a: Id; b: Id; openingId: Id; door: Pt }[];
+  /**
+   * A walkable connection between two rooms: through a door, sliding door or passage
+   * (`via: 'opening'`, `openingId` is the opening) or across an open-plan divider
+   * (`via: 'divider'`, `openingId` is the divider wall's id). `door` is the crossing point.
+   */
+  edges: { a: Id; b: Id; openingId: Id; door: Pt; via: 'opening' | 'divider' }[];
   /** Doors that lead outside: the home's entrances. */
   entrances: { roomId: Id; openingId: Id; door: Pt }[];
 }
@@ -26,10 +30,23 @@ export function roomGraph(level: Level): RoomGraph {
     const left = rooms.find((r) => pointInPolygon(add(f.center, scale(f.normal, reach)), r.polygon));
     const right = rooms.find((r) => pointInPolygon(add(f.center, scale(f.normal, -reach)), r.polygon));
     if (left && right && left.roomId !== right.roomId) {
-      graph.edges.push({ a: left.roomId, b: right.roomId, openingId: o.id, door: f.center });
+      graph.edges.push({ a: left.roomId, b: right.roomId, openingId: o.id, door: f.center, via: 'opening' });
     } else if ((left || right) && !(left && right) && o.kind === 'door') {
       graph.entrances.push({ roomId: (left ?? right)!.roomId, openingId: o.id, door: f.center });
     }
+  }
+  for (const w of Object.values(level.walls)) {
+    if (w.kind !== 'divider') continue;
+    const a = level.vertices[w.a];
+    const b = level.vertices[w.b];
+    if (!a || !b) continue;
+    const m = mid(a, b);
+    const n = perp(norm(sub(b, a)));
+    const left = rooms.find((r) => pointInPolygon(add(m, scale(n, 150)), r.polygon));
+    const right = rooms.find((r) => pointInPolygon(add(m, scale(n, -150)), r.polygon));
+    if (!left || !right || left.roomId === right.roomId) continue;
+    if (graph.edges.some((e) => e.via === 'divider' && ((e.a === left.roomId && e.b === right.roomId) || (e.a === right.roomId && e.b === left.roomId)))) continue;
+    graph.edges.push({ a: left.roomId, b: right.roomId, openingId: w.id, door: m, via: 'divider' });
   }
   return graph;
 }

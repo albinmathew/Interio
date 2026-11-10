@@ -43,8 +43,12 @@ export const WallsLayer = memo(function WallsLayer({ level }: { level: Level }) 
   const solid = paths.filter((p) => p.kind === 'wall');
   const low = paths.filter((p) => p.kind === 'low');
   const rail = paths.filter((p) => p.kind === 'railing');
+  const dividers = paths.filter((p) => p.kind === 'divider');
   return (
     <g data-layer="walls">
+      {dividers.map((p) => (
+        <path key={p.id} d={p.centre} fill="none" stroke={INK.lowLine} strokeWidth={1.5} strokeDasharray="6 4" data-wall-id={p.id} data-wall-kind="divider" {...NS} />
+      ))}
       {/* Outlines first, fills on top: joined walls of a kind read as one shape. */}
       {low.map((p) => (
         <path key={`o${p.id}`} d={p.d} fill="none" stroke={INK.lowLine} strokeWidth={2.5} strokeLinejoin="round" {...NS} />
