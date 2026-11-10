@@ -329,3 +329,64 @@ test('auto-furnish adds a room layout as one undo step, with catalog models draw
   await expect(count(page)).toHaveAttribute('data-count', '0');
   expect(errors).toEqual([]);
 });
+
+test('drag a card onto the floor, turn with the handle, and warn about overlaps', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await openSample(page);
+  await ready(page);
+  const chair = getEntry('armchair')!;
+
+  // Drag the card out of the catalog and drop it in the middle of the living room.
+  await card(page, 'armchair').scrollIntoViewIfNeeded();
+  const box = (await card(page, 'armchair').boundingBox())!;
+  const drop = await at(page, 6500, 2100);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 10, { steps: 4 });
+  await expect(card(page, 'armchair')).toHaveAttribute('aria-pressed', 'true');
+  await page.mouse.move(drop.x, drop.y, { steps: 8 });
+  await page.mouse.up();
+  await expect(count(page)).toHaveAttribute('data-count', '1');
+  await expect(page.getByTestId('item-name')).toHaveText(chair.name);
+  // Dropping places it and disarms the card.
+  await expect(card(page, 'armchair')).toHaveAttribute('aria-pressed', 'false');
+  let [item] = await items(page);
+  expect(item).toMatchObject({ catalogId: 'armchair', x: 6500, y: 2100, rotationDeg: 0 });
+  expect(await undoSteps(page)).toBe(1);
+
+  // The handle sits 450 mm in front of the item (its front faces -y at rotation 0).
+  // Dragging it round to the east turns the item to face east: 90 degrees, one undo step.
+  const handle = await at(page, item!.x, item!.y - chair.dims.d / 2 - 450, 30);
+  const east = await at(page, item!.x + 1500, item!.y, 30);
+  await page.mouse.move(handle.x, handle.y);
+  await page.mouse.down();
+  await page.mouse.move((handle.x + east.x) / 2, (handle.y + east.y) / 2, { steps: 5 });
+  await page.mouse.move(east.x, east.y, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.getByTestId('item-rotation')).toHaveValue('90');
+  [item] = await items(page);
+  expect(item).toMatchObject({ x: 6500, y: 2100, rotationDeg: 90 });
+  expect(await undoSteps(page)).toBe(2);
+
+  // Esc during a drag puts the item back and leaves no undo step.
+  const grab = await at(page, item!.x, item!.y, 300);
+  const away = await at(page, 8500, 1200, 300);
+  await page.mouse.move(grab.x, grab.y);
+  await page.mouse.down();
+  await page.mouse.move(away.x, away.y, { steps: 6 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  expect((await items(page))[0]).toMatchObject({ x: 6500, y: 2100, rotationDeg: 90 });
+  expect(await undoSteps(page)).toBe(2);
+
+  // No warning while it stands free; one appears when another item is put on top of it.
+  await expect(page.getByTestId('item-overlap')).toHaveCount(0);
+  await page.evaluate((id) => {
+    const state = (window as unknown as Dev).__interio.store.getState();
+    state.addItem({ catalogId: 'table.coffee', x: 6700, y: 2100, z: 0, rotationDeg: 0 });
+    state.select({ kind: 'item', id });
+  }, item!.id);
+  await expect(page.getByTestId('item-overlap')).toContainText('Overlaps coffee table');
+  expect(errors).toEqual([]);
+});
