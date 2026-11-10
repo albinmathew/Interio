@@ -92,6 +92,7 @@ export function splitWall(level: Level, wallId: Id, p: Pt): Id | null {
       o.offset -= splitAt;
     }
   }
+  clampWallOpenings(level, new Set([wallId, second.id]));
   return vid;
 }
 
@@ -189,9 +190,18 @@ export function removeWall(level: Level, id: Id): void {
   removeOrphanVertices(level);
 }
 
+/** Re-clamps the openings of the given walls; drops those whose wall became too short to hold them. */
+export function clampWallOpenings(level: Level, wallIds: ReadonlySet<Id>): void {
+  for (const o of Object.values(level.openings)) {
+    if (wallIds.has(o.wallId) && !clampOpening(level, o)) delete level.openings[o.id];
+  }
+}
+
 export function moveVertex(level: Level, id: Id, p: Pt): void {
   if (!level.vertices[id]) return;
   level.vertices[id] = roundPt(p);
+  const touched = new Set(Object.values(level.walls).filter((w) => w.a === id || w.b === id).map((w) => w.id));
+  clampWallOpenings(level, touched);
 }
 
 /** Merges vertices closer than `tol` and drops the zero-length and duplicate walls that result. */

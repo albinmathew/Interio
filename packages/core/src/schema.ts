@@ -310,6 +310,9 @@ export const DEFAULTS = {
   windowWidth: 1500,
   windowHeight: 1200,
   windowSill: 900,
+  slidingWidth: 1800,
   slidingHeight: 2400,
+  passageWidth: 1200,
+  passageHeight: 2100,
   eyeHeight: 1600,
 } as const;
