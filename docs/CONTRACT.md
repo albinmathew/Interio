@@ -69,7 +69,7 @@ Features render inside a full-size container and read the store themselves. Use 
 
 ## Storage
 
-`lib/storage.ts` (IndexedDB): projects as JSON, assets under `<projectId>/<name>` (`pdf`, `underlay`). `lib/session.ts`: `openProject`, `createFromDraft`, `startAutosave`, `loadUnderlay`, export/import. `lib/useUnderlay.ts` gives the source-drawing underlay to the editor.
+`lib/storage.ts` (IndexedDB): projects as JSON, assets under `<projectId>/<name>` (`pdf`, `underlay`). `lib/session.ts`: `openProject`, `createFromDraft`, `startAutosave`, `loadUnderlay`, export/import. Exported projects are a single gzipped `.interio` file that carries the project JSON, the underlay and the source PDF; plain project JSON from earlier versions still opens. `lib/useUnderlay.ts` gives the source-drawing underlay to the editor.
 
 ## Running several checkouts
 

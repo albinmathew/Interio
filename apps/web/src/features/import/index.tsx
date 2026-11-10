@@ -803,7 +803,17 @@ function ScalePanel({ detail, userScale, onScale }: { detail: ImportDetail; user
   ];
   return (
     <Panel>
-      <PanelHeader title="Scale" actions={<Badge tone={scale.spreadPct > 1 && scale.source !== 'user' ? 'warn' : 'neutral'}>from {SOURCE_LABEL[scale.source]}</Badge>} />
+      <PanelHeader
+        title="Scale"
+        actions={
+          // With no estimate at all the importer falls back to a nominal value: say so instead of naming a source.
+          scale.source === 'titleBlock' && c.titleBlock === null ? (
+            <Badge tone="warn">not found: set it below</Badge>
+          ) : (
+            <Badge tone={scale.spreadPct > 1 && scale.source !== 'user' ? 'warn' : 'neutral'}>from {SOURCE_LABEL[scale.source]}</Badge>
+          )
+        }
+      />
       <div className="flex flex-col gap-3 p-3 text-sm">
         <p className="text-ink" data-testid="scale-estimate" data-mm-per-unit={scale.mmPerPdfUnit.toFixed(4)}>
           Using <span className="font-semibold">1 : {ratio(scale.mmPerPdfUnit).toFixed(1)}</span>

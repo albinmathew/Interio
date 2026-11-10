@@ -96,7 +96,7 @@ Design mode shows the home as a dollhouse. Drag to orbit, scroll to zoom, and us
 - **Find things.** Search the catalog by name, or narrow it by category. Selecting a room narrows the catalog to what suits that room.
 - **Move and turn.** Click an item to select it, then drag it. Use the panel on the right for exact rotation and elevation, to swap it for a similar entry, to duplicate it or to remove it.
 - **Furnish a room for me.** Click a room's floor and press **Auto-furnish room** for a suggested layout. **Clear this room** removes its furniture.
-- **Furnish the whole home.** Choose **Furnish it for me** after an import, or on the sample home on the dashboard.
+- **Furnish the whole home.** Press **Furnish home** in the Design toolbar to fill every empty room, or choose **Furnish it for me** after an import or on the sample home. **Clear furniture** removes everything after a confirmation.
 - **Overlaps.** An item that overlaps a wall or another item is flagged in its panel.
 
 ### Design shortcuts
@@ -112,11 +112,17 @@ Design mode shows the home as a dollhouse. Drag to orbit, scroll to zoom, and us
 
 ## Finishes
 
-Every room has a floor finish and a wall finish. The 3D view and the walkthrough show them.
+Every room has a floor finish, a wall finish and a ceiling colour. The 3D view and the walkthrough show them.
 
+- In Design mode, click a room's floor or wall and open the **Finishes** tab. Pick a floor, wall or ceiling swatch; the room updates at once.
+- **Apply to all rooms** and **Apply to all rooms of this type** copy the choice across the home. **Reset to default** restores the finish that suits the room type.
 - In Plan mode, click inside a room and choose **Floor finish** and **Wall finish** in the panel on the right.
-- In Design mode, click a room's floor to see its area, size and current finishes.
 - Changing a room's type in Plan mode suggests a floor finish that suits it, such as tiles for a bathroom.
+
+## Lighting and pictures
+
+- **Lighting.** The Design toolbar switches between **Daylight**, **Warm evening** and **Night**. The choice is saved with the project and Walk mode follows it. Lamps and ceiling lights you place light their rooms in the evening and at night.
+- **Picture.** The camera button in the Design toolbar saves a high-resolution picture of the current view without the panels.
 
 ## Walk through
 
