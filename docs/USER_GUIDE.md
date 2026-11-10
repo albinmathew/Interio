@@ -129,6 +129,31 @@ Every room has a floor finish, a wall finish and a ceiling colour. The 3D view a
 - **Lighting.** The Design toolbar switches between **Daylight**, **Warm evening** and **Night**. The choice is saved with the project and Walk mode follows it. Lamps and ceiling lights you place light their rooms in the evening and at night.
 - **Picture.** The camera button in the Design toolbar saves a high-resolution picture of the current view without the panels.
 
+## Ask the assistant
+
+In Design mode, press **Assistant** at the top right, type what you want changed in plain words and press `Enter` (`Shift+Enter` starts a new line). The examples under the introduction use the room names of your home; click one to put it in the box.
+
+- **What it can change.** Furniture (add, remove, swap, furnish or clear a room), a room's name and what kind of room it is, floor, wall and ceiling finishes, and the lighting. For example: "add a sink to the utility", "make the service room a laundry room", "swap the sofa for a corner sofa", "warmer lighting".
+- **What it cannot change.** Walls, doors and windows. Move those in Plan mode.
+- **The answer.** Each answer lists what was asked of the plan, line by line, with a tick for what was done and a cross for what was not (no free space, for instance). An answer that changes nothing explains why.
+- **Follow-ups.** The assistant sees the earlier requests of the conversation, so "make it bigger" or "undo that and use a sofa instead" work. **Clear** starts over. The conversation is kept until you close the page; it is not saved with the project.
+- **Undo.** Everything one answer changes is a single undo step. **Undo** under the answer takes it back while it is still the latest edit; the header's undo works as always.
+- **Save as variant.** Keeps the look an answer produced, named after the request, so you can compare it with others later.
+- **Waiting.** An answer can take up to a minute. **Cancel** abandons the request and nothing is changed; so does leaving Design mode.
+
+The assistant has to be switched on, in the same way as for imports (see **The assistant** under **Import a floor plan**): set `ANTHROPIC_API_KEY` or `INTERIO_AI_PROVIDER=claude-code` in `.env` and restart `pnpm dev`. While it is off the panel says so and everything else keeps working. With it on, a description of the home (room names, sizes, finishes and furniture) and your request are sent to Anthropic; no picture is sent.
+
+## Variants
+
+A variant is a saved look of the home: the furniture, the room names, types and finishes, and the lighting. The walls are shared by every variant. Press **Variants** at the top right of Design mode; the button shows how many you have.
+
+- **Save.** Type a name (or keep "Variant 2", "Variant 3"...) and press **Save current look**. A small picture of the view is stored with it.
+- **First layout.** The first time a home is furnished, with **Furnish home** or **Furnish it for me**, that look is saved as **First layout** by itself, so there is always something to go back to.
+- **Compare.** The list shows the newest first, each with its picture, when it was saved, how many items it holds and the request that produced it. **Apply** makes the home look like that again. The variant that matches the home as it is now is marked **Current**.
+- **Unsaved changes.** If the look on screen is not saved anywhere, applying another variant first offers **Save and switch**, **Switch without saving** or **Cancel**. Applying is one undo step either way.
+- **Keep them tidy.** The pencil renames a variant, the arrows replace it with the current look, and the bin deletes it after a confirmation.
+- **Saved with the project.** Variants travel in the exported `.interio` file. Undo and redo never remove a saved variant.
+
 ## Walk through
 
 Walk mode puts you inside the home at eye height, starting just inside the entrance.
