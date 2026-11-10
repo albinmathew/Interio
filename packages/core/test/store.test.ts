@@ -57,3 +57,19 @@ describe('plan store', () => {
     expect(() => migrate({ schema: 99 })).toThrow(/Unsupported/);
   });
 });
+
+describe('gestures', () => {
+  it('cancels a gesture without leaving an undo step', () => {
+    const store = createPlanStore();
+    store.getState().loadProject(createSampleProject());
+    const before = store.getState().project;
+    const vid = Object.keys(selectLevel(store.getState())!.vertices)[0]!;
+    store.getState().beginGesture();
+    store.getState().moveVertex(vid, { x: 777, y: 777 });
+    store.getState().cancelGesture();
+    expect(store.getState().project).toBe(before);
+    expect(store.getState().past).toHaveLength(0);
+    store.getState().renameProject('After');
+    expect(store.getState().past).toHaveLength(1);
+  });
+});

@@ -177,6 +177,8 @@ export function deriveFaces(level: Level, minArea = 500_000): Face[] {
         edgeWalls.map((id) => (level.walls[id]?.thickness ?? 0) / 2),
       );
       const interiorArea = polygonArea(interior);
+      // The clear floor inside the walls must be usable too: ducts and shafts are not rooms.
+      if (interiorArea < minArea * 0.8) continue;
       faces.push({
         polygon,
         edgeWalls,

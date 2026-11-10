@@ -30,7 +30,7 @@ Walls must meet at shared vertices. Use `ops.addWall`, which welds endpoints, sp
 
 `planStore` (zustand) holds one open project with undo/redo. React: `usePlanStore(selector)`, `useLevel()`.
 
-Actions: `loadProject`, `applyDraft`, `addWall`, `moveVertex`, `weldVertices`, `splitWall`, `removeWall`, `setWallProps`, `addOpening`, `updateOpening`, `removeOpening`, `setRoomProps`, `addItem`, `updateItem`, `removeItem`, `mutateLevel`, `setLevelProps`, `setProjectSettings`, `select`, `transact`, `beginGesture` / `endGesture`, `undo`, `redo`.
+Actions: `loadProject`, `applyDraft`, `addWall`, `moveVertex`, `weldVertices`, `splitWall`, `removeWall`, `setWallProps`, `addOpening`, `updateOpening`, `removeOpening`, `setRoomProps`, `addItem`, `updateItem`, `removeItem`, `mutateLevel`, `setLevelProps`, `setProjectSettings`, `select`, `transact`, `beginGesture` / `endGesture` / `cancelGesture`, `undo`, `redo`.
 
 - Every action is one undo step. Wrap pointer drags in `beginGesture()` / `endGesture()` and multi-step edits in `transact()`.
 - Features keep UI state (active tool, camera, panels) in their **own** stores. Only plan data lives here.

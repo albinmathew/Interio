@@ -170,7 +170,7 @@ export default function Walkthrough() {
   return (
     <div ref={container} className="relative h-full w-full overflow-hidden bg-canvas select-none" data-testid="walkthrough">
       <Canvas
-        shadows
+        shadows="percentage"
         dpr={[1, 2]}
         style={{ touchAction: 'none' }}
         camera={{ position: [start.x / 1000, walkUi.get().eyeHeight / 1000, -start.y / 1000], fov, near: 0.05, far: 200 }}

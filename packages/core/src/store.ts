@@ -67,6 +67,8 @@ export interface PlanState {
   /** For pointer drags: every edit between begin and end is one undo step. */
   beginGesture(): void;
   endGesture(): void;
+  /** Aborts the open gesture: restores the plan as it was at `beginGesture` and records no undo step. */
+  cancelGesture(): void;
   undo(): void;
   redo(): void;
 }
@@ -234,6 +236,12 @@ export function createPlanStore(): PlanStore {
       },
       beginGesture: open,
       endGesture: close,
+      cancelGesture() {
+        const before = snapshot;
+        depth = 0;
+        snapshot = null;
+        if (before) set({ project: before });
+      },
       undo() {
         const { past, project, future } = get();
         const prev = past[past.length - 1];
