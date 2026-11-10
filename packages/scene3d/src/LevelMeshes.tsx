@@ -3,6 +3,7 @@ import {
   DEFAULT_WALL_MATERIAL,
   EXTERIOR_WALL_COLOR,
   selectLevelMesh,
+  type Id,
   type Level,
   type MeshGroup,
 } from '@interio/core';
@@ -22,6 +23,8 @@ export interface LevelMeshesProps {
   cutaway?: boolean;
   /** Hinged doors stand open and sliding doors are parked. Default true. */
   doorsOpen?: boolean;
+  /** Openings that stay shut while the others stand open (the front door when walking). */
+  closedDoors?: readonly Id[];
   /** Door and window joinery, railings and skirting boards. Default true. */
   details?: boolean;
   /** Tiling PBR textures for floors and feature walls. Default true; flat colours otherwise. */
@@ -55,7 +58,7 @@ function material(level: Level, g: MeshGroup, textures: boolean): THREE.MeshStan
  * mesh carries `userData.group` (the core MeshGroup) so pointer handlers can tell what
  * was hit; joinery meshes do not.
  */
-export function LevelMeshes({ level, showCeilings = false, cutaway = false, doorsOpen = true, details = true, textures = true }: LevelMeshesProps) {
+export function LevelMeshes({ level, showCeilings = false, cutaway = false, doorsOpen = true, closedDoors, details = true, textures = true }: LevelMeshesProps) {
   const mesh = selectLevelMesh(level);
   const rooms = level.rooms;
   const parts = useMemo(
@@ -115,7 +118,7 @@ export function LevelMeshes({ level, showCeilings = false, cutaway = false, door
       })}
       {details && (
         <>
-          <OpeningsLayer level={level} doorsOpen={doorsOpen} fade={fade} />
+          <OpeningsLayer level={level} doorsOpen={doorsOpen} closedDoors={closedDoors} fade={fade} />
           <RailingsLayer level={level} />
           <SkirtingLayer level={level} mesh={mesh} />
           <ContactShade level={level} ceilings={showCeilings} fade={fade} />
