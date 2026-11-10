@@ -3,7 +3,7 @@
  * input. Input is translated to canvas-relative pixels and handed to the
  * controller; panning and zooming are handled here.
  */
-import { usePlanStore, type Level, type Underlay } from '@interio/core';
+import { usePlanStore, type Level, type Pt, type Underlay } from '@interio/core';
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { useController } from './context';
 import type { PointerInput } from './controller';
@@ -25,6 +25,9 @@ export function Canvas({ level, underlay, underlayScale }: { level: Level; under
   const controller = useController();
   const ref = useRef<HTMLDivElement>(null);
   const pan = useRef<{ x: number; y: number } | null>(null);
+  // Touch points currently down, for two-finger pinch and pan.
+  const touches = useRef(new Map<number, Pt>());
+  const pinch = useRef<{ distance: number; mid: Pt } | null>(null);
   const view = useEditor((s) => s.view);
   const tool = useEditor((s) => s.tool);
   const spacePan = useEditor((s) => s.spacePan);
@@ -96,8 +99,24 @@ export function Canvas({ level, underlay, underlayScale }: { level: Level; under
     return { screen: { x: e.clientX - r.left, y: e.clientY - r.top }, shift: e.shiftKey, alt: e.altKey };
   };
 
+  const pinchState = () => {
+    const [a, b] = [...touches.current.values()];
+    if (!a || !b) return null;
+    return { distance: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+  };
+
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button === 2) return;
+    if (e.pointerType === 'touch') {
+      touches.current.set(e.pointerId, toInput(e).screen);
+      if (touches.current.size === 2) {
+        // A second finger turns the gesture into pinch-zoom: finish whatever the first one started.
+        controller.pointerUp();
+        pan.current = null;
+        pinch.current = pinchState();
+        return;
+      }
+    }
     // Commit any field being edited in the panel before the selection changes.
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && focused !== document.body) focused.blur();
@@ -108,6 +127,15 @@ export function Canvas({ level, underlay, underlayScale }: { level: Level; under
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) touches.current.set(e.pointerId, toInput(e).screen);
+    if (pinch.current) {
+      const next = pinchState();
+      if (!next) return;
+      const prev = pinch.current;
+      pinch.current = next;
+      editorStore.setState((s) => ({ view: zoomAt(panBy(s.view, next.mid.x - prev.mid.x, next.mid.y - prev.mid.y), next.mid, next.distance / prev.distance) }));
+      return;
+    }
     if (pan.current) {
       const dx = e.clientX - pan.current.x;
       const dy = e.clientY - pan.current.y;
@@ -120,6 +148,11 @@ export function Canvas({ level, underlay, underlayScale }: { level: Level; under
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    touches.current.delete(e.pointerId);
+    if (pinch.current) {
+      if (touches.current.size < 2) pinch.current = null;
+      return;
+    }
     if (pan.current) pan.current = null;
     else controller.pointerUp();
   };

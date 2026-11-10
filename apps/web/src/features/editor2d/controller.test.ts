@@ -153,6 +153,24 @@ describe('wall tool', () => {
     expect(t.ui.getState().tool).toBe('select');
   });
 
+  it('keeps openings inside their walls when a new wall splits one or a drag shortens one', () => {
+    const t = setup(createSampleProject());
+    t.c.setTool('wall');
+    // A partition landing inside the balcony sliding door (x 4500 to 7500 on the bottom wall).
+    t.click(5200, 1200);
+    t.click(5200, 0);
+    expect(validateLevel(t.level())).toEqual([]);
+    expect(t.undos()).toBe(1);
+    const sliding = Object.values(t.level().openings).find((o) => o.kind === 'sliding')!;
+    const wall = t.level().walls[sliding.wallId]!;
+    expect(sliding.offset + sliding.width / 2).toBeLessThanOrEqual(ops.wallLength(t.level(), wall));
+    // Shorten Bedroom 3's outer wall until its window no longer fits where it was.
+    t.c.setTool('select');
+    t.drag({ x: 12000, y: 9000 }, { x: 10400, y: 9000 }, { alt: true });
+    expect(validateLevel(t.level()).filter((i) => i.code === 'opening.bounds')).toEqual([]);
+    expect(t.undos()).toBe(2);
+  });
+
   it('uses the chosen wall kind and thickness', () => {
     const t = setup(createProject('Blank'));
     t.c.setTool('wall');
@@ -403,6 +421,12 @@ describe('split, measure and scale', () => {
     expect(Object.keys(t.level().walls)).toHaveLength(2);
     expect(t.plan.getState().selection).toEqual({ kind: 'vertex', id: t.vertexAt(3000, 0)! });
     expect(t.undos()).toBe(2);
+    // Not through a door: move the opening first.
+    t.plan.getState().addOpening({ wallId: Object.keys(t.level().walls)[0]!, offset: 1500, width: 900, height: 2100, sill: 0, kind: 'door' });
+    const doorWall = Object.values(t.level().walls)[0]!;
+    const { a: wa, b: wb } = ops.wallEnds(t.level(), doorWall);
+    t.move((wa.x + wb.x) / 2 + 40, 20);
+    expect(t.ui.getState().draft).toMatchObject({ kind: 'split', valid: false });
   });
 
   it('measures between two snapped points without touching the plan', () => {

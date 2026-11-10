@@ -22,7 +22,7 @@ import {
   type Bounds,
   type Insets,
 } from './logic/view';
-import { dissolveVertex, incidentWalls, perpendicularDelta } from './logic/walls';
+import { dissolveVertex, incidentWalls, perpendicularDelta, strayOpenings, tidyOpenings } from './logic/walls';
 import type { Draft, EditorStore } from './state';
 import { OPENING_TOOLS, toolByKey, type ToolId } from './tools';
 
@@ -86,6 +86,15 @@ export function createController(deps: ControllerDeps) {
   };
   const clearOverlays = () => ui.setState({ snap: null, guides: [] });
 
+  /**
+   * After an edit that changes wall lengths: keep doors and windows inside their
+   * walls. Call it inside the same gesture or transaction as the edit.
+   */
+  function keepOpeningsInWalls() {
+    const lv = level();
+    if (lv && strayOpenings(lv).length > 0) plan.getState().mutateLevel(tidyOpenings);
+  }
+
   function snapAt(input: PointerInput, extra: Partial<SnapContext> = {}): SnapResult | null {
     const lv = level();
     if (!lv) return null;
@@ -123,7 +132,11 @@ export function createController(deps: ControllerDeps) {
       return;
     }
     const st = ui.getState();
-    plan.getState().addWall(from, point, { kind: st.wallKind, thickness: st.wallThickness });
+    const s = plan.getState();
+    s.transact(() => {
+      s.addWall(from, point, { kind: st.wallKind, thickness: st.wallThickness });
+      keepOpeningsInWalls(); // the new wall may have split one that carries an opening
+    });
     const end = roundPt(point);
     const closes = d.chain.length >= 2 && dist(end, d.chain[0]!) < 1;
     if (landsOnPlan || closes) endDraft();
@@ -216,7 +229,9 @@ export function createController(deps: ControllerDeps) {
     const middle = vec.mid(a, b);
     const atMiddle = !input.alt && dist(point, middle) <= tol();
     if (atMiddle) point = middle;
-    const valid = dist(point, a) > 20 && dist(point, b) > 20;
+    const along = dist(point, a);
+    const inOpening = Object.values(lv.openings).some((o) => o.wallId === near.wallId && Math.abs(along - o.offset) < o.width / 2 + 50);
+    const valid = along > 20 && dist(point, b) > 20 && !inOpening;
     ui.setState({ draft: { kind: 'split', wallId: near.wallId, point, valid }, ...(atMiddle ? { snap: { point, kind: 'wall' as const }, guides: [] } : {}) });
   }
 
@@ -428,6 +443,7 @@ export function createController(deps: ControllerDeps) {
       s.weldVertices();
       if (!level()?.walls[p.target.id]) s.select(null);
     }
+    if (p.target.kind === 'vertex' || p.target.kind === 'wall') keepOpeningsInWalls();
     s.endGesture();
     ui.setState({ dragging: false, snap: null, guides: [] });
   }
@@ -687,6 +703,7 @@ export function createController(deps: ControllerDeps) {
     zoomBy,
     applyScale,
     deleteSelection,
+    keepOpeningsInWalls,
     nudge,
     flipDoor,
     endDraft,

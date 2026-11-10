@@ -110,7 +110,7 @@ const ItemLabels = memo(function ItemLabels({ level, view }: { level: Level; vie
     <g data-layer="item-labels" pointerEvents="none">
       {items.map(({ item, fp }) => {
         const span = Math.max(fp.w, fp.d) * view.scale;
-        if (span < 44) return null;
+        if (span < 64) return null;
         const c = planToScreen(view, item);
         const maxChars = Math.max(3, Math.floor(span / 6));
         const name = fp.name.length > maxChars ? `${fp.name.slice(0, maxChars - 1)}…` : fp.name;

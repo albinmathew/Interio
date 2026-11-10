@@ -93,6 +93,25 @@ export function dissolveVertex(level: Level, vertexId: Id): void {
   ops.removeOrphanVertices(level);
 }
 
+/** Openings that no longer fit their wall: past an end, or wider than the wall allows. */
+export function strayOpenings(level: Level): Opening[] {
+  return Object.values(level.openings).filter((o) => {
+    const wall = level.walls[o.wallId];
+    if (!wall || !level.vertices[wall.a] || !level.vertices[wall.b]) return true;
+    const length = ops.wallLength(level, wall);
+    return o.offset - o.width / 2 < -0.5 || o.offset + o.width / 2 > length + 0.5;
+  });
+}
+
+/**
+ * Pulls stray openings back inside their wall (shifting, then narrowing) and
+ * drops the ones whose wall is now too short to hold any opening. Mutates the
+ * level: run it inside `mutateLevel`.
+ */
+export function tidyOpenings(level: Level): void {
+  for (const o of strayOpenings(level)) if (!ops.clampOpening(level, o)) delete level.openings[o.id];
+}
+
 /** New position of vertex b so the wall a -> b has `length`, keeping its direction. */
 export function endForLength(a: Pt, b: Pt, length: number): Pt {
   const d = vec.norm(vec.sub(b, a));

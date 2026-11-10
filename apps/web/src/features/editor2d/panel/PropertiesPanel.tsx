@@ -48,12 +48,14 @@ const WALL_KIND_OPTIONS: { value: WallKind; label: string }[] = [
 ];
 
 function WallPanel({ level, wall }: { level: Level; wall: Wall }) {
+  const controller = useController();
   const { a, b } = ops.wallEnds(level, wall);
   const length = ops.wallLength(level, wall);
   const setLength = (next: number) =>
     store().transact(() => {
       store().moveVertex(wall.b, endForLength(a, b, next));
       store().weldVertices();
+      controller.keepOpeningsInWalls();
     });
   return (
     <>
@@ -221,11 +223,13 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
 }
 
 function VertexPanel({ level, id }: { level: Level; id: Id }) {
+  const controller = useController();
   const v = level.vertices[id]!;
   const move = (p: { x: number; y: number }) =>
     store().transact(() => {
       store().moveVertex(id, p);
       store().weldVertices();
+      controller.keepOpeningsInWalls();
     });
   const count = incidentWalls(level, id).length;
   return (
