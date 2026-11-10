@@ -70,14 +70,26 @@ describe('viewpoints', () => {
       const p = standPoint(world, r.id)!;
       expect(name(roomAtPoint(world, p)?.roomId)).toBe(r.name);
       expect(isFree(world.collider, p, 400), r.name).toBe(true);
-      expect(roomPose(world, r.id)).toMatchObject(p);
     }
   });
 
-  it('looks down the long axis of a room', () => {
-    // The corridor runs along x.
-    const yaw = roomPose(world, roomId('Corridor'))!.yawDeg;
-    expect(Math.abs(Math.cos((yaw * Math.PI) / 180))).toBeGreaterThan(0.95);
+  it('views each room from a corner, looking across the open floor', () => {
+    for (const r of Object.values(level.rooms)) {
+      const pose = roomPose(world, r.id)!;
+      const middle = standPoint(world, r.id)!;
+      expect(name(roomAtPoint(world, pose)?.roomId), r.name).toBe(r.name);
+      expect(isFree(world.collider, pose, 300), r.name).toBe(true);
+      // Nothing between the camera and the middle of the room.
+      expect(findPath(world.nav, pose, middle), r.name).not.toBeNull();
+      const facing = vec.rotate({ x: 1, y: 0 }, pose.yawDeg);
+      const toMiddle = vec.sub(middle, pose);
+      if (vec.len(toMiddle) > 1) expect(vec.dot(facing, vec.norm(toMiddle)), r.name).toBeGreaterThan(0.999);
+    }
+    // Big rooms are seen from well back; the corridor is seen along its length.
+    const living = roomPose(world, roomId('Living / Dining'))!;
+    expect(vec.dist(living, standPoint(world, roomId('Living / Dining'))!)).toBeGreaterThan(2500);
+    const corridor = roomPose(world, roomId('Corridor'))!;
+    expect(Math.abs(Math.cos((corridor.yawDeg * Math.PI) / 180))).toBeGreaterThan(0.95);
   });
 
   it('lands minimap clicks on walkable floor', () => {

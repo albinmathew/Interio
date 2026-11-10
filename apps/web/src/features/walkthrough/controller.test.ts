@@ -162,10 +162,11 @@ describe('guided tour playback', () => {
     expect(worstStep).toBeLessThan(25); // 1.2 m/s at 60 fps: it walked, it did not teleport
     expect(frames / 60).toBeGreaterThan(60);
     expect(frames / 60).toBeLessThan(240);
-    // Finished: the walker has the controls back.
+    // Finished: the walker has the controls back, and walking off clears the finished state.
     expect(c.manual).toBe(true);
-    c.stopTour();
-    expect(c.tourState().status).toBe('idle');
+    c.input.forward = 1;
+    c.update(1 / 60);
+    expect(c.tourState()).toMatchObject({ status: 'idle', visited: [] });
   });
 
   it('runs at any speed setting and frame rate', () => {

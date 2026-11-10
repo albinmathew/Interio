@@ -200,8 +200,7 @@ export class WalkController {
   }
 
   jumpToRoom(roomId: Id): boolean {
-    const here = isWalkable(this.world.nav, this) ? this.world.nav.component[this.cell()] : undefined;
-    const pose = roomPose(this.world, roomId, here);
+    const pose = roomPose(this.world, roomId);
     if (!pose) return false;
     if (this.tour) this.pauseTour();
     this.jumpTo(pose);
@@ -215,11 +214,6 @@ export class WalkController {
     if (this.tour) this.pauseTour();
     this.jumpTo({ ...at, yawDeg: deg(this.yaw) });
     return true;
-  }
-
-  private cell(): number {
-    const g = this.world.nav;
-    return Math.floor((this.y - g.minY) / g.cell) * g.cols + Math.floor((this.x - g.minX) / g.cell);
   }
 
   /** Moves by a plan-space offset through the collision code. Used by tests and the debug hook. */
@@ -275,6 +269,11 @@ export class WalkController {
   private updateManual(dt: number): void {
     const { input } = this;
     if (input.turn) this.yaw = wrap(this.yaw + input.turn * TURN_RATE * dt);
+    if (this.ended && (input.forward || input.strafe || this.target)) {
+      // Walking off after the tour: its closing caption has done its job.
+      this.ended = null;
+      this.changed();
+    }
     const top = input.run ? RUN_SPEED : WALK_SPEED;
     let wx = 0;
     let wy = 0;

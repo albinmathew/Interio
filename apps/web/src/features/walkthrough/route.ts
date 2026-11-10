@@ -75,48 +75,59 @@ export function inRoomOrDoorway(level: Level, rooms: RoomGeom[], p: Pt, toleranc
 /** Pockets smaller than this many cells (0.4 m2) are not offered as places to land. */
 const MIN_LANDING = 40;
 
+interface RoomFloor {
+  /** Room index in the grid. */
+  room: number;
+  /**
+   * Per cell: chamfer distance (10 = one cell) to the edge of the room's own
+   * walkable floor, 0 outside it. Doorways count as edges, so deep cells are in
+   * the body of the room, not on a threshold.
+   */
+  depth: Uint16Array;
+}
+
 /**
- * The best place to stand in a room: open floor, well clear of walls and
- * furniture, not far from the middle. Prefers the part of the room connected to
- * `component` (where the walker is coming from).
+ * The walkable floor of a room. A room split by furniture has several pieces:
+ * the one connected to `component` (where the walker is) is used when it is a
+ * real share of the room, otherwise the largest.
  */
-export function standPoint(world: WalkWorld, roomId: Id, component?: number): Pt | null {
+function roomFloor(world: WalkWorld, roomId: Id, component?: number): RoomFloor | null {
   const g = world.nav;
   const ri = roomIndexOf(g, roomId);
   if (ri < 0) return null;
-  const centre = world.rooms[ri]!.centroid;
-  const perComponent = new Map<number, number>();
+  const pieces = new Map<number, number>();
   for (let i = 0; i < g.free.length; i++) {
-    if (g.free[i] && g.room[i] === ri) perComponent.set(g.component[i]!, (perComponent.get(g.component[i]!) ?? 0) + 1);
+    if (g.free[i] && g.room[i] === ri) pieces.set(g.component[i]!, (pieces.get(g.component[i]!) ?? 0) + 1);
   }
-  if (perComponent.size === 0) return null;
-  let target = component;
-  if (target === undefined || (perComponent.get(target) ?? 0) < 4) {
-    target = [...perComponent.entries()].sort((a, b) => b[1] - a[1])[0]![0];
-  }
-  // Distance to the edge of this room's own walkable floor (doorways count as edges,
-  // so the answer is in the body of the room, not on a threshold).
+  if (pieces.size === 0) return null;
+  const [largest, size] = [...pieces.entries()].sort((m, n) => n[1] - m[1])[0]!;
+  const target = component !== undefined && (pieces.get(component) ?? 0) >= Math.max(4, size / 4) ? component : largest;
+
   const depth = new Uint16Array(g.free.length);
-  const mine = (i: number) => g.free[i] === 1 && g.room[i] === ri && g.component[i] === target;
-  for (let i = 0; i < depth.length; i++) depth[i] = mine(i) ? 60000 : 0;
+  for (let i = 0; i < depth.length; i++) depth[i] = g.free[i] === 1 && g.room[i] === ri && g.component[i] === target ? 60000 : 0;
   const at = (x: number, y: number) => (x < 0 || y < 0 || x >= g.cols || y >= g.rows ? 0 : depth[y * g.cols + x]!);
   for (let y = 0; y < g.rows; y++)
     for (let x = 0; x < g.cols; x++) {
       const i = y * g.cols + x;
       if (depth[i]) depth[i] = Math.min(depth[i]!, at(x - 1, y) + 10, at(x, y - 1) + 10, at(x - 1, y - 1) + 14, at(x + 1, y - 1) + 14);
     }
-  let best = -1;
-  let bestScore = -Infinity;
   for (let y = g.rows - 1; y >= 0; y--)
     for (let x = g.cols - 1; x >= 0; x--) {
       const i = y * g.cols + x;
-      if (!depth[i]) continue;
-      depth[i] = Math.min(depth[i]!, at(x + 1, y) + 10, at(x, y + 1) + 10, at(x + 1, y + 1) + 14, at(x - 1, y + 1) + 14);
+      if (depth[i]) depth[i] = Math.min(depth[i]!, at(x + 1, y) + 10, at(x, y + 1) + 10, at(x + 1, y + 1) + 14, at(x - 1, y + 1) + 14);
     }
-  for (let i = 0; i < depth.length; i++) {
-    if (!depth[i]) continue;
+  return { room: ri, depth };
+}
+
+function middleOf(world: WalkWorld, floor: RoomFloor): Pt | null {
+  const g = world.nav;
+  const centre = world.rooms[floor.room]!.centroid;
+  let best = -1;
+  let bestScore = -Infinity;
+  for (let i = 0; i < floor.depth.length; i++) {
+    if (!floor.depth[i]) continue;
     // 1 unit is 10 mm of clearance; a metre off-centre costs as much as 200 mm of clearance.
-    const score = Math.min(depth[i]!, 120) - 0.02 * vec.dist(cellCentre(g, i), centre);
+    const score = Math.min(floor.depth[i]!, 120) - 0.02 * vec.dist(cellCentre(g, i), centre);
     if (score > bestScore) {
       bestScore = score;
       best = i;
@@ -125,11 +136,48 @@ export function standPoint(world: WalkWorld, roomId: Id, component?: number): Pt
   return best < 0 ? null : cellCentre(g, best);
 }
 
-/** A viewpoint for jumping into a room: its stand point, looking down the longest view. */
+/**
+ * The best place to stand and look around a room: open floor, well clear of
+ * walls and furniture, not far from the middle. Prefers the part of the room
+ * connected to `component` (where the walker is coming from).
+ */
+export function standPoint(world: WalkWorld, roomId: Id, component?: number): Pt | null {
+  const floor = roomFloor(world, roomId, component);
+  return floor ? middleOf(world, floor) : null;
+}
+
+/**
+ * A viewpoint for jumping into a room, the way a room is photographed: back in
+ * the corner furthest from the middle of the open floor, looking across it.
+ * Falls back to the middle, looking down the longest view.
+ */
 export function roomPose(world: WalkWorld, roomId: Id, component?: number): Pose | null {
-  const p = standPoint(world, roomId, component);
-  if (!p) return null;
-  return { ...p, yawDeg: longestView(world.nav, p, roomIndexOf(world.nav, roomId)) };
+  const floor = roomFloor(world, roomId, component);
+  const middle = floor && middleOf(world, floor);
+  if (!floor || !middle) return null;
+  const g = world.nav;
+  const inRoom = (i: number) => floor.depth[i]! > 0;
+  const sees = (from: Pt): boolean => {
+    const n = Math.max(1, Math.ceil(vec.dist(from, middle) / (g.cell / 2)));
+    for (let k = 0; k <= n; k++) {
+      const i = cellIndex(g, vec.lerp(from, middle, k / n));
+      if (i < 0 || !inRoom(i)) return false;
+    }
+    return true;
+  };
+  let eye: Pt | null = null;
+  let far = 600; // closer than this there is no room to look across: stay in the middle
+  for (let i = 0; i < floor.depth.length; i++) {
+    if (floor.depth[i]! < 24) continue; // third ring in: off the wall, and never in a door opening
+    const p = cellCentre(g, i);
+    const d = vec.dist(p, middle);
+    if (d > far && sees(p)) {
+      far = d;
+      eye = p;
+    }
+  }
+  if (!eye) return { ...middle, yawDeg: longestView(g, middle, floor.room) };
+  return { ...eye, yawDeg: (Math.atan2(middle.y - eye.y, middle.x - eye.x) * 180) / Math.PI };
 }
 
 /** A walkable point at or near `p` for UI jumps (minimap clicks), avoiding dead pockets. */
