@@ -36,7 +36,7 @@ export const ROOM_TYPES = [
 export const RoomTypeSchema = z.enum(ROOM_TYPES);
 export type RoomType = z.infer<typeof RoomTypeSchema>;
 
-export const WALL_KINDS = ['wall', 'low', 'railing'] as const;
+export const WALL_KINDS = ['wall', 'low', 'railing', 'divider'] as const;
 export const WallKindSchema = z.enum(WALL_KINDS);
 export type WallKind = z.infer<typeof WallKindSchema>;
 
@@ -48,7 +48,11 @@ export const WallSchema = z.object({
   b: z.string(),
   thickness: z.number().positive(),
   height: z.number().positive(),
-  /** `wall` is full height; `low` is a parapet/half wall; `railing` is a balcony railing. All three bound rooms. */
+  /**
+   * `wall` is full height; `low` is a parapet/half wall; `railing` is a balcony railing;
+   * `divider` is a boundary between zones of an open-plan space (foyer / dining / living):
+   * it bounds rooms like any wall but has no 3D geometry and does not block movement.
+   */
   kind: WallKindSchema.default('wall'),
 });
 export type Wall = z.infer<typeof WallSchema>;
@@ -305,6 +309,8 @@ export const DEFAULTS = {
   lowWallHeight: 1000,
   railingHeight: 1100,
   railingThickness: 60,
+  dividerThickness: 10,
+  dividerHeight: 10,
   doorWidth: 900,
   doorHeight: 2100,
   windowWidth: 1500,

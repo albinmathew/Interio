@@ -16,7 +16,7 @@ What every package may rely on. `packages/core` is the source of truth; this pag
 
 | Type | Notes |
 |---|---|
-| `Wall` | Between two **shared vertices** `a`, `b` along its centreline. `thickness`, `height`, `kind: wall \| low \| railing`. "Left" is the CCW normal of a -> b. |
+| `Wall` | Between two **shared vertices** `a`, `b` along its centreline. `thickness`, `height`, `kind: wall \| low \| railing \| divider`. A `divider` splits an open-plan space into rooms: it bounds rooms and connects them in `roomGraph`, but has no 3D geometry and does not block movement. "Left" is the CCW normal of a -> b. |
 | `Opening` | On a wall. `offset` is the distance from vertex `a` to the opening's **centre**. `kind: door \| sliding \| window \| passage`, `width`, `height`, `sill`, `hinge`, `swing`. |
 | `Room` | A named **seed point**. Its polygon is derived from the wall graph; name, type and finishes follow the seed. |
 | `Item` | `catalogId`, centre `x`,`y`, underside elevation `z`, `rotationDeg`. At 0 degrees the front faces plan -y and width runs along x. |

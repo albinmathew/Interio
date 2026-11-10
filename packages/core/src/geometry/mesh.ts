@@ -244,7 +244,9 @@ function buildWall(
 function compute(level: Level): LevelMesh {
   const groups: MeshGroup[] = [];
   const rooms = deriveRooms(level);
-  for (const fp of wallFootprints(level)) buildWall(level, fp, rooms, groups);
+  for (const fp of wallFootprints(level)) {
+    if (level.walls[fp.wallId]?.kind !== 'divider') buildWall(level, fp, rooms, groups);
+  }
 
   rooms.forEach((room, i) => {
     const key = room.roomId ?? `face${i}`;

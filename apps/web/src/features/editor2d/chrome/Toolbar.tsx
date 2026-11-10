@@ -88,10 +88,17 @@ const WALL_KINDS: { value: WallKind; label: string; title: string }[] = [
   { value: 'wall', label: 'Wall', title: 'Full-height wall' },
   { value: 'low', label: 'Low', title: 'Low wall or parapet' },
   { value: 'railing', label: 'Railing', title: 'Balcony railing' },
+  { value: 'divider', label: 'Divider', title: 'Open-plan divider: splits a space into rooms without a wall' },
 ];
 
 const kindThickness = (kind: WallKind): number =>
-  kind === 'railing' ? DEFAULTS.railingThickness : kind === 'low' ? DEFAULTS.partitionThickness : DEFAULTS.wallThickness;
+  kind === 'railing'
+    ? DEFAULTS.railingThickness
+    : kind === 'low'
+      ? DEFAULTS.partitionThickness
+      : kind === 'divider'
+        ? DEFAULTS.dividerThickness
+        : DEFAULTS.wallThickness;
 
 /** What the active tool does, plus its options. */
 export function HintBar() {

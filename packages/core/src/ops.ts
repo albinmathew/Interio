@@ -120,8 +120,16 @@ function resolveWallProps(level: Level, props?: WallProps): Pick<Wall, 'thicknes
   const kind = props?.kind ?? 'wall';
   const height =
     props?.height ??
-    (kind === 'railing' ? DEFAULTS.railingHeight : kind === 'low' ? DEFAULTS.lowWallHeight : level.ceilingHeight);
-  const thickness = props?.thickness ?? (kind === 'railing' ? DEFAULTS.railingThickness : DEFAULTS.wallThickness);
+    (kind === 'railing'
+      ? DEFAULTS.railingHeight
+      : kind === 'low'
+        ? DEFAULTS.lowWallHeight
+        : kind === 'divider'
+          ? DEFAULTS.dividerHeight
+          : level.ceilingHeight);
+  const thickness =
+    props?.thickness ??
+    (kind === 'railing' ? DEFAULTS.railingThickness : kind === 'divider' ? DEFAULTS.dividerThickness : DEFAULTS.wallThickness);
   return { kind, height, thickness };
 }
 
@@ -256,7 +264,7 @@ export function addItem(level: Level, item: Omit<Item, 'id'>): Id {
   return id;
 }
 
-const ROOM_MIN_AREA = 200_000; // mm^2
+const ROOM_MIN_AREA = 500_000; // mm^2: smaller faces are shafts and wall pockets, not rooms
 
 /**
  * Re-attaches rooms to the faces of the wall graph: each room follows its seed,
