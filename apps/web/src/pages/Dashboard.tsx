@@ -338,7 +338,7 @@ function StartCard({ icon, title, body, onClick, testId, busy, extra }: StartCar
           data-testid={extra.testId}
           title={extra.hint}
           onClick={extra.onClick}
-          className="flex w-[104px] shrink-0 flex-col items-center justify-center gap-1 border-l border-line px-2 text-center text-xs leading-tight font-medium text-accent-strong hover:bg-accent-soft"
+          className="flex w-[124px] shrink-0 flex-col items-center justify-center gap-1 border-l border-line px-2 text-center text-xs leading-tight font-medium text-accent-strong hover:bg-accent-soft"
         >
           {extra.busy ? <Spinner /> : <Sparkles className="h-4 w-4" />}
           {extra.label}

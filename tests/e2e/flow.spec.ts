@@ -461,13 +461,13 @@ test.describe('docs screenshots', () => {
     await page.waitForURL(/\/p\/[^/]+\/design$/);
     await designReady(page);
     await page.getByLabel('Project name').fill('Sample home');
+    await page.getByLabel('Project name').blur();
     await expect(toastMessage(page)).toBeHidden({ timeout: 10_000 });
     await page.waitForTimeout(1500);
     await shot(page, 'design.jpg');
 
     await gotoMode(page, 'plan');
-    await clickPlan2d(page, 6500, 2000);
-    await expect(panel(page)).toHaveAttribute('data-selection', 'room');
+    await expect(page.getByTestId('total-rooms')).toHaveText('10');
     await page.waitForTimeout(500);
     await shot(page, 'plan.jpg');
 
