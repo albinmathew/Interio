@@ -248,6 +248,8 @@ export const STUB_HEIGHT = 0.1;
 export function stubBoxes(level: Pick<Level, 'walls' | 'vertices' | 'openings'>): BoxSpec[] {
   const degree = new Map<string, number>();
   for (const w of Object.values(level.walls)) {
+    // Dividers have no body, so they do not make a corner.
+    if (w.kind === 'divider') continue;
     degree.set(w.a, (degree.get(w.a) ?? 0) + 1);
     degree.set(w.b, (degree.get(w.b) ?? 0) + 1);
   }

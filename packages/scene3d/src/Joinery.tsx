@@ -87,8 +87,10 @@ function OpeningObject({ level, opening, doorsOpen, fade }: { level: Level; open
   const wall = level.walls[opening.wallId];
   const thickness = wall?.thickness;
   const height = wall?.height;
+  // A divider is a line between zones of one space, not a wall: nothing to hang joinery on.
+  const bodiless = wall?.kind === 'divider';
   const parts = useMemo(() => {
-    if (thickness === undefined || height === undefined) return null;
+    if (thickness === undefined || height === undefined || bodiless) return null;
     const spec = openingParts(opening, thickness, height, doorsOpen);
     if (!spec || spec.kind === 'passage') return null;
     const look = LOOKS[spec.kind];
@@ -98,7 +100,7 @@ function OpeningObject({ level, opening, doorsOpen, fade }: { level: Level; open
       ...part('metal', spec.metal, () => solid(look.metal)),
       ...part('glass', spec.glass, glass, false),
     ];
-  }, [opening, thickness, height, doorsOpen]);
+  }, [opening, thickness, height, doorsOpen, bodiless]);
   useDisposable(parts);
   useEffect(() => {
     if (!parts || !fade) return;

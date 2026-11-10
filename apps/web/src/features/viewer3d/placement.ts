@@ -6,7 +6,7 @@
  * Item convention (see core `Item`): at rotation 0 the width runs along plan +x and
  * the front faces plan -y, so the back is towards +y.
  */
-import type { CatalogEntry, Id, Item, Level, Pt, RoomGeom } from '@interio/core';
+import type { CatalogEntry, Id, Item, Level, Pt, RoomGeom, Wall } from '@interio/core';
 
 export interface Pose {
   x: number;
@@ -88,7 +88,15 @@ export interface WallRun {
   pieces: [number, number, Id][];
 }
 
-export function wallRuns(room: Pick<RoomGeom, 'interior' | 'edgeWalls'>): WallRun[] {
+/** Walls by id, to tell real walls from open-plan dividers. */
+export type WallKinds = Record<Id, Pick<Wall, 'kind'>>;
+
+/**
+ * The stretches of a room's boundary that are real walls. Edges along a `divider` (the
+ * line between zones of an open-plan space) are left out: furniture neither snaps to
+ * them nor is held back by them.
+ */
+export function wallRuns(room: Pick<RoomGeom, 'interior' | 'edgeWalls'>, walls?: WallKinds): WallRun[] {
   const poly = room.interior;
   const n = poly.length;
   const runs: WallRun[] = [];
@@ -99,6 +107,7 @@ export function wallRuns(room: Pick<RoomGeom, 'interior' | 'edgeWalls'>): WallRu
     if (length < 1) continue;
     const dir = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
     const wallId = room.edgeWalls[i] ?? '';
+    if (walls?.[wallId]?.kind === 'divider') continue;
     const last = runs[runs.length - 1];
     // Counter-clockwise polygon: the interior is on the left of every edge.
     if (last && Math.abs(last.dir.x * dir.y - last.dir.y * dir.x) < 1e-3 && dot(last.dir, dir) > 0 && Math.hypot(last.b.x - a.x, last.b.y - a.y) < 1) {
@@ -112,7 +121,8 @@ export function wallRuns(room: Pick<RoomGeom, 'interior' | 'edgeWalls'>): WallRu
   // The polygon is closed: the last run may continue into the first.
   const first = runs[0];
   const last = runs[runs.length - 1];
-  if (first && last && first !== last && Math.abs(last.dir.x * first.dir.y - last.dir.y * first.dir.x) < 1e-3 && dot(last.dir, first.dir) > 0) {
+  const joined = first && last && Math.hypot(last.b.x - first.a.x, last.b.y - first.a.y) < 1;
+  if (first && last && first !== last && joined && Math.abs(last.dir.x * first.dir.y - last.dir.y * first.dir.x) < 1e-3 && dot(last.dir, first.dir) > 0) {
     last.pieces.push(...first.pieces.map(([s, e, id]) => [s + last.length, e + last.length, id] as [number, number, Id]));
     last.b = first.b;
     last.length += first.length;
@@ -204,6 +214,8 @@ export interface FloorOptions {
   rotationDeg: number;
   /** Distance (mm) between the item's back and a wall within which it snaps. Default 250; 0 disables snapping. */
   snap?: number;
+  /** The level's walls, so open-plan dividers can be told from real walls. */
+  walls?: WallKinds;
 }
 
 /**
@@ -214,7 +226,7 @@ export interface FloorOptions {
 export function placeOnFloor(rooms: RoomGeom[], size: Size, cursor: Pt, opts: FloorOptions): Placement {
   const found = roomFor(rooms, cursor);
   if (!found) return { x: cursor.x, y: cursor.y, z: 0, rotationDeg: opts.rotationDeg, ok: false };
-  const runs = wallRuns(found.room);
+  const runs = wallRuns(found.room, opts.walls);
   const p = found.point;
   const snap = opts.snap ?? 250;
 
@@ -255,12 +267,12 @@ export function placeOnFloor(rooms: RoomGeom[], size: Size, cursor: Pt, opts: Fl
 }
 
 /** Where a wall-anchored item lands: flat against the nearest wall of the room, facing into it. */
-export function placeOnWall(rooms: RoomGeom[], size: Size, cursor: Pt, opts: { roomId?: Id | null } = {}): Placement {
+export function placeOnWall(rooms: RoomGeom[], size: Size, cursor: Pt, opts: { roomId?: Id | null; walls?: WallKinds } = {}): Placement {
   const pinned = opts.roomId ? rooms.find((r) => r.roomId === opts.roomId) : undefined;
   const found = pinned ? { room: pinned, point: cursor } : roomFor(rooms, cursor);
   if (!found) return { x: cursor.x, y: cursor.y, z: 0, rotationDeg: 0, ok: false };
   let best: { run: WallRun; t: number; distance: number } | null = null;
-  for (const run of wallRuns(found.room)) {
+  for (const run of wallRuns(found.room, opts.walls)) {
     const rel = sub(found.point, run.a);
     const t = clamp(dot(rel, run.dir), 0, run.length);
     const q = add(run.a, mul(run.dir, t));
@@ -302,13 +314,19 @@ export function defaultElevation(entry: CatalogEntry, ceilingHeight: number, sca
 }
 
 /** Placement of a catalog entry for a cursor position, by anchor: floor, wall or ceiling. */
-export function placeEntry(level: Pick<Level, 'ceilingHeight'>, rooms: RoomGeom[], entry: CatalogEntry, cursor: Pt, opts: PlaceOptions): Placement {
+export function placeEntry(
+  level: Pick<Level, 'ceilingHeight'> & Partial<Pick<Level, 'walls'>>,
+  rooms: RoomGeom[],
+  entry: CatalogEntry,
+  cursor: Pt,
+  opts: PlaceOptions,
+): Placement {
   const scale = opts.scale ?? 1;
   const size = { w: entry.dims.w * scale, d: entry.dims.d * scale };
   const z = opts.z ?? defaultElevation(entry, level.ceilingHeight, scale);
-  if (entry.anchor === 'wall') return { ...placeOnWall(rooms, size, cursor, { roomId: opts.wallRoomId }), z };
+  if (entry.anchor === 'wall') return { ...placeOnWall(rooms, size, cursor, { roomId: opts.wallRoomId, walls: level.walls }), z };
   const snap = entry.anchor === 'floor' && opts.snap !== false ? undefined : 0;
-  return { ...placeOnFloor(rooms, size, cursor, { rotationDeg: opts.rotationDeg, snap }), z };
+  return { ...placeOnFloor(rooms, size, cursor, { rotationDeg: opts.rotationDeg, snap, walls: level.walls }), z };
 }
 
 /* ---------------------------------------------------------------- overlap */
@@ -398,7 +416,10 @@ export function findOverlaps(
     const size = itemSize(entry, item);
     return [{ item, poly: footprint(item, size), z0: item.z, z1: item.z + size.h, radius: Math.hypot(size.w, size.d) / 2 }];
   });
-  const walls = Object.values(level.walls).map((wall) => ({ id: wall.id, height: wall.height, solids: wallSolids(level, wall.id) }));
+  // Dividers have no body: nothing to bump into.
+  const walls = Object.values(level.walls)
+    .filter((wall) => wall.kind !== 'divider')
+    .map((wall) => ({ id: wall.id, height: wall.height, solids: wallSolids(level, wall.id) }));
   const out = new Map<Id, Overlap>();
   const entry = (id: Id): Overlap => out.get(id) ?? out.set(id, { items: [], walls: [] }).get(id)!;
   for (let i = 0; i < boxes.length; i++) {
