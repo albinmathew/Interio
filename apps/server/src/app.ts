@@ -3,17 +3,19 @@
  *
  *   GET  /api/health        -> { ok, ai, model, provider }
  *   POST /api/analyze-plan  -> AnalyzePlanResponse (see @interio/core)
+ *   POST /api/design-edit   -> DesignEditResponse  (see @interio/core)
  *
  * analyze-plan request: { image: base64 PNG|JPEG, mediaType, fileName? }
  *   200 { available: false }                 no provider configured; the client imports vector-only
  *   200 { available: true, result, model }   the reading
  *   400 / 413 / 502 { available: true, error }
  */
-import type { AnalyzePlanResponse } from '@interio/core';
+import { DesignEditRequestSchema, type AnalyzePlanResponse, type DesignEditResponse } from '@interio/core';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { effortFromEnv, fallbacksFromEnv, modelFromEnv, visionFromEnv, type Env, type Provider } from './config';
+import { designEdit } from './design/edit';
 import { AnalyzeError, MAX_IMAGE_BYTES, analyzePlan, type VisionSettings } from './vision/analyze';
 
 export interface AppOptions extends Partial<Omit<VisionSettings, 'client'>> {
@@ -55,6 +57,7 @@ export function createApp(options: AppOptions = {}): Hono {
   if (!client) {
     // Answered without reading the body: with no provider there is nothing to validate it for.
     app.post('/api/analyze-plan', (c) => c.json({ available: false } satisfies AnalyzePlanResponse));
+    app.post('/api/design-edit', (c) => c.json({ available: false } satisfies DesignEditResponse));
   } else {
     const settings: VisionSettings = {
       ...overrides,
@@ -89,6 +92,43 @@ export function createApp(options: AppOptions = {}): Hono {
           return c.json({ available: true, result, model: servedBy } satisfies AnalyzePlanResponse);
         } catch (error) {
           if (error instanceof AnalyzeError) return c.json(failure(error.message), error.status);
+          throw error;
+        }
+      },
+    );
+  }
+
+  if (client) {
+    const settings: VisionSettings = {
+      ...overrides,
+      client,
+      model,
+      effort: overrides.effort ?? effortFromEnv(env),
+      fallbacks: overrides.fallbacks ?? fallbacksFromEnv(env),
+    };
+    const fail = (error: string): DesignEditResponse => ({ available: true, error });
+
+    // A design request in plain language: the home, the catalog and the request in; a reply and operations out.
+    app.post(
+      '/api/design-edit',
+      bodyLimit({ maxSize: 1_000_000, onError: (c) => c.json(fail('Request body is too large'), 413) }),
+      async (c) => {
+        let json: unknown;
+        try {
+          json = await c.req.json();
+        } catch {
+          return c.json(fail('Request body must be JSON'), 400);
+        }
+        const parsed = DesignEditRequestSchema.safeParse(json);
+        if (!parsed.success) {
+          const field = parsed.error.issues[0]?.path[0];
+          return c.json(fail(`Request is not valid${typeof field === 'string' ? `: ${field}` : ''}`), 400);
+        }
+        try {
+          const { reply, ops, model: servedBy } = await designEdit(settings, parsed.data);
+          return c.json({ available: true, reply, ops, model: servedBy } satisfies DesignEditResponse);
+        } catch (error) {
+          if (error instanceof AnalyzeError) return c.json(fail(error.message), error.status);
           throw error;
         }
       },

@@ -186,9 +186,21 @@ function applyOne(op: DesignOp): Omit<AppliedOp, 'op'> {
       if (!item) return { ok: false, message: 'That item is no longer in the plan' };
       if (!entry) return { ok: false, message: `"${op.catalogId}" is not in the catalog` };
       if (item.catalogId === op.catalogId) return { ok: false, message: `It is already a ${entry.name}` };
-      const z = entry.anchor === 'ceiling' ? l.ceilingHeight - entry.dims.h : entry.anchor === 'wall' ? (entry.mountHeight ?? item.z) : item.z;
-      store.updateItem(op.itemId, { catalogId: op.catalogId, z });
-      return { ok: true, message: `Swapped ${entryName(item.catalogId)} for ${entry.name}` };
+      const swapped = `Swapped ${entryName(item.catalogId)} for ${entry.name}`;
+      if (!item.roomId || !l.rooms[item.roomId]) {
+        store.updateItem(op.itemId, { catalogId: op.catalogId });
+        return { ok: true, message: swapped };
+      }
+      // The new piece may be a different size: find it a proper spot as close as possible to where the old one stood.
+      store.removeItem(op.itemId);
+      const placed = placeEntry(level()!, item.roomId, op.catalogId, { near: { x: item.x, y: item.y } });
+      if (!placed) {
+        const { id: _id, ...old } = item;
+        store.addItem(old);
+        return { ok: false, message: `No free space for ${entry.name} where ${entryName(item.catalogId)} stands` };
+      }
+      store.addItem({ ...placed, roomId: item.roomId });
+      return { ok: true, message: swapped };
     }
 
     case 'set_lighting': {

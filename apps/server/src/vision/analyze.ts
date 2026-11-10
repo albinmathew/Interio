@@ -9,7 +9,7 @@ import { OUTPUT_SCHEMA, SYSTEM_PROMPT, buildUserText } from './prompt';
 import { resizedSize, resolutionTierFor } from './resize';
 import { parseJsonText, toVisionResult } from './sanitize';
 
-type CreateParams = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming;
+export type CreateParams = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming;
 
 /** The part of a Messages response this module reads. */
 export interface VisionMessage {
@@ -90,7 +90,7 @@ const MAX_IMAGE_EDGE = 8000;
 const MAX_OUTPUT_TOKENS = 16_000;
 const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_RETRY_DELAY_MS = 750;
-const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+export const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
 export async function analyzePlan(settings: VisionSettings, input: AnalyzeInput): Promise<AnalyzeOutput> {
@@ -161,14 +161,16 @@ function tooLarge(maxBytes: number): AnalyzeError {
   return new AnalyzeError(413, `image is larger than ${(maxBytes / 1_000_000).toFixed(1)} MB`);
 }
 
-interface RetryOptions {
+export interface RetryOptions {
   timeoutMs: number;
   retryDelayMs: number;
   logger: Logger;
+  /** Prefix of log lines. Default `analyze-plan`. */
+  label?: string;
 }
 
 /** One attempt plus at most one retry, and only for failures that a retry can fix. */
-async function createWithRetry(client: VisionClient, params: CreateParams, opts: RetryOptions): Promise<VisionMessage> {
+export async function createWithRetry(client: VisionClient, params: CreateParams, opts: RetryOptions): Promise<VisionMessage> {
   for (let attempt = 1; ; attempt++) {
     try {
       // Retries are counted here, so the SDK's own are switched off.
@@ -176,7 +178,7 @@ async function createWithRetry(client: VisionClient, params: CreateParams, opts:
     } catch (error) {
       const failure = describeFailure(error);
       // Status, error class and request id only: upstream bodies and anything credential-shaped stay out of logs and replies.
-      opts.logger('analyze-plan: upstream call failed', { attempt, ...failure.detail });
+      opts.logger(`${opts.label ?? 'analyze-plan'}: upstream call failed`, { attempt, ...failure.detail });
       if (!failure.retryable || attempt >= 2) throw new AnalyzeError(502, failure.message);
       await new Promise((resolve) => setTimeout(resolve, opts.retryDelayMs));
     }
@@ -221,7 +223,7 @@ function describeFailure(error: unknown): Failure {
   return failure(false, 'The AI service rejected the request.');
 }
 
-const defaultLogger: Logger = (message, detail) => {
+export const defaultLogger: Logger = (message, detail) => {
   if (detail) console.error(message, detail);
   else console.error(message);
 };

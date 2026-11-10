@@ -86,8 +86,21 @@ describe('applying design operations', () => {
     expect(results[1]!.message).toMatch(/No free space for .* in Bath 2/);
     expect(itemsIn(room('Living / Dining').id).filter((i) => i.catalogId === 'armchair')).toHaveLength(2);
     expect(itemsIn(kitchen.id)).toHaveLength(before - 1);
-    expect(level().items[swap.id]!.catalogId).toBe(other);
+    // The swapped piece is placed afresh near the old spot, so it never ends up through a wall.
+    expect(level().items[swap.id]).toBeUndefined();
+    const fridges = itemsIn(kitchen.id).filter((i) => i.catalogId.startsWith('fridge'));
+    expect(fridges.map((i) => i.catalogId)).toEqual([other]);
+    expect(Math.hypot(fridges[0]!.x - swap.x, fridges[0]!.y - swap.y)).toBeLessThan(400);
     expect(planStore.getState().project!.settings['viewer3d.lighting']).toBe('evening');
+  });
+
+  it('keeps the old piece when its replacement does not fit', () => {
+    const bath = room('Bath 2');
+    planStore.getState().addItem({ catalogId: 'basin.pedestal', x: bath.seed.x, y: bath.seed.y, z: 0, rotationDeg: 0, roomId: bath.id });
+    const basin = itemsIn(bath.id)[0]!;
+    const [result] = applyDesignOps([{ op: 'replace_item', itemId: basin.id, catalogId: 'sofa.corner' }]);
+    expect(result).toMatchObject({ ok: false, message: 'No free space for Corner sofa where Pedestal basin stands' });
+    expect(itemsIn(bath.id).map((i) => i.catalogId)).toEqual(['basin.pedestal']);
   });
 
   it('leaves no undo step when nothing could be applied', () => {
