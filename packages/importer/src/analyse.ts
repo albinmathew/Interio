@@ -132,6 +132,20 @@ export function analyse(ex: Extracted, overrides?: Record<string, LayerRole>): A
   const wb = boundsOf(wallSegs);
   const margin = 0.08 * Math.max(wb.maxX - wb.minX, wb.maxY - wb.minY);
   const crop: Box = { minX: wb.minX - margin, minY: wb.minY - margin, maxX: wb.maxX + margin, maxY: wb.maxY + margin };
+  if (mode === 'layers') {
+    // Balconies hang outside the walls: let railings, doors and windows near the plan widen the crop.
+    const reach = 0.3 * Math.max(wb.maxX - wb.minX, wb.maxY - wb.minY);
+    const near: Box = { minX: wb.minX - reach, minY: wb.minY - reach, maxX: wb.maxX + reach, maxY: wb.maxY + reach };
+    const pad = 0.25 * margin;
+    for (const s of ex.segs) {
+      const role = roles[s.layer];
+      if ((role !== 'lowWall' && role !== 'window' && role !== 'door') || !inBox(s, near)) continue;
+      crop.minX = Math.min(crop.minX, Math.min(s.x1, s.x2) - pad);
+      crop.minY = Math.min(crop.minY, Math.min(s.y1, s.y2) - pad);
+      crop.maxX = Math.max(crop.maxX, Math.max(s.x1, s.x2) + pad);
+      crop.maxY = Math.max(crop.maxY, Math.max(s.y1, s.y2) + pad);
+    }
+  }
   const diag = Math.hypot(wb.maxX - wb.minX, wb.maxY - wb.minY);
 
   const paired = pairStrips(wallSegs, dirs, { maxT: diag / 35, oriented: 'auto' });

@@ -258,7 +258,7 @@ export function pairStrips(edges: EdgeIn[], dirs: Dirs, opts: PairOptions): Pair
   const strict = run(true);
   if (opts.oriented === true) return strict;
   // Outlines that wrap rooms instead of walls have their solid side outside: fall back to plain pairing.
-  return totalLength(strict.strips) >= 0.7 * totalLength(plain.strips) ? strict : plain;
+  return totalLength(strict.strips) >= 0.5 * totalLength(plain.strips) ? strict : plain;
 }
 
 /**
