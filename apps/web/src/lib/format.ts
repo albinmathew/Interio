@@ -7,6 +7,13 @@ export const squareFeet = (mm2: number): string => `${Math.round(mm2 / 92_903.04
 /** 3400, 3960 -> "3400 × 3960" */
 export const dims = (w: number, d: number): string => `${Math.round(w)} × ${Math.round(d)}`;
 
+/** 1 250 000 -> "1.2 MB", 48 000 -> "47 KB" */
+export function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function timeAgo(ts: number): string {
   const s = Math.max(0, (Date.now() - ts) / 1000);
   if (s < 60) return 'just now';
