@@ -8,6 +8,7 @@ import { Line, OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react';
 import * as THREE from 'three';
+import { Effects, HELPER_LAYER } from './Effects';
 import { clampTarget, fitOrbit, fitTop, freeView, type Box, type CameraPose } from './camera';
 import { findOverlaps, itemSize, type Overlap } from './placement';
 import { cameraState, entryOrPlaceholder, registerEntry, useViewer, type ViewMode } from './state';
@@ -70,8 +71,8 @@ function Outline({ item, color, handle }: { item: Item; color: string; handle: b
   return (
     <>
       <group position={[item.x / 1000, item.z / 1000, -item.y / 1000]} rotation={[0, yaw, 0]}>
-        <Line points={points} segments color={color} lineWidth={2.2} depthTest={false} renderOrder={20} transparent />
-        <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={19}>
+        <Line points={points} segments color={color} lineWidth={2.2} depthTest={false} renderOrder={20} transparent layers={HELPER_LAYER} />
+        <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={19} layers={HELPER_LAYER}>
           <planeGeometry args={[w, d]} />
           <meshBasicMaterial color={color} transparent opacity={0.16} depthWrite={false} />
         </mesh>
@@ -86,11 +87,12 @@ function Outline({ item, color, handle }: { item: Item; color: string; handle: b
             depthTest={false}
             renderOrder={20}
             transparent
+            layers={HELPER_LAYER}
           />
         )}
       </group>
       {handle && (
-        <mesh name="rotate-handle" position={knob} renderOrder={21}>
+        <mesh name="rotate-handle" position={knob} renderOrder={21} layers={HELPER_LAYER}>
           <sphereGeometry args={[HANDLE_RADIUS, 24, 16]} />
           <meshBasicMaterial color={color} depthTest={false} transparent />
         </mesh>
@@ -347,6 +349,7 @@ export function Scene({ level }: { level: Level }) {
       <Ghost level={level} />
       <Selection items={items} overlaps={overlaps} />
       <CameraRig box={box} />
+      <Effects box={box} />
       <DebugHook />
     </>
   );

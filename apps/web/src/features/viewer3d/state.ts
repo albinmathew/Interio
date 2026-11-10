@@ -40,6 +40,8 @@ export interface ViewerState {
   category: CatalogCategory | 'all';
   /** Show only entries suggested for the room in focus. */
   roomOnly: boolean;
+  /** Rendering quality: `low` drops ambient occlusion and the high pixel ratio when frames get slow. */
+  quality: 'high' | 'low';
 
   setView(view: ViewMode): void;
   toggleCutaway(): void;
@@ -53,6 +55,7 @@ export interface ViewerState {
   setQuery(query: string): void;
   setCategory(category: CatalogCategory | 'all'): void;
   setRoomOnly(roomOnly: boolean): void;
+  setQuality(quality: 'high' | 'low'): void;
 }
 
 export const useViewer = create<ViewerState>((set) => ({
@@ -66,6 +69,7 @@ export const useViewer = create<ViewerState>((set) => ({
   query: '',
   category: 'all',
   roomOnly: false,
+  quality: 'high',
 
   setView: (view) => set({ view }),
   toggleCutaway: () => set((s) => ({ cutaway: !s.cutaway })),
@@ -80,6 +84,7 @@ export const useViewer = create<ViewerState>((set) => ({
   setQuery: (query) => set({ query }),
   setCategory: (category) => set({ category }),
   setRoomOnly: (roomOnly) => set({ roomOnly }),
+  setQuality: (quality) => set({ quality }),
 }));
 
 /** Camera facts the keyboard needs, updated by the camera rig without re-rendering anything. */

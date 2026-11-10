@@ -138,6 +138,7 @@ function Overlay({ level }: { level: Level }) {
 
 export default function Viewer3D() {
   const level = useLevel();
+  const quality = useViewer((s) => s.quality);
   useKeyboard();
   // Leaving the view drops any half-finished placement.
   useEffect(() => () => useViewer.setState({ placing: null, ghost: null, drag: null }), []);
@@ -149,7 +150,7 @@ export default function Viewer3D() {
       <Canvas
         shadows="percentage"
         frameloop="demand"
-        dpr={[1, 2]}
+        dpr={quality === 'high' ? [1, 2] : 1}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         camera={{ fov: 38, near: 0.1, far: 600, position: [12, 14, 12] }}
       >
