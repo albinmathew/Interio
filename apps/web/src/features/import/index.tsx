@@ -335,7 +335,8 @@ function Review({ detail, ai, roles, userScale, busy, creating, name, view, erro
         </div>
       </Panel>
 
-      <div className="flex min-h-0 flex-col gap-4 lg:overflow-auto">
+      <div className="flex min-h-0 flex-col gap-4">
+       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:overflow-auto">
         <Panel>
           <PanelHeader title="Summary" />
           <div className="flex flex-col gap-3 p-3">
@@ -439,7 +440,8 @@ function Review({ detail, ai, roles, userScale, busy, creating, name, view, erro
           )}
         </Panel>
 
-        <Panel className="sticky bottom-0">
+       </div>
+        <Panel className="shrink-0">
           <div className="flex flex-col gap-3 p-3">
             <Field label="Project name">
               <TextInput value={name} onChange={(e) => onName(e.currentTarget.value)} aria-label="Project name" />

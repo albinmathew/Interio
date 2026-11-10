@@ -6,11 +6,13 @@
 import {
   DEFAULTS,
   defaultFloorFor,
+  deriveFaces,
   deriveRooms,
   ops,
   vec,
   type Id,
   type Issue,
+  type Level,
   type Mat2x3,
   type Opening,
   type PlanDraft,
@@ -137,6 +139,39 @@ function buildUnderlay(ex: Extracted, an: Analysis, toPlan: (p: P2) => Pt): Unde
     }
   }
   return { segments: Float32Array.from(out), snapPoints: Float32Array.from([...snaps.values()].flat()) };
+}
+
+/**
+ * Drops short wall tails that end outside every room: the stubs a flat's outer
+ * walls leave where they carry on into the neighbouring flat. Free-standing
+ * walls inside a room stay, and so does anything long enough to matter when a
+ * room failed to close.
+ */
+export function pruneOutsideTails(level: Level, maxLength = 1500): void {
+  const faces = deriveFaces(level);
+  if (faces.length === 0) return;
+  const inRoom = (p: Pt) => faces.some((f) => vec.pointInPolygon(p, f.polygon));
+  for (let pass = 0; pass < 3; pass++) {
+    const degree = new Map<Id, number>();
+    for (const w of Object.values(level.walls)) {
+      degree.set(w.a, (degree.get(w.a) ?? 0) + 1);
+      degree.set(w.b, (degree.get(w.b) ?? 0) + 1);
+    }
+    let removed = false;
+    for (const w of Object.values(level.walls)) {
+      const freeA = degree.get(w.a) === 1;
+      const freeB = degree.get(w.b) === 1;
+      if (!freeA && !freeB) continue;
+      const { a, b } = ops.wallEnds(level, w);
+      if (vec.dist(a, b) > maxLength) continue;
+      if (Object.values(level.openings).some((o) => o.wallId === w.id)) continue;
+      const tip = freeA ? a : b;
+      if (inRoom(tip) || inRoom(vec.mid(a, b))) continue;
+      ops.removeWall(level, w.id);
+      removed = true;
+    }
+    if (!removed) break;
+  }
 }
 
 const TYPE_NAMES: Record<RoomType, string> = {
@@ -285,6 +320,27 @@ export function buildDraft(ex: Extracted, an: Analysis, opts: BuildOptions = {})
   }
 
   /* ----------------------------------------------------------------- rooms */
+  pruneOutsideTails(level);
+  // Pruning can move the plan's lower-left corner: put the origin back on it.
+  if (Object.keys(level.walls).length > 0) {
+    let minX = Infinity;
+    let minY = Infinity;
+    for (const w of Object.values(level.walls)) {
+      const { a, b } = ops.wallEnds(level, w);
+      minX = Math.min(minX, a.x - w.thickness / 2, b.x - w.thickness / 2);
+      minY = Math.min(minY, a.y - w.thickness / 2, b.y - w.thickness / 2);
+    }
+    const dx = Math.round(minX);
+    const dy = Math.round(minY);
+    if (dx !== 0 || dy !== 0) {
+      for (const v of Object.values(level.vertices)) {
+        v.x -= dx;
+        v.y -= dy;
+      }
+      ox += dx / s;
+      oy += dy / s;
+    }
+  }
   ops.reconcileRooms(level);
   const geoms = deriveRooms(level);
   const geomOf = (roomId: Id): RoomGeom | undefined => geoms.find((g) => g.roomId === roomId);

@@ -155,5 +155,5 @@ export function chooseScale(c: ScaleCandidates, user?: number | null, fallback =
           ? { mmPerPdfUnit: c.wallThickness, source: 'wallThickness' }
           : { mmPerPdfUnit: c.titleBlock ?? fallback, source: 'titleBlock' };
   const spreadPct = values.length >= 2 ? ((Math.max(...values) - Math.min(...values)) / pick.mmPerPdfUnit) * 100 : 0;
-  return { ...pick, spreadPct: Math.round(spreadPct * 100) / 100 };
+  return { ...pick, spreadPct: Math.round(spreadPct * 10000) / 10000 };
 }
