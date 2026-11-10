@@ -32,7 +32,9 @@ export function useFocusRoom(level: Level): Room | null {
 
 /** Thumbnail, or a neutral tile with the entry's footprint drawn to scale. */
 function Thumb({ entry }: { entry: CatalogEntry }) {
-  if (entry.thumbnail) return <img src={entry.thumbnail} alt="" loading="lazy" draggable={false} className="h-full w-full object-contain" />;
+  // Lazy and decoded off the main thread: only the cards near the viewport ever fetch their picture.
+  if (entry.thumbnail)
+    return <img src={entry.thumbnail} alt="" loading="lazy" decoding="async" width={256} height={256} draggable={false} className="h-full w-full object-contain" />;
   const max = Math.max(entry.dims.w, entry.dims.d, 1);
   const w = (entry.dims.w / max) * 56;
   const d = (entry.dims.d / max) * 56;
@@ -76,7 +78,8 @@ function EntryCard({ entry, active }: { entry: CatalogEntry; active: boolean }) 
         else ui.startPlacing(entry.id);
       }}
       className={cn(
-        'flex touch-none flex-col rounded-lg border p-1.5 text-left transition-colors select-none',
+        // Cards outside the scroll viewport skip layout and paint, so the whole catalog scrolls smoothly.
+        'flex touch-none flex-col rounded-lg border p-1.5 text-left transition-colors select-none [contain-intrinsic-size:auto_9.5rem] [content-visibility:auto]',
         active ? 'border-accent bg-accent-soft' : 'border-line bg-surface hover:bg-sunken',
       )}
     >
@@ -122,7 +125,8 @@ export function CatalogPanel({ level, className }: { level: Level; className?: s
   });
   const ui = useViewer.getState();
   return (
-    <Panel className={cn('flex min-h-0 flex-col', className)}>
+    <div data-testid="catalog-panel" className={className}>
+      <Panel className="flex h-full min-h-0 flex-col">
       <PanelHeader title="Catalog" actions={<span className="text-xs text-ink-faint">{entries.length} items</span>} />
       <div className="flex flex-col gap-2 border-b border-line p-2.5">
         <div className="relative">
@@ -179,6 +183,7 @@ export function CatalogPanel({ level, className }: { level: Level; className?: s
           </div>
         )}
       </div>
-    </Panel>
+      </Panel>
+    </div>
   );
 }

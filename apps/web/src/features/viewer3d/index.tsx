@@ -4,15 +4,17 @@
  */
 import { planStore, useLevel, usePlanStore, type Level } from '@interio/core';
 import { Canvas } from '@react-three/fiber';
-import { Box, Layers, Maximize, ScanLine } from 'lucide-react';
+import { PencilRuler } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
-import { EmptyState, IconButton, Kbd, Panel, Segmented } from '../../ui';
+import { useNavigate } from 'react-router-dom';
+import { Button, EmptyState, Kbd, Panel } from '../../ui';
 import { duplicateSelection, nudgeSelection, removeSelection, rotateSelection } from './actions';
 import { CatalogPanel } from './CatalogPanel';
 import { nudgeDirection } from './placement';
 import { Scene, useLiveItems, useOverlaps } from './Scene';
 import { SidePanel } from './SidePanel';
-import { cameraState, entryOrPlaceholder, useViewer, type ViewMode } from './state';
+import { cameraState, entryOrPlaceholder, useViewer } from './state';
+import { Toolbar } from './Toolbar';
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -77,49 +79,32 @@ function Hint({ level }: { level: Level }) {
   );
 }
 
-function Toolbar({ count }: { count: number }) {
-  const view = useViewer((s) => s.view);
-  const cutaway = useViewer((s) => s.cutaway);
-  const ui = useViewer.getState();
+/** Shown instead of the hint when the walls do not close a single room yet. */
+function NoRooms() {
   return (
-    <Panel className="absolute top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 p-1">
-      <Segmented<ViewMode>
-        size="sm"
-        value={view}
-        onChange={ui.setView}
-        options={[
-          {
-            value: 'orbit',
-            title: 'Dollhouse view',
-            label: (
-              <>
-                <Box className="h-4 w-4" />
-                3D
-              </>
-            ),
-          },
-          {
-            value: 'top',
-            title: 'Look straight down',
-            label: (
-              <>
-                <ScanLine className="h-4 w-4" />
-                Top
-              </>
-            ),
-          },
-        ]}
-      />
-      <IconButton label="Fit the home in view" size="sm" onClick={ui.requestFit}>
-        <Maximize className="h-4 w-4" />
-      </IconButton>
-      <IconButton label="Hide walls that block the view" size="sm" active={cutaway} disabled={view === 'top'} onClick={ui.toggleCutaway}>
-        <Layers className="h-4 w-4" />
-      </IconButton>
-      <span className="px-2 text-xs text-ink-faint" data-testid="item-count" data-count={count}>
-        {count === 1 ? '1 item' : `${count} items`}
-      </span>
+    <Panel className="absolute bottom-3 left-1/2 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 py-2 pr-2 pl-3.5">
+      <p className="text-[13px] text-ink-soft" data-testid="viewer-no-rooms">
+        <span className="font-medium text-ink">No rooms yet.</span> Close the walls into rooms in Plan mode to furnish and style them.
+      </p>
+      <PlanModeButton />
     </Panel>
+  );
+}
+
+function PlanModeButton() {
+  const navigate = useNavigate();
+  const projectId = usePlanStore((s) => s.project?.id);
+  return (
+    <Button
+      variant="primary"
+      size="sm"
+      className="shrink-0"
+      icon={<PencilRuler className="h-4 w-4" />}
+      data-testid="open-plan-mode"
+      onClick={() => projectId && navigate(`/p/${projectId}/plan`)}
+    >
+      Open Plan mode
+    </Button>
   );
 }
 
@@ -129,9 +114,9 @@ function Overlay({ level }: { level: Level }) {
   return (
     <>
       <CatalogPanel level={level} className="absolute top-3 bottom-3 left-3 w-72" />
-      <Toolbar count={Object.keys(level.items).length} />
-      <SidePanel level={level} items={items} overlaps={overlaps} className="absolute top-3 right-3 w-64" />
-      <Hint level={level} />
+      <Toolbar level={level} />
+      <SidePanel level={level} items={items} overlaps={overlaps} className="absolute top-3 right-3 max-h-[calc(100%-1.5rem)] w-64" />
+      {Object.keys(level.rooms).length === 0 ? <NoRooms /> : <Hint level={level} />}
     </>
   );
 }
@@ -144,7 +129,16 @@ export default function Viewer3D() {
   useEffect(() => () => useViewer.setState({ placing: null, ghost: null, drag: null }), []);
   if (!level) return null;
   if (Object.keys(level.walls).length === 0)
-    return <EmptyState title="Nothing to furnish yet" body="Draw some walls in Plan mode, or import a floor plan, then come back." />;
+    return (
+      <div className="h-full w-full" data-testid="viewer-empty">
+        <EmptyState
+          icon={<PencilRuler className="h-8 w-8" />}
+          title="Nothing to furnish yet"
+          body="This home has no walls. Draw them in Plan mode, or import a floor plan, and the 3D view appears here."
+          action={<PlanModeButton />}
+        />
+      </div>
+    );
   return (
     <div className="relative h-full w-full" data-testid="viewer3d">
       <Canvas

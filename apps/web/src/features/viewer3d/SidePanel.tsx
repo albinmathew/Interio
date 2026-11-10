@@ -1,11 +1,13 @@
 import { entriesFor } from '@interio/catalog';
-import { MATERIALS, planStore, selectRooms, usePlanStore, type Item, type Level, type Room } from '@interio/core';
+import { planStore, selectRooms, usePlanStore, type Item, type Level, type Room } from '@interio/core';
 import { Copy, RotateCcw, RotateCw, Sparkles, Trash2, X } from 'lucide-react';
 import { dims, squareMetres } from '../../lib/format';
-import { Badge, Button, Field, IconButton, NumberInput, Panel, PanelHeader, Select, cn, toast } from '../../ui';
+import { Badge, Button, Field, IconButton, NumberInput, Panel, PanelHeader, Segmented, Select, cn, toast } from '../../ui';
 import { autoFurnishRoom, clearRoom, duplicateSelection, removeSelection, replaceEntry, rotateSelection, setElevation, setRotation } from './actions';
+import { currentFinish, finishName } from './finishes';
+import { FinishesPanel } from './FinishesPanel';
 import type { Overlap } from './placement';
-import { entryOrPlaceholder } from './state';
+import { entryOrPlaceholder, useViewer, type RoomTab } from './state';
 
 const close = (
   <IconButton label="Deselect" size="sm" onClick={() => planStore.getState().select(null)}>
@@ -95,6 +97,7 @@ function ItemPanel({ level, item, overlap }: { level: Level; item: Item; overlap
 }
 
 function RoomPanel({ level, room }: { level: Level; room: Room }) {
+  const tab = useViewer((s) => s.roomTab);
   const geom = selectRooms(level).find((r) => r.roomId === room.id);
   const count = Object.values(level.items).filter((i) => i.roomId === room.id).length;
   const row = (label: string, value: string) => (
@@ -104,34 +107,57 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
     </div>
   );
   return (
-    <div data-testid="room-panel">
+    <div data-testid="room-panel" className="flex min-h-0 flex-col">
       <PanelHeader title={<span data-testid="room-name">{room.name}</span>} actions={close} />
-      <dl className="flex flex-col gap-1.5 p-3 text-[13px]">
-        {geom && row('Floor area', squareMetres(geom.interiorArea))}
-        {geom && row('Size', `${dims(geom.width, geom.depth)} mm`)}
-        {row('Floor', MATERIALS[room.floorMaterial]?.name ?? 'Default')}
-        {row('Walls', MATERIALS[room.wallMaterial ?? '']?.name ?? 'Warm white')}
-        {row('Furniture', count === 1 ? '1 item' : `${count} items`)}
-      </dl>
-      <div className="flex flex-col gap-2 border-t border-line p-3">
-        <Button
-          variant="primary"
+      {geom && (
+        <p className="px-3 pt-2.5 text-xs text-ink-soft" data-testid="room-size">
+          {squareMetres(geom.interiorArea)} · {dims(geom.width, geom.depth)} mm
+        </p>
+      )}
+      <div className="px-3 pt-2.5">
+        <Segmented<RoomTab>
           size="sm"
-          icon={<Sparkles className="h-4 w-4" />}
-          data-testid="room-autofurnish"
-          title="Adds a suggested layout for this kind of room. Undo removes it in one step."
-          onClick={() => {
-            const added = autoFurnishRoom(room.id);
-            if (added === 0) toast.info(count > 0 ? 'No space left for more furniture here' : 'Nothing to suggest for this room');
-            else toast.success(added === 1 ? 'Added 1 item' : `Added ${added} items`);
-          }}
-        >
-          Auto-furnish room
-        </Button>
-        {count > 0 && (
-          <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} data-testid="room-clear" onClick={() => clearRoom(room.id)}>
-            Clear this room
-          </Button>
+          className="flex w-full [&>button]:flex-1 [&>button]:justify-center"
+          value={tab}
+          onChange={useViewer.getState().setRoomTab}
+          options={[
+            { value: 'furnish', label: 'Furnish', title: 'Furniture in this room' },
+            { value: 'finishes', label: 'Finishes', title: 'Floor, wall and ceiling finishes' },
+          ]}
+        />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {tab === 'finishes' ? (
+          <FinishesPanel level={level} room={room} />
+        ) : (
+          <div data-testid="furnish-panel">
+            <dl className="flex flex-col gap-1.5 p-3 text-[13px]">
+              {row('Floor', finishName(currentFinish(room, 'floor')))}
+              {row('Walls', finishName(currentFinish(room, 'wall')))}
+              {row('Furniture', count === 1 ? '1 item' : `${count} items`)}
+            </dl>
+            <div className="flex flex-col gap-2 border-t border-line p-3">
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<Sparkles className="h-4 w-4" />}
+                data-testid="room-autofurnish"
+                title="Adds a suggested layout for this kind of room. Undo removes it in one step."
+                onClick={() => {
+                  const added = autoFurnishRoom(room.id);
+                  if (added === 0) toast.info(count > 0 ? 'No space left for more furniture here' : 'Nothing to suggest for this room');
+                  else toast.success(added === 1 ? 'Added 1 item' : `Added ${added} items`);
+                }}
+              >
+                Auto-furnish room
+              </Button>
+              {count > 0 && (
+                <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} data-testid="room-clear" onClick={() => clearRoom(room.id)}>
+                  Clear this room
+                </Button>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -145,8 +171,16 @@ export function SidePanel({ level, items, overlaps, className }: { level: Level;
   const room = selection?.kind === 'room' ? level.rooms[selection.id] : undefined;
   if (!item && !room) return null;
   return (
-    <Panel className={cn('overflow-hidden', className)}>
-      {item ? <ItemPanel level={level} item={item} overlap={overlaps.get(item.id)} /> : room ? <RoomPanel level={level} room={room} /> : null}
-    </Panel>
+    <div data-testid="side-panel" className={cn('flex flex-col', className)}>
+      <Panel className="flex min-h-0 flex-col overflow-hidden">
+        {item ? (
+          <div className="min-h-0 overflow-y-auto">
+            <ItemPanel level={level} item={item} overlap={overlaps.get(item.id)} />
+          </div>
+        ) : room ? (
+          <RoomPanel level={level} room={room} />
+        ) : null}
+      </Panel>
+    </div>
   );
 }
