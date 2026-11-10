@@ -220,6 +220,9 @@ function makeRun(pieces: Piece[], T: number): Run {
     const glass = (k: GapKind) => k === 'window' || k === 'glazed';
     if (b.u1 - a.u2 <= T && ((a.kind === 'passage' && glass(b.kind)) || (glass(a.kind) && b.kind === 'passage'))) {
       openings.splice(i, 2, { u1: a.u1, u2: b.u2, kind: 'glazed', confidence: 0.6 });
+    } else if (b.u1 - a.u2 <= T && a.kind === b.kind && glass(a.kind)) {
+      // Two panels either side of a mullion are one window.
+      openings.splice(i, 2, { u1: a.u1, u2: b.u2, kind: a.kind, confidence: Math.min(a.confidence, b.confidence) });
     } else i++;
   }
   return {
@@ -351,6 +354,27 @@ export function buildRuns(input: TopologyInput): Run[] {
     ...clusterByOffset(lowPieces.filter((p) => p.lowKind === 'railing'), 0.5 * T),
     ...clusterByOffset(lowPieces.filter((p) => p.lowKind === 'low'), 0.5 * T),
   ];
+  /**
+   * Which side of a railing its balcony is on: the side the walls and railings
+   * meeting its ends run towards. +1 is +n, -1 is -n, 0 unknown.
+   */
+  const interiorSide = (dir: number, c: number, u1: number, u2: number): number => {
+    const n = dirs.list[dir]!.n;
+    let vote = 0;
+    for (const s of [...walls, ...lowPieces]) {
+      if (dirs.sin(dir, s.dir) < 0.5) continue;
+      const d = dirs.list[s.dir]!.d;
+      const sign = d.x * n.x + d.y * n.y > 0 ? 1 : -1;
+      for (const u of [u1, u2]) {
+        const p = dirs.point(dir, u, c);
+        if (Math.abs(dirs.c(s.dir, p) - s.c) > s.t / 2 + 4 * T) continue;
+        const along = dirs.u(s.dir, p);
+        if (along < s.u1 - 4 * T || along > s.u2 + 4 * T) continue;
+        vote += sign * (Math.max(0, s.u2 - along) - Math.max(0, along - s.u1));
+      }
+    }
+    return Math.abs(vote) < T ? 0 : Math.sign(vote);
+  };
   for (const group of lowGroups) {
     const sorted = [...group].sort((a, b) => a.u1 - b.u1);
     let cur: typeof sorted = [];
@@ -377,6 +401,7 @@ export function buildRuns(input: TopologyInput): Run[] {
         // A low wall that carries on from a wall end shares that wall's line.
         const lead = runs.find(
           (r) =>
+            kind === 'low' &&
             r.kind === 'wall' &&
             r.dir === dir &&
             Math.abs(r.c - c) <= r.t / 2 + t / 2 + 0.25 * T &&
@@ -391,7 +416,9 @@ export function buildRuns(input: TopologyInput): Run[] {
           // Balconies are dimensioned to the slab edge: put a slim rail on the outer line of the band.
           const slim = 0.375 * T;
           if (t > slim) {
-            c = c >= dirs.c(dir, input.centre) ? hi : lo;
+            const inside = interiorSide(dir, c, u1, u2);
+            const outward = inside !== 0 ? -inside : c >= dirs.c(dir, input.centre) ? 1 : -1;
+            c = outward > 0 ? hi : lo;
             t = slim;
           }
         }
