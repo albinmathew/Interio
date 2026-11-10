@@ -98,17 +98,25 @@ export function importExtracted(ex: Extracted, opts: ImportOptions = {}): Import
   }
 }
 
+/**
+ * Attaches an already rendered page image to the draft's underlay, so the
+ * wizard can render the page once and reuse it across re-runs.
+ */
+export function attachPageImage(result: ImportDetail, blob: Blob, widthPx: number, heightPx: number): void {
+  result.draft.underlay.image = {
+    blob,
+    widthPx,
+    heightPx,
+    planFromImage: planFromImage(result.page.origin, result.draft.scale.mmPerPdfUnit, result.page, widthPx, heightPx),
+  };
+}
+
 async function attachRaster(result: ImportDetail, data: ArrayBuffer, opts: ImportOptions): Promise<void> {
   const want = opts.raster ?? isBrowser();
   if (!want) return;
   try {
     const { blob, widthPx, heightPx } = await renderPage(data, opts.rasterMaxSidePx ?? 2400, opts.page ?? 1);
-    result.draft.underlay.image = {
-      blob,
-      widthPx,
-      heightPx,
-      planFromImage: planFromImage(result.page.origin, result.draft.scale.mmPerPdfUnit, result.page, widthPx, heightPx),
-    };
+    attachPageImage(result, blob, widthPx, heightPx);
   } catch {
     result.draft.issues.push({ severity: 'info', code: 'no-raster', message: 'The page image could not be rendered; only the line work is available as a backdrop.' });
   }

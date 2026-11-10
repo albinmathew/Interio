@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { importPdfDetailed, type ImportDetail } from '../src/index';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '../../../fixtures/local');
-const pdfs = existsSync(dir) ? readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.pdf')).sort() : [];
+const pdfs: string[] = existsSync(dir) ? (readdirSync(dir) as string[]).filter((f) => f.toLowerCase().endsWith('.pdf')).sort() : [];
 const visionPath = (pdf: string) => join(dir, pdf.replace(/\.pdf$/i, '.vision.json'));
 const labelled = pdfs.filter((f) => existsSync(visionPath(f)));
 const mirrors = pdfs.filter((f) => f.includes('TYPE-1') && pdfs.includes(f.replace('TYPE-1', 'TYPE-2')));
@@ -48,7 +48,7 @@ const areas = (detail: ImportDetail): number[] =>
     .sort((a, b) => a - b);
 
 describe.skipIf(pdfs.length === 0)('local PDFs', () => {
-  it.each(pdfs)('%s imports to a valid plan without the AI result', async (pdf) => {
+  for (const pdf of pdfs) it(`${pdf} imports to a valid plan without the AI result`, async () => {
     const detail = await run(pdf, false);
     const level = detail.draft.level;
     expect(detail.mode).not.toBe('none');
@@ -65,7 +65,7 @@ describe.skipIf(pdfs.length === 0)('local PDFs', () => {
     expect(Math.min(...ys)).toBeLessThan(400);
   });
 
-  it.each(labelled)('%s: labelled rooms are closed, named and to size', async (pdf) => {
+  for (const pdf of labelled) it(`${pdf}: labelled rooms are closed, named and to size`, async () => {
     const detail = await run(pdf, true);
     const { draft, checks } = detail;
     // Every label lands in a closed room.
@@ -80,7 +80,7 @@ describe.skipIf(pdfs.length === 0)('local PDFs', () => {
     expect(own.length).toBeGreaterThanOrEqual(0.7 * checks.length);
   });
 
-  it.each(labelled)('%s: scale comes from the dimensions and agrees with the wall thickness', async (pdf) => {
+  for (const pdf of labelled) it(`${pdf}: scale comes from the dimensions and agrees with the wall thickness`, async () => {
     const detail = await run(pdf, true);
     const c = detail.scaleCandidates;
     expect(detail.draft.scale.source).toBe('dimension');
@@ -92,7 +92,7 @@ describe.skipIf(pdfs.length === 0)('local PDFs', () => {
     }
   });
 
-  it.each(labelled)('%s: every room can be entered and balconies have a wide opening', async (pdf) => {
+  for (const pdf of labelled) it(`${pdf}: every room can be entered and balconies have a wide opening`, async () => {
     const { draft } = await run(pdf, true);
     const level = draft.level;
     const byWall = new Map<string, string[]>();
@@ -107,7 +107,7 @@ describe.skipIf(pdfs.length === 0)('local PDFs', () => {
     }
   });
 
-  it.each(labelled)('%s: interior area is close to the carpet area on the sheet', async (pdf) => {
+  for (const pdf of labelled) it(`${pdf}: interior area is close to the carpet area on the sheet`, async () => {
     const detail = await run(pdf, true);
     const carpet = carpetArea(detail);
     if (carpet === null) return;
@@ -123,7 +123,7 @@ describe.skipIf(pdfs.length === 0)('local PDFs', () => {
     expect(sum / carpet).toBeLessThan(1.03);
   });
 
-  it.each(mirrors)('%s and its mirror give the same rooms', async (pdf) => {
+  for (const pdf of mirrors) it(`${pdf} and its mirror give the same rooms`, async () => {
     const a = areas(await run(pdf, false));
     const b = areas(await run(pdf.replace('TYPE-1', 'TYPE-2'), false));
     expect(b.length).toBe(a.length);
