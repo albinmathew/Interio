@@ -67,4 +67,25 @@ export const storage = {
   async getAsset<T>(projectId: string, name: string): Promise<T | null> {
     return ((await (await db()).get('assets', `${projectId}/${name}`)) as T | undefined) ?? null;
   },
+
+  /** Every asset of a project, keyed by asset name. */
+  async getAssets(projectId: string): Promise<Record<string, unknown>> {
+    const database = await db();
+    const prefix = `${projectId}/`;
+    const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`);
+    const [keys, values] = await Promise.all([database.getAllKeys('assets', range), database.getAll('assets', range)]);
+    const assets: Record<string, unknown> = {};
+    keys.forEach((key, i) => {
+      if (typeof key === 'string') assets[key.slice(prefix.length)] = values[i];
+    });
+    return assets;
+  },
+
+  /** Stores a project together with its assets in one transaction, so a failed write leaves nothing half-saved. */
+  async saveProjectWithAssets(project: Project, assets: Record<string, unknown>): Promise<void> {
+    const tx = (await db()).transaction(['projects', 'assets'], 'readwrite');
+    const writes: Promise<unknown>[] = [tx.objectStore('projects').put(project)];
+    for (const [name, value] of Object.entries(assets)) writes.push(tx.objectStore('assets').put(value, `${project.id}/${name}`));
+    await Promise.all([...writes, tx.done]);
+  },
 };
