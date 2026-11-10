@@ -9,11 +9,14 @@ import { useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, EmptyState, Kbd, Panel } from '../../ui';
 import { duplicateSelection, nudgeSelection, removeSelection, rotateSelection } from './actions';
+import { cancelRequest } from './assistantStore';
 import { CatalogPanel } from './CatalogPanel';
+import { DOCK_TOP, DockButtons, DockPanel } from './Dock';
+import { markFirstLayoutDone, saveFirstLayout } from './firstLayout';
 import { nudgeDirection } from './placement';
 import { Scene, useLiveItems, useOverlaps } from './Scene';
 import { SidePanel } from './SidePanel';
-import { cameraState, entryOrPlaceholder, useViewer } from './state';
+import { DOCK_WIDTH, cameraState, entryOrPlaceholder, useViewer } from './state';
 import { Toolbar } from './Toolbar';
 
 function isTyping(target: EventTarget | null): boolean {
@@ -108,14 +111,37 @@ function PlanModeButton() {
   );
 }
 
+/**
+ * A home that arrives furnished with nothing saved yet (straight from "Furnish it for
+ * me", say) gets its first look saved by itself; the assistant never answers into a
+ * view the user has left.
+ */
+function useDesignSession(): void {
+  const projectId = usePlanStore((s) => s.project?.id);
+  const hasVariants = usePlanStore((s) => (s.project?.variants.length ?? 0) > 0);
+  useEffect(() => {
+    if (projectId) void saveFirstLayout();
+  }, [projectId]);
+  useEffect(() => {
+    if (projectId && hasVariants) markFirstLayoutDone(projectId);
+  }, [projectId, hasVariants]);
+  useEffect(() => () => cancelRequest('Stopped when you left Design mode. Nothing was changed.'), []);
+}
+
 function Overlay({ level }: { level: Level }) {
   const items = useLiveItems(level);
   const overlaps = useOverlaps(level, items);
+  const docked = useViewer((s) => s.dock !== null);
+  useDesignSession();
+  // The item / room panel sits beside the docked panel, clear of the hint at the bottom.
+  const side = docked ? { top: DOCK_TOP, right: DOCK_WIDTH + 24, maxHeight: `calc(100% - ${DOCK_TOP + 12 + 44}px)` } : { top: DOCK_TOP, right: 12, maxHeight: `calc(100% - ${DOCK_TOP + 12}px)` };
   return (
     <>
       <CatalogPanel level={level} className="absolute top-3 bottom-3 left-3 w-72" />
       <Toolbar level={level} />
-      <SidePanel level={level} items={items} overlaps={overlaps} className="absolute top-3 right-3 max-h-[calc(100%-1.5rem)] w-64" />
+      <DockButtons />
+      <SidePanel level={level} items={items} overlaps={overlaps} className="absolute w-64" style={side} />
+      <DockPanel level={level} />
       {Object.keys(level.rooms).length === 0 ? <NoRooms /> : <Hint level={level} />}
     </>
   );

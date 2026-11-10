@@ -1,6 +1,7 @@
 import { entriesFor } from '@interio/catalog';
 import { planStore, selectRooms, usePlanStore, type Item, type Level, type Room } from '@interio/core';
 import { Copy, RotateCcw, RotateCw, Sparkles, Trash2, X } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { dims, squareMetres } from '../../lib/format';
 import { Badge, Button, Field, IconButton, NumberInput, Panel, PanelHeader, Segmented, Select, cn, toast } from '../../ui';
 import { autoFurnishRoom, clearRoom, duplicateSelection, removeSelection, replaceEntry, rotateSelection, setElevation, setRotation } from './actions';
@@ -165,13 +166,25 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
 }
 
 /** Details of the selected item or room. Renders nothing when neither is selected. */
-export function SidePanel({ level, items, overlaps, className }: { level: Level; items: Record<string, Item>; overlaps: Map<string, Overlap>; className?: string }) {
+export function SidePanel({
+  level,
+  items,
+  overlaps,
+  className,
+  style,
+}: {
+  level: Level;
+  items: Record<string, Item>;
+  overlaps: Map<string, Overlap>;
+  className?: string;
+  style?: CSSProperties;
+}) {
   const selection = usePlanStore((s) => s.selection);
   const item = selection?.kind === 'item' ? items[selection.id] : undefined;
   const room = selection?.kind === 'room' ? level.rooms[selection.id] : undefined;
   if (!item && !room) return null;
   return (
-    <div data-testid="side-panel" className={cn('flex flex-col', className)}>
+    <div data-testid="side-panel" className={cn('flex flex-col', className)} style={style}>
       <Panel className="flex min-h-0 flex-col overflow-hidden">
         {item ? (
           <div className="min-h-0 overflow-y-auto">

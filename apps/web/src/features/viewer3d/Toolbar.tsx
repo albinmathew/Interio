@@ -8,6 +8,7 @@ import { useState, type ReactNode } from 'react';
 import { clearFurniture, furnishHome } from '../../lib/furnish';
 import { Button, Dialog, IconButton, Panel, Segmented, toast } from '../../ui';
 import { captureBridge, captureFileName, downloadDataUrl } from './capture';
+import { saveFirstLayout } from './firstLayout';
 import { useLightingPreset, useViewer, type ViewMode } from './state';
 
 const Divider = () => <span className="mx-1 h-5 w-px shrink-0 bg-line" aria-hidden="true" />;
@@ -47,6 +48,8 @@ function furnishWholeHome(): void {
   const after = furnishedRooms(selectLevel(planStore.getState()));
   const filled = [...after].filter((id) => !before.has(id)).length;
   toast.success(`Added ${itemCount(added)} to ${roomCount(filled)}`);
+  // The first furnished look of a home is kept as a variant to come back to.
+  void saveFirstLayout();
 }
 
 export function Toolbar({ level }: { level: Level }) {
