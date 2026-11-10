@@ -28,3 +28,4 @@ export { createSurfaceMaterial, setTextureBaseUrl, type SurfaceFallback } from '
 export { SURFACE_TEXTURES, textureSpecFor, tintToward, type TextureSpec } from './materialSpecs';
 export { DOOR_OPEN_DEG, doorLeafAngle, openingParts, railingParts, skirtingBoxes, type BoxSpec, type OpeningParts } from './parts';
 export { isFaded, wallHidesRoom, type FadeWall } from './wallFade';
+export { detectSoftwareRenderer, isSoftwareRenderer, type RenderQuality } from './quality';

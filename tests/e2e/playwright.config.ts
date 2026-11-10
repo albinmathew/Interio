@@ -7,8 +7,10 @@ const API_PORT = Number(process.env.INTERIO_E2E_API_PORT ?? 8887);
 export default defineConfig({
   testDir: '.',
   outputDir: '../../test-results',
-  timeout: 60_000,
-  expect: { timeout: 10_000 },
+  // CI runners rasterise WebGL on two shared cores: give them room and one retry.
+  timeout: process.env.CI ? 150_000 : 60_000,
+  expect: { timeout: process.env.CI ? 20_000 : 10_000 },
+  retries: process.env.CI ? 1 : 0,
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],

@@ -8,7 +8,8 @@
  */
 import { getEntry } from '@interio/catalog';
 import { selectLevelMesh, selectRooms, useLevel, usePlanStore, type Pt } from '@interio/core';
-import { PlanScene, SceneLighting, lightingFromSettings, lightingRig } from '@interio/scene3d';
+import { PlanScene, SceneLighting, detectSoftwareRenderer, lightingFromSettings, lightingRig, type RenderQuality } from '@interio/scene3d';
+import { PerformanceMonitor } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState, cn, toast } from '../../ui';
@@ -54,6 +55,8 @@ export default function Walkthrough() {
   const bridge = useRef<SceneBridge | null>(null);
   const fadeEl = useRef<HTMLDivElement>(null);
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+  // Software renderers and devices that cannot hold the frame rate get a cheaper scene: no shadow pass, flat room light.
+  const [quality, setQuality] = useState<RenderQuality>(() => (detectSoftwareRenderer() ? 'low' : 'high'));
 
   const world = useMemo(
     () => (level ? buildWorld(level, { resolveEntry: getEntry, mesh: selectLevelMesh(level), rooms: selectRooms(level) }) : null),
@@ -174,14 +177,15 @@ export default function Walkthrough() {
   return (
     <div ref={container} className="relative h-full w-full overflow-hidden bg-canvas select-none" data-testid="walkthrough">
       <Canvas
-        shadows="percentage"
-        dpr={[1, 2]}
+        shadows={quality === 'high' ? 'percentage' : false}
+        dpr={quality === 'high' ? [1, 2] : 1}
         style={{ touchAction: 'none' }}
         camera={{ position: [start.x / 1000, walkUi.get().eyeHeight / 1000, -start.y / 1000], fov, near: 0.05, far: 200 }}
         onCreated={({ gl }) => setCanvas(gl.domElement)}
       >
         <color attach="background" args={[lightingRig(lighting, 'interior').background]} />
-        <SceneLighting level={level} mode="interior" preset={lighting} resolveEntry={getEntry} />
+        {quality === 'high' && <PerformanceMonitor flipflops={2} onDecline={() => setQuality('low')} onFallback={() => setQuality('low')} />}
+        <SceneLighting level={level} mode="interior" preset={lighting} resolveEntry={getEntry} quality={quality} />
         <PlanScene level={level} resolveEntry={getEntry} showCeilings closedDoors={frontDoors} />
         <CameraRig controller={controller} />
         <TargetMarker controller={controller} />

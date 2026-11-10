@@ -1,4 +1,5 @@
 import { selectLevelMesh, selectRooms, type CatalogEntry, type Level } from '@interio/core';
+import type { RenderQuality } from './quality';
 import { useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
@@ -27,6 +28,11 @@ export interface SceneLightingProps {
   resolveEntry?: (catalogId: string) => CatalogEntry | undefined;
   /** Most lamps lit at once in the evening and night presets. Default 12. */
   maxLamps?: number;
+  /**
+   * `low` is for software renderers and slow devices: no shadow pass and no per-room
+   * point lights (a flat fill stands in for them). Default `high`.
+   */
+  quality?: RenderQuality;
 }
 
 const environments = new Map<string, Promise<THREE.Texture>>();
@@ -187,21 +193,23 @@ export function SceneLighting({
   preset = DEFAULT_LIGHTING_PRESET,
   resolveEntry,
   maxLamps = MAX_INTERIOR_LIGHTS,
+  quality = 'high',
 }: SceneLightingProps) {
+  const low = quality === 'low';
   const hasEnv = useEnvironment(envUrl, lightingRig(preset, mode).environment);
   const rig = lightingRig(preset, mode, hasEnv);
   const { hemisphere, bounce, sun, lamps } = rig;
   return (
     <>
       {/* Little flat fill, so surfaces keep their shading. */}
-      {rig.ambient > 0 && <ambientLight intensity={rig.ambient} />}
+      {(rig.ambient > 0 || (low && lamps)) && <ambientLight intensity={rig.ambient + (low && lamps ? 0.55 : 0)} color={low && lamps ? lamps.color : undefined} />}
       {/* The ground colour lights what faces down: ceilings, door heads. */}
       <hemisphereLight color={hemisphere.sky} groundColor={hemisphere.ground} intensity={hemisphere.intensity} />
       {/* Light bounced off the floor: keeps ceilings, door heads and the undersides of furniture from going grey. */}
       {bounce.intensity > 0 && <directionalLight position={[0, -1, 0]} intensity={bounce.intensity} color={bounce.color} />}
       {/* Under ceilings the sun only gets in through windows (ceilings cast shadows), so the rooms have lamps of their own. */}
-      {sun && <Sun level={level} intensity={sun.intensity} color={sun.color} direction={sun.direction} shadows={shadows} mapSize={shadowMapSize} />}
-      {lamps && (
+      {sun && <Sun level={level} intensity={sun.intensity} color={sun.color} direction={sun.direction} shadows={shadows && !low} mapSize={shadowMapSize} />}
+      {lamps && !low && (
         <Lamps
           level={level}
           color={lamps.color}
