@@ -8,9 +8,11 @@ export interface TestGlbOptions {
   max: [number, number, number];
   translation?: [number, number, number];
   scale?: number;
+  /** Name of the mesh node. */
+  name?: string;
 }
 
-export function makeBoxGlb({ min, max, translation = [0, 0, 0], scale = 1 }: TestGlbOptions): ArrayBuffer {
+export function makeBoxGlb({ min, max, translation = [0, 0, 0], scale = 1, name = 'box' }: TestGlbOptions): ArrayBuffer {
   const [x0, y0, z0] = min;
   const [x1, y1, z1] = max;
   // prettier-ignore
@@ -32,7 +34,7 @@ export function makeBoxGlb({ min, max, translation = [0, 0, 0], scale = 1 }: Tes
     asset: { version: '2.0', generator: 'interio-test' },
     scene: 0,
     scenes: [{ nodes: [0] }],
-    nodes: [{ mesh: 0, translation, scale: [scale, scale, scale] }],
+    nodes: [{ name, mesh: 0, translation, scale: [scale, scale, scale] }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] }],
     buffers: [{ byteLength: bin.byteLength }],
     bufferViews: [

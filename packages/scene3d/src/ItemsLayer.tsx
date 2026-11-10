@@ -96,12 +96,19 @@ function BoxModel({ entry, appearance }: { entry: CatalogEntry; appearance?: Ite
   return <ParametricModel entry={box} appearance={appearance} />;
 }
 
-function GlbModel({ entry, url, yawDeg, appearance }: { entry: CatalogEntry; url: string; yawDeg?: number; appearance?: ItemAppearance }) {
-  const gltf = useGLTF(url);
+interface GlbProps {
+  entry: CatalogEntry;
+  url: string;
+  yawDeg?: number;
+  appearance?: ItemAppearance;
+}
+
+/** One instance of a loaded GLB scene, fitted to the entry's dimensions. */
+function GlbInstance({ scene, entry, yawDeg, appearance }: Omit<GlbProps, 'url'> & { scene: THREE.Object3D }) {
   const { w, d, h } = entry.dims;
   const { object, fit } = useMemo(() => {
     // One clone per placed item: the loader cache keeps the original, materials and geometry are shared.
-    const instance = cloneSkinned(gltf.scene);
+    const instance = cloneSkinned(scene);
     instance.updateMatrixWorld(true);
     instance.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -112,7 +119,7 @@ function GlbModel({ entry, url, yawDeg, appearance }: { entry: CatalogEntry; url
     const box = new THREE.Box3().setFromObject(instance);
     const bounds = { min: box.min.toArray(), max: box.max.toArray() };
     return { object: instance, fit: fitModel(bounds, { w, d, h }, yawDeg) };
-  }, [gltf.scene, w, d, h, yawDeg]);
+  }, [scene, w, d, h, yawDeg]);
   useAppearance(object, appearance);
   return (
     <group scale={fit.scale}>
@@ -125,7 +132,26 @@ function GlbModel({ entry, url, yawDeg, appearance }: { entry: CatalogEntry; url
   );
 }
 
-/** Shows `fallback` when a model fails to load (missing file, bad GLB) instead of taking the scene down. */
+const failed = new Set<string>();
+
+/** Loads the GLB (suspending while it downloads). A file that cannot be loaded renders as the box. */
+function GlbModel({ url, ...rest }: GlbProps) {
+  let scene: THREE.Object3D;
+  try {
+    scene = useGLTF(url).scene;
+  } catch (thrown) {
+    // Still loading: let Suspense show the fallback.
+    if (thrown instanceof Promise) throw thrown;
+    if (!failed.has(url)) {
+      failed.add(url);
+      console.warn(`Model ${url} could not be loaded; showing a box instead.`, thrown);
+    }
+    return <BoxModel entry={rest.entry} appearance={rest.appearance} />;
+  }
+  return <GlbInstance scene={scene} {...rest} />;
+}
+
+/** Last line of defence: shows `fallback` if a model throws while rendering, instead of taking the scene down. */
 interface BoundaryProps {
   resetKey: string;
   fallback: ReactNode;
@@ -148,7 +174,7 @@ class ModelBoundary extends Component<BoundaryProps, BoundaryState> {
   }
 
   override componentDidCatch(error: unknown): void {
-    console.warn(`Model failed to load (${this.props.resetKey}); showing a box instead.`, error);
+    console.warn(`Model ${this.props.resetKey} failed to render; showing a box instead.`, error);
   }
 
   override render(): ReactNode {

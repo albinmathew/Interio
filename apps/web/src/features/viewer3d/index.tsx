@@ -37,7 +37,7 @@ function useKeyboard(): void {
         duplicateSelection();
       } else if ((key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') && selected) {
         const step = e.shiftKey ? 10 : 50;
-        const d = nudgeDirection(key, cameraState.azimuthDeg);
+        const d = nudgeDirection(key, cameraState.heading());
         nudgeSelection(d.x * step, d.y * step);
       } else return;
       e.preventDefault();

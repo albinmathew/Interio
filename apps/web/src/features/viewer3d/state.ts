@@ -83,9 +83,9 @@ export const useViewer = create<ViewerState>((set) => ({
 }));
 
 /** Camera facts the keyboard needs, updated by the camera rig without re-rendering anything. */
-export const cameraState = {
+export const cameraState: { heading: () => number } = {
   /** Heading in degrees clockwise from plan north. */
-  azimuthDeg: 0,
+  heading: () => 0,
 };
 
 /* ----------------------------------------------------------------- entries */

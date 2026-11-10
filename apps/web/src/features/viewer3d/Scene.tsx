@@ -180,6 +180,18 @@ function CameraRig({ box }: { box: Box }) {
   latest.current = { box, size };
   const lens = camera as THREE.PerspectiveCamera;
 
+  // Heading clockwise from plan north (-Z), for camera-relative arrow keys.
+  useEffect(() => {
+    const forward = new THREE.Vector3();
+    cameraState.heading = () => {
+      camera.getWorldDirection(forward);
+      return (Math.atan2(forward.x, -forward.z) * 180) / Math.PI;
+    };
+    return () => {
+      cameraState.heading = () => 0;
+    };
+  }, [camera]);
+
   // Shift the image so the home is centred in the area the panels leave free.
   useLayoutEffect(() => {
     const free = freeView(size.width, size.height, lens.fov, insetsFor(size));
@@ -260,8 +272,6 @@ function CameraRig({ box }: { box: Box }) {
       onChange={() => {
         const c = controls.current;
         if (!c) return;
-        // Heading clockwise from plan north (-Z), for camera-relative arrow keys.
-        cameraState.azimuthDeg = (Math.atan2(c.target.x - camera.position.x, -(c.target.z - camera.position.z)) * 180) / Math.PI;
         if (anim.current) return;
         const t = c.target;
         const [x, y, z] = clampTarget([t.x, t.y, t.z], latest.current.box);
@@ -281,6 +291,7 @@ function CameraRig({ box }: { box: Box }) {
 function DebugHook() {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const hook = {
@@ -295,12 +306,24 @@ function DebugHook() {
         const r = gl.domElement.getBoundingClientRect();
         return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
       },
+      /** World bounds (metres) and mesh names of a placed item as it is drawn right now. */
+      describeItem(id: string): { min: number[]; max: number[]; meshes: string[] } | null {
+        const object = scene.getObjectByName(`item:${id}`);
+        if (!object) return null;
+        object.updateWorldMatrix(true, true);
+        const box = new THREE.Box3().setFromObject(object);
+        const meshes: string[] = [];
+        object.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh) meshes.push(o.name);
+        });
+        return { min: box.min.toArray(), max: box.max.toArray(), meshes };
+      },
     };
     window.__interio = hook;
     return () => {
       if (window.__interio === hook) delete window.__interio;
     };
-  }, [camera, gl]);
+  }, [camera, gl, scene]);
   return null;
 }
 
@@ -337,6 +360,7 @@ declare global {
       ui: typeof useViewer;
       registerEntry: typeof registerEntry;
       project(x: number, y: number, z?: number): { x: number; y: number };
+      describeItem(id: string): { min: number[]; max: number[]; meshes: string[] } | null;
     };
   }
 }

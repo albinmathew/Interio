@@ -15,7 +15,7 @@ interface Look {
   metalness?: number;
 }
 
-const GLASS = { color: '#c9dfe6', opacity: 0.22 };
+const GLASS = { color: '#cfe2e8', opacity: 0.16 };
 const LOOKS: Record<'door' | 'sliding' | 'window', { frame: Look; leaf: Look; metal: Look }> = {
   door: {
     frame: { color: '#f3f0ea', roughness: 0.6 },
@@ -46,7 +46,7 @@ const glass = () =>
     transparent: true,
     opacity: GLASS.opacity,
     depthWrite: false,
-    envMapIntensity: 1.5,
+    envMapIntensity: 1.1,
   });
 
 interface Part {
