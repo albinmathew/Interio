@@ -439,6 +439,12 @@ export function Scene({ level }: { level: Level }) {
   const [x0, , z0] = bounds.min;
   const [x1, y1, z1] = bounds.max;
   const box = useMemo<Box>(() => ({ min: [x0, 0, z0], max: [x1, y1, z1] }), [x0, z0, x1, y1, z1]);
+  // `?env=sky` and `?soft=<texels>` override the environment and the shadow edge, for comparing looks.
+  const overrides = useMemo(() => {
+    const q = new URLSearchParams(window.location.search);
+    const soft = Number(q.get('soft'));
+    return { sky: q.get('env') === 'sky', soft: q.has('soft') && Number.isFinite(soft) && soft >= 0 ? soft : null };
+  }, []);
   return (
     <>
       <color attach="background" args={[lightingRig(lighting, 'dollhouse').background]} />
@@ -447,9 +453,9 @@ export function Scene({ level }: { level: Level }) {
         mode="dollhouse"
         preset={lighting}
         resolveEntry={resolveEntry}
-        envUrl={tier === 'low' || new URLSearchParams(window.location.search).get('env') === 'sky' ? undefined : ROOM_ENVIRONMENT}
+        envUrl={tier === 'low' || overrides.sky ? undefined : ROOM_ENVIRONMENT}
         shadowMapSize={tier === 'low' ? 1024 : view === 'showcase' ? 4096 : 2048}
-        shadowSoftness={Number(new URLSearchParams(window.location.search).get('soft') ?? (tier === 'low' ? 2 : view === 'showcase' ? 5 : 3.5))}
+        shadowSoftness={overrides.soft ?? (tier === 'low' ? 2 : view === 'showcase' ? 5 : 3.5)}
       />
       <LevelMeshes level={level} cutaway={cutaway && view === 'orbit'} />
       <Ground box={box} />

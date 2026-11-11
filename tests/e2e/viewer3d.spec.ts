@@ -309,8 +309,9 @@ test('auto-furnish adds a room layout as one undo step, with catalog models draw
   expect(placed.every((i) => getEntry(i.catalogId))).toBe(true);
   expect(await undoSteps(page)).toBe(1);
 
-  // A shipped GLB is drawn at exactly its catalog size: the load-time fit leaves it alone.
-  const model = placed.find((i) => getEntry(i.catalogId)!.model.kind === 'glb' && i.rotationDeg % 90 === 0)!;
+  // Models are drawn at exactly their catalog size (a GLB when the layout has one: the load-time fit leaves it alone).
+  const square = placed.filter((i) => i.rotationDeg % 90 === 0);
+  const model = square.find((i) => getEntry(i.catalogId)!.model.kind === 'glb') ?? square[0]!;
   const { w, d, h } = getEntry(model.catalogId)!.dims;
   const quarter = (model.rotationDeg / 90) % 2 !== 0;
   const describe = () => page.evaluate((i) => (window as unknown as Dev).__interio.describeItem(i), model.id);
