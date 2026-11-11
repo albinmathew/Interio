@@ -40,6 +40,8 @@ export const PEDESTAL_SLOTS: FinishSlot[] = [
 
 const GLIDE = '#1a1a1a';
 const SCREEN = 'lacquer.black.gloss';
+/** Thickness of a desk pad. */
+const PAD_H = 0.003;
 
 /* --------------------------------------------------------------------- desk */
 
@@ -47,7 +49,8 @@ const SCREEN = 'lacquer.black.gloss';
  * A desk used from +Z: a timber top with a cable grommet on two black steel
  * frames, a slim drawer, a cable tray at the back and a modesty panel.
  * `corner: 'left' | 'right'`: an L-shaped desk whose return runs forward on
- * that side, `depth` in mm for its arms (default 700).
+ * that side, `depth` in mm for its arms (default 700). `pad` (default true): a leather
+ * desk pad, the top then sits 3 mm lower so the desk keeps its height.
  */
 export function buildWorkDesk(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3D {
   const m = new Model(entry, ctx);
@@ -55,7 +58,9 @@ export function buildWorkDesk(entry: CatalogEntry, ctx?: BuildContext): THREE.Ob
   const corner = param<'left' | 'right' | 'none'>(entry, 'corner', 'none');
   const p = new Parts(m, corner === 'right');
   const topT = 0.026;
-  const under = H - topT;
+  const pad = param<boolean>(entry, 'pad', true);
+  const T = pad ? H - PAD_H : H; // top surface
+  const under = T - topT;
   const bar = 0.05;
   const barT = 0.022;
   const inset = 0.05;
@@ -75,8 +80,8 @@ export function buildWorkDesk(entry: CatalogEntry, ctx?: BuildContext): THREE.Ob
     for (const x of [x0 + 0.04, x1 - 0.04]) p.fixed(GLIDE, rbox(0.05, 0.006, bar * 0.6, 0.002, x, 0, z, 1));
   };
   const grommet = (x: number, z: number) => {
-    p.part('frame', new THREE.TorusGeometry(0.03, 0.0035, 6, 24).rotateX(Math.PI / 2).translate(x, H - 0.0035, z));
-    p.fixed(GLIDE, cyl(0.029, 0.029, 0.003, x, H - 0.005, z, 'y', 24));
+    p.part('frame', new THREE.TorusGeometry(0.03, 0.0035, 6, 24).rotateX(Math.PI / 2).translate(x, T - 0.0035, z));
+    p.fixed(GLIDE, cyl(0.029, 0.029, 0.003, x, T - 0.005, z, 'y', 24));
   };
   const drawer = (x: number, z: number, w: number) => {
     const dh = 0.075;
@@ -87,7 +92,7 @@ export function buildWorkDesk(entry: CatalogEntry, ctx?: BuildContext): THREE.Ob
   };
 
   if (corner === 'none') {
-    p.part('top', slabTop(W, D, 0.01, topT, H, 0.004));
+    p.part('top', slabTop(W, D, 0.01, topT, T, 0.004));
     frameX(-W / 2 + inset, -D / 2 + 0.04, D / 2 - 0.06);
     frameX(W / 2 - inset, -D / 2 + 0.04, D / 2 - 0.06);
     // Modesty panel and cable tray at the back.
@@ -95,6 +100,7 @@ export function buildWorkDesk(entry: CatalogEntry, ctx?: BuildContext): THREE.Ob
     p.part('frame', rbox(W * 0.5, 0.06, 0.12, 0.004, -W * 0.08, under - 0.075, -D / 2 + 0.16, 1));
     drawer(W / 2 - inset - 0.25, D / 2 - 0.06, 0.4);
     grommet(-W / 2 + 0.22, -D / 2 + 0.09);
+    if (pad) p.fixed('leather.black', rbox(Math.min(0.9, W * 0.6), PAD_H, Math.min(0.4, D * 0.55), 0.01, W * 0.05, T, D / 2 - 0.06 - Math.min(0.4, D * 0.55) / 2, 2));
     return p.build();
   }
   // L-shaped: the main top along the back, the return forward on the left (mirrored for the right).
@@ -125,6 +131,7 @@ export function buildWorkDesk(entry: CatalogEntry, ctx?: BuildContext): THREE.Ob
   p.part('frame', rbox(0.006, 0.26, D - dd - inset - 0.06, 0.002, -W / 2 + 0.08, under - 0.3, (-D / 2 + dd + D / 2 - inset) / 2 - 0.02, 1));
   drawer(W / 2 - inset - 0.25, -D / 2 + dd - 0.06, 0.4);
   grommet(-W / 2 + 0.16, -D / 2 + 0.16);
+  if (pad) p.fixed('leather.black', rbox(Math.min(0.9, W * 0.45), PAD_H, Math.min(0.4, dd * 0.55), 0.01, W * 0.12, T, -D / 2 + dd - 0.06 - Math.min(0.4, dd * 0.55) / 2, 2));
   return p.build();
 }
 
