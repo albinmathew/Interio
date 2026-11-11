@@ -40,7 +40,9 @@ export async function expectCanvasRendered(canvas: Locator, minColours = 12): Pr
           return seen.size;
         }, png.toString('base64'));
       },
-      { timeout: 20_000 },
+      // CI rasterises WebGL in software on two cores: one capture of a continuously
+      // drawing walk view can take most of the old 20 s budget there.
+      { timeout: process.env.CI ? 90_000 : 20_000 },
     )
     .toBeGreaterThan(minColours);
 }
