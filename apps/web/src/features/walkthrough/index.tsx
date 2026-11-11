@@ -180,6 +180,8 @@ export default function Walkthrough() {
       <Canvas
         shadows={quality === 'high' ? 'percentage' : false}
         dpr={quality === 'high' ? [1, 2] : 1}
+        // Multisampling is the costliest part of a frame on a software rasteriser; the canvas keeps the setting it starts with.
+        gl={{ antialias: !detectSoftwareRenderer() }}
         style={{ touchAction: 'none' }}
         camera={{ position: [start.x / 1000, walkUi.get().eyeHeight / 1000, -start.y / 1000], fov, near: 0.05, far: 200 }}
         onCreated={({ gl }) => setCanvas(gl.domElement)}
@@ -187,7 +189,7 @@ export default function Walkthrough() {
         <color attach="background" args={[lightingRig(lighting, 'interior').background]} />
         {quality === 'high' && <PerformanceMonitor flipflops={2} onDecline={() => setQuality('low')} onFallback={() => setQuality('low')} />}
         <SceneLighting level={level} mode="interior" preset={lighting} resolveEntry={getEntry} quality={quality} />
-        <PlanScene level={level} resolveEntry={getEntry} showCeilings closedDoors={frontDoors} />
+        <PlanScene level={level} resolveEntry={getEntry} showCeilings closedDoors={frontDoors} lampsLit={lighting !== 'daylight'} quality={quality} />
         <CameraRig controller={controller} />
         <TargetMarker controller={controller} />
         <Bridge target={bridge} />

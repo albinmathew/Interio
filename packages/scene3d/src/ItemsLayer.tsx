@@ -19,6 +19,13 @@ export interface ItemObjectProps {
   item: Item;
   entry: CatalogEntry;
   appearance?: ItemAppearance;
+  /** Lamps are switched on: the bulbs of lighting entries glow (evening and night). */
+  lit?: boolean;
+  /**
+   * Cheaper shading for software renderers: physical materials (sheen, clear coat) are
+   * drawn as standard ones with the same colour, map and roughness.
+   */
+  lite?: boolean;
 }
 
 export interface ItemsLayerProps {
@@ -26,6 +33,10 @@ export interface ItemsLayerProps {
   resolveEntry: (catalogId: string) => CatalogEntry | undefined;
   /** Optional per-item appearance (selection, warnings). */
   appearanceFor?: (item: Item) => ItemAppearance | undefined;
+  /** Lamps are switched on: the bulbs of lighting entries glow. */
+  lampsLit?: boolean;
+  /** Cheaper shading for software renderers (see `ItemObjectProps.lite`). */
+  lite?: boolean;
 }
 
 type Tintable = THREE.Material & { emissive?: THREE.Color; emissiveIntensity?: number };
@@ -74,6 +85,107 @@ function useAppearance(root: THREE.Object3D, a: ItemAppearance | undefined): voi
   }, [root, opacity, emissive, intensity]);
 }
 
+/** Material of a lamp's bulb in the premium set (a fixed part of every lighting model). */
+export const BULB_MATERIAL = 'lacquer.white.gloss';
+
+const glowing = new THREE.MeshStandardMaterial({
+  name: `${BULB_MATERIAL}:lit`,
+  color: '#fff4e2',
+  emissive: '#ffd59a',
+  emissiveIntensity: 2.4,
+  roughness: 0.4,
+});
+
+/** While `lit`, the bulbs of a lighting model glow. Only lighting entries are touched: gloss white elsewhere stays gloss white. */
+function useBulbs(root: THREE.Object3D, entry: CatalogEntry, lit: boolean): void {
+  useLayoutEffect(() => {
+    if (!lit || entry.category !== 'lighting') return;
+    const swapped: [THREE.Mesh, THREE.Material | THREE.Material[]][] = [];
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      const m = mesh.material as THREE.Material | undefined;
+      if (mesh.isMesh && m && !Array.isArray(m) && m.name === BULB_MATERIAL) {
+        swapped.push([mesh, m]);
+        mesh.material = glowing;
+        mesh.castShadow = false;
+      }
+    });
+    return () => {
+      for (const [mesh, m] of swapped) {
+        mesh.material = m;
+        mesh.castShadow = true;
+      }
+    };
+  }, [root, entry, lit]);
+}
+
+/**
+ * Glass and mirrors in flat, top-down light: plain transparency makes clear glass all but
+ * vanish, so glass takes more of the environment's reflections (which transparency would
+ * otherwise scale down) and a faint body tint. Materials are shared, so each is tuned once.
+ */
+function tuneGlass(root: THREE.Object3D): void {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    const m = mesh.material as THREE.MeshPhysicalMaterial | undefined;
+    if (!mesh.isMesh || !m || Array.isArray(m) || !m.isMeshPhysicalMaterial || m.userData.glassTuned || !m.name.startsWith('glass.')) return;
+    m.userData.glassTuned = true;
+    if (m.name === 'glass.mirror') {
+      m.envMapIntensity = 1.6;
+      m.roughness = Math.min(m.roughness, 0.02);
+    } else {
+      m.envMapIntensity = 3.2;
+      m.opacity = Math.max(m.opacity, m.name === 'glass.clear' ? 0.3 : m.opacity);
+      m.specularIntensity = 1;
+      m.clearcoat = 1;
+      m.clearcoatRoughness = 0.04;
+    }
+    m.needsUpdate = true;
+  });
+}
+
+const standIns = new WeakMap<THREE.Material, THREE.MeshStandardMaterial>();
+
+/** A standard material that looks like `m` without the physical extras. Shared per source material. */
+function standIn(m: THREE.MeshPhysicalMaterial): THREE.MeshStandardMaterial {
+  let s = standIns.get(m);
+  if (!s) {
+    s = new THREE.MeshStandardMaterial({
+      name: m.name,
+      color: m.color,
+      map: m.map,
+      roughness: m.roughness,
+      metalness: m.metalness,
+      transparent: m.transparent,
+      opacity: m.opacity,
+      side: m.side,
+      depthWrite: m.depthWrite,
+      envMapIntensity: m.envMapIntensity,
+    });
+    standIns.set(m, s);
+  }
+  return s;
+}
+
+/** On software renderers, draws physical materials as standard ones (see `ItemObjectProps.lite`). */
+function useLite(root: THREE.Object3D, lite: boolean): void {
+  useLayoutEffect(() => {
+    if (!lite) return;
+    const swapped: [THREE.Mesh, THREE.Material][] = [];
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      const m = mesh.material as THREE.MeshPhysicalMaterial | undefined;
+      if (mesh.isMesh && m && !Array.isArray(m) && m.isMeshPhysicalMaterial) {
+        swapped.push([mesh, m]);
+        mesh.material = standIn(m);
+      }
+    });
+    return () => {
+      for (const [mesh, m] of swapped) mesh.material = m;
+    };
+  }, [root, lite]);
+}
+
 /** Frees the geometry of a generated model. Its materials are shared by every item of that finish and stay. */
 function disposeGeometry(root: THREE.Object3D): void {
   root.traverse((o) => {
@@ -82,11 +194,29 @@ function disposeGeometry(root: THREE.Object3D): void {
   });
 }
 
-function ParametricModel({ entry, finishes, appearance }: { entry: CatalogEntry; finishes?: Record<string, string>; appearance?: ItemAppearance }) {
+function ParametricModel({
+  entry,
+  finishes,
+  appearance,
+  lit = false,
+  lite = false,
+}: {
+  entry: CatalogEntry;
+  finishes?: Record<string, string>;
+  appearance?: ItemAppearance;
+  lit?: boolean;
+  lite?: boolean;
+}) {
   // Rebuild when the item's own finishes change (a new upholstery, another wood).
   const finishKey = finishes ? JSON.stringify(finishes) : '';
-  const object = useMemo(() => buildParametric(entry, finishes), [entry, finishKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const object = useMemo(() => {
+    const built = buildParametric(entry, finishes);
+    tuneGlass(built);
+    return built;
+  }, [entry, finishKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => disposeGeometry(object), [object]);
+  useLite(object, lite);
+  useBulbs(object, entry, lit);
   useAppearance(object, appearance);
   return <primitive object={object} />;
 }
@@ -184,8 +314,8 @@ class ModelBoundary extends Component<BoundaryProps, BoundaryState> {
   }
 }
 
-function ItemModel({ entry, finishes, appearance }: { entry: CatalogEntry; finishes?: Record<string, string>; appearance?: ItemAppearance }) {
-  if (entry.model.kind !== 'glb') return <ParametricModel entry={entry} finishes={finishes} appearance={appearance} />;
+function ItemModel({ entry, finishes, appearance, lit, lite }: { entry: CatalogEntry; finishes?: Record<string, string>; appearance?: ItemAppearance; lit?: boolean; lite?: boolean }) {
+  if (entry.model.kind !== 'glb') return <ParametricModel entry={entry} finishes={finishes} appearance={appearance} lit={lit} lite={lite} />;
   const box = <BoxModel entry={entry} appearance={appearance} />;
   return (
     <ModelBoundary resetKey={entry.model.url} fallback={box}>
@@ -201,7 +331,7 @@ function ItemModel({ entry, finishes, appearance }: { entry: CatalogEntry; finis
  * cloned per instance and fitted to `entry.dims` with their bottom-centre on the item
  * position (a box stands in while loading or when the file is missing).
  */
-export function ItemObject({ item, entry, appearance }: ItemObjectProps) {
+export function ItemObject({ item, entry, appearance, lit, lite }: ItemObjectProps) {
   const s = item.scale ?? 1;
   return (
     <group
@@ -211,17 +341,17 @@ export function ItemObject({ item, entry, appearance }: ItemObjectProps) {
       scale={[s, s, s]}
       userData={{ itemId: item.id }}
     >
-      <ItemModel entry={entry} finishes={item.finishes} appearance={appearance} />
+      <ItemModel entry={entry} finishes={item.finishes} appearance={appearance} lit={lit} lite={lite} />
     </group>
   );
 }
 
-export function ItemsLayer({ level, resolveEntry, appearanceFor }: ItemsLayerProps) {
+export function ItemsLayer({ level, resolveEntry, appearanceFor, lampsLit, lite }: ItemsLayerProps) {
   return (
     <group name="items">
       {Object.values(level.items).map((item) => {
         const entry = resolveEntry(item.catalogId);
-        return entry ? <ItemObject key={item.id} item={item} entry={entry} appearance={appearanceFor?.(item)} /> : null;
+        return entry ? <ItemObject key={item.id} item={item} entry={entry} appearance={appearanceFor?.(item)} lit={lampsLit} lite={lite} /> : null;
       })}
     </group>
   );

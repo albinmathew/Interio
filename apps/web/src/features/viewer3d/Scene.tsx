@@ -38,11 +38,11 @@ const GHOST_NAME = 'placement-ghost';
 
 const WARNING: ItemAppearance = { emissive: WARN, emissiveIntensity: 0.55 };
 
-function Items({ items, overlaps }: { items: Record<string, Item>; overlaps: Map<string, Overlap> }) {
+function Items({ items, overlaps, lit, lite }: { items: Record<string, Item>; overlaps: Map<string, Overlap>; lit: boolean; lite: boolean }) {
   return (
     <group name="items">
       {Object.values(items).map((item) => (
-        <ItemObject key={item.id} item={item} entry={entryOrPlaceholder(item.catalogId)} appearance={overlaps.has(item.id) ? WARNING : undefined} />
+        <ItemObject key={item.id} item={item} entry={entryOrPlaceholder(item.catalogId)} appearance={overlaps.has(item.id) ? WARNING : undefined} lit={lit} lite={lite} />
       ))}
     </group>
   );
@@ -453,7 +453,7 @@ export function Scene({ level }: { level: Level }) {
       />
       <LevelMeshes level={level} cutaway={cutaway && view === 'orbit'} />
       <Ground box={box} />
-      <Items items={items} overlaps={overlaps} />
+      <Items items={items} overlaps={overlaps} lit={lighting !== 'daylight'} lite={tier === 'low'} />
       <Ghost level={level} />
       <Selection items={items} overlaps={overlaps} />
       <WallFaceHighlight level={level} />

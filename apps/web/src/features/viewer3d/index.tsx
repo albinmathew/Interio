@@ -184,7 +184,8 @@ export default function Viewer3D() {
         shadows="percentage"
         frameloop="demand"
         dpr={tier === 'high' || (view === 'showcase' && tier !== 'low') ? [1, 2] : 1}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        // No multisampling on software rasterisers (the costliest part of their frame); the occlusion composer has its own.
+        gl={{ antialias: tier !== 'low', powerPreference: 'high-performance' }}
         camera={{ fov: 38, near: 0.1, far: 600, position: [12, 14, 12] }}
       >
         <Scene level={level} />
