@@ -3,12 +3,15 @@
 # apps/web/public/{textures,env}. Sources and licences: docs/assets/scene3d.md.
 # Needs curl, unzip and macOS `sips`. Run from the repository root:
 #   bash packages/scene3d/scripts/fetch-textures.sh
+# ONLY="granite cane env" fetches just those sets (folder names; `env` is the HDRI).
 set -eu
 
 DEST="apps/web/public"
 TMP="$(mktemp -d)"
 UA="interio-asset-fetch/0.1"
 trap 'rm -rf "$TMP"' EXIT
+
+want() { [ -z "${ONLY:-}" ] || [[ " $ONLY " == *" $1 "* ]]; }
 
 conv() { # in out quality maxsize
   sips -s format jpeg -s formatOptions "$3" -Z "$4" "$1" --out "$2" >/dev/null
@@ -25,6 +28,7 @@ put() { # source set map [normal-size]
 
 # polyhaven <asset> <set> [maps] [normal-size]: maps is a list of color, normal, rough (default all three).
 polyhaven() {
+  want "$2" || return 0
   mkdir -p "$TMP/$1" "$DEST/textures/$2"
   for map in ${3:-color normal rough}; do
     case "$map" in color) src=diff ;; normal) src=nor_gl ;; rough) src=rough ;; esac
@@ -35,6 +39,7 @@ polyhaven() {
 
 # ambientcg <asset> <set> [maps] [normal-size]
 ambientcg() {
+  want "$2" || return 0
   mkdir -p "$TMP/$1" "$DEST/textures/$2"
   curl -sS -f --retry 4 --retry-all-errors --connect-timeout 30 -L -A "$UA" "https://ambientcg.com/get?file=${1}_1K-JPG.zip" -o "$TMP/$1/src.zip"
   unzip -q -o -j "$TMP/$1/src.zip" '*.jpg' -d "$TMP/$1"
@@ -81,8 +86,7 @@ ambientcg Travertine009 travertine "color normal"
 ambientcg Wicker010A cane "color normal"
 polyhaven hessian_230 jute "color normal"
 
-mkdir -p "$DEST/env"
-curl -sS -f --retry 4 --retry-all-errors --connect-timeout 30 -A "$UA" "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_overcast_puresky_1k.hdr" -o "$DEST/env/kloofendal_overcast_puresky_1k.hdr"
+want env && mkdir -p "$DEST/env" && curl -sS -f --retry 4 --retry-all-errors --connect-timeout 30 -A "$UA" "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_overcast_puresky_1k.hdr" -o "$DEST/env/kloofendal_overcast_puresky_1k.hdr"
 
 # Palette swatches, cut from the colour maps.
 bash "$(dirname "$0")/make-swatches.sh"
