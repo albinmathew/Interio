@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectCanvasRendered, expectSaved, gotoMode, openSample } from './helpers';
+import { expectCanvasRendered, expectSaved, expectWalkRendered, gotoMode, openSample } from './helpers';
 
 test('sample home shows in 3D, in plan, in walk mode, and survives a reload', async ({ page }) => {
   const errors: string[] = [];
@@ -13,13 +13,13 @@ test('sample home shows in 3D, in plan, in walk mode, and survives a reload', as
   await expect(page.getByText('Bedroom 1')).toBeVisible();
 
   await gotoMode(page, 'walk');
-  await expectCanvasRendered(page.locator('canvas'));
+  await expectWalkRendered(page.locator('canvas'));
 
   await page.getByLabel('Project name').fill('My flat');
   await expectSaved(page);
   await page.reload();
   await expect(page.getByLabel('Project name')).toHaveValue('My flat');
-  await expectCanvasRendered(page.locator('canvas'));
+  await expectWalkRendered(page.locator('canvas'));
 
   await page.goto('/');
   await expect(page.getByTestId('project-card')).toHaveCount(1);

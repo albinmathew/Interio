@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { autoFurnish } from '../../packages/catalog/src';
 import { MATERIAL_LIST } from '../../packages/core/src/materials';
 import type { Level } from '../../packages/core/src/schema';
-import { expectCanvasRendered, expectSaved, gotoMode, openSample } from './helpers';
+import { expectCanvasRendered, expectSaved, expectWalkRendered, gotoMode, openSample } from './helpers';
 
 /**
  * Styling the sample home in Design mode: room finishes, whole-home furnishing,
@@ -318,14 +318,14 @@ test.describe('finishes and styling', () => {
 
     // Walk mode uses the same preset: its night is darker than its day.
     await gotoMode(page, 'walk');
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
     const walkNight = await brightness(page);
     await gotoMode(page, 'design');
     await ready(page);
     await page.getByRole('tab', { name: 'Daylight' }).click();
     await expect(preset).toHaveAttribute('data-preset', 'daylight');
     await gotoMode(page, 'walk');
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
     await expect.poll(() => brightness(page)).toBeGreaterThan(walkNight * 1.1);
   });
 

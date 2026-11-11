@@ -13,8 +13,8 @@ import { expect, test } from '@playwright/test';
 import { importPdfDetailed } from '../../packages/importer/src';
 import {
   designReady,
-  expectCanvasRendered,
   expectSaved,
+  expectWalkRendered,
   gotoMode,
   openProjectState,
   projectIdOf,
@@ -119,7 +119,7 @@ test.describe('real floor plans', () => {
 
       /* ---- walk: the guided tour visits every room and ends */
       await gotoMode(page, 'walk');
-      await expectCanvasRendered(page.locator('canvas'));
+      await expectWalkRendered(page.locator('canvas'));
       await expect(page.getByTestId('walk-room-item')).toHaveCount(rooms);
       const tour = await runTour(page, 24, 360_000);
       expect([...tour.visited].sort()).toEqual([...tour.rooms].sort());

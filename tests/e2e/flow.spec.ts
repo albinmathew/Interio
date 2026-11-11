@@ -12,8 +12,8 @@ import {
   clickPlan2d,
   clickPlan3d,
   designReady,
-  expectCanvasRendered,
   expectSaved,
+  expectWalkRendered,
   gotoMode,
   openProjectState,
   openSample,
@@ -69,7 +69,7 @@ test.describe('journey', () => {
 
     // Walk: the guided tour reaches every room and ends.
     await gotoMode(page, 'walk');
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
     const tour = await runTour(page, 16);
     expect(tour.rooms).toHaveLength(10);
     expect([...tour.visited].sort()).toEqual([...tour.rooms].sort());
@@ -157,7 +157,7 @@ test.describe('journey', () => {
 
     // Walk: the walker stands in it.
     await gotoMode(page, 'walk');
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
     await expect(page.getByTestId('walk-room-item')).toHaveCount(1);
     await expect(page.getByTestId('walk-room-label')).toHaveText('Studio');
     expect(errors).toEqual([]);
@@ -353,7 +353,7 @@ test.describe('shell', () => {
   test('toasts show inside a view that is in browser full screen', async ({ page }) => {
     await openSample(page);
     await gotoMode(page, 'walk');
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
 
     // Outside full screen the toasts live in the page body.
     await page.getByTestId('walk-screenshot').click();
@@ -472,7 +472,7 @@ test.describe('docs screenshots', () => {
     await shot(page, 'plan.jpg');
 
     await gotoMode(page, 'walk');
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
     await page.getByTestId('walk-room-item').filter({ hasText: 'Living / Dining' }).click();
     await page.waitForTimeout(2500);
     await shot(page, 'walk.jpg');

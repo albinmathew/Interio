@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { expectCanvasRendered, gotoMode, openSample } from './helpers';
+import { expectWalkRendered, gotoMode, openSample } from './helpers';
 
 /** Mirrors `window.__interioWalk` (apps/web/src/features/walkthrough/index.tsx). */
 interface WalkState {
@@ -55,7 +55,7 @@ test.describe('walkthrough', () => {
 
   test('renders and starts just inside the entrance, facing into the home', async ({ page }) => {
     await openWalk(page);
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
     await expect(label(page)).toHaveText('Foyer');
     const s = await hook.state(page);
     // Entrance door is on the east wall at (12000, 1100).
@@ -104,7 +104,7 @@ test.describe('walkthrough', () => {
 
   test('keyboard walks, and click-to-move walks to the clicked floor point', async ({ page }) => {
     await openWalk(page);
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
     const start = await hook.state(page);
 
     // Facing west: W walks towards -x and the hint goes away.
@@ -173,7 +173,7 @@ test.describe('walkthrough', () => {
   test('guided tour controls work and the tour reaches every room, then ends', async ({ page }) => {
     test.setTimeout(240_000);
     await openWalk(page);
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
 
     // Controls: start, pause, resume, next, previous, stop.
     await page.getByTestId('walk-tour-speed').selectOption('4');
@@ -225,18 +225,18 @@ test.describe('walkthrough', () => {
     // Still drawing after the tour. The last stop may face a plain wall, which under the
     // reduced quality of software renderers (CI) shows only a few colours: check for a live,
     // non-blank view rather than a busy one.
-    await expectCanvasRendered(page.locator('canvas'), 4);
+    await expectWalkRendered(page.locator('canvas'));
   });
 
   test('view options: field of view, eye height and a PNG of the view', async ({ page }) => {
     await openWalk(page);
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
     await page.getByTestId('walk-options').click();
     await page.getByTestId('walk-fov').fill('95');
     await page.getByTestId('walk-eye-height').fill('1200');
     await expect(page.getByText('95°')).toBeVisible();
     await expect(page.getByText('1.20 m')).toBeVisible();
-    await expectCanvasRendered(page.locator('canvas'));
+    await expectWalkRendered(page.locator('canvas'));
 
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('walk-screenshot').click()]);
     expect(download.suggestedFilename()).toMatch(/^interio-foyer-[\d-]+\.png$/);

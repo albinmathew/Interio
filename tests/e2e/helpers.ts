@@ -45,6 +45,16 @@ export async function expectCanvasRendered(canvas: Locator, minColours = 12): Pr
     .toBeGreaterThan(minColours);
 }
 
+/**
+ * Walk mode is drawn: a live, non-blank view. Interior views of an unfurnished home
+ * (a corridor, a bare wall) legitimately show only a few colours, especially with the
+ * reduced quality software renderers get on CI, so this checks for a drawn frame rather
+ * than a busy one.
+ */
+export async function expectWalkRendered(canvas: Locator): Promise<void> {
+  await expectCanvasRendered(canvas, 4);
+}
+
 /** Waits until autosave has written the project. */
 export async function expectSaved(page: Page): Promise<void> {
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-status', 'saved');
