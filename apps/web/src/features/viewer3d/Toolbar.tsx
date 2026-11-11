@@ -99,7 +99,7 @@ export function Toolbar({ level }: { level: Level }) {
               label: (
                 <>
                   <Aperture className="h-4 w-4" />
-                  Showcase
+                  <span className="sr-only 2xl:not-sr-only">Showcase</span>
                 </>
               ),
             },

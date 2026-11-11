@@ -13,7 +13,9 @@ import {
   slotValue,
   surfaceFinishName,
 } from './customise';
+import { captureRatio, exportScale } from './capture';
 import { finishOptions } from './finishes';
+import { renderTier } from './state';
 
 const SLOTS: FinishSlot[] = [
   { id: 'frame', label: 'Frame', kind: 'wood', default: 'wood.oak' },
@@ -119,5 +121,21 @@ describe('surface sections', () => {
     expect(surfaceFinishName('#ABCDEF')).toBe('Custom #abcdef');
     expect(surfaceFinishName('wall.marble')).toBe('Marble cladding');
     expect(surfaceFinishName('gone')).toBe('Custom');
+  });
+});
+
+describe('render tiers and pictures', () => {
+  it('software renderers always get the low tier; a GPU steps down to medium when slow', () => {
+    expect(renderTier(true, 'high')).toBe('low');
+    expect(renderTier(true, 'low')).toBe('low');
+    expect(renderTier(false, 'high')).toBe('high');
+    expect(renderTier(false, 'low')).toBe('medium');
+  });
+
+  it('Showcase pictures are larger than the other views, within the size limit', () => {
+    expect(exportScale('showcase')).toBeGreaterThan(exportScale('orbit'));
+    expect(exportScale('top')).toBe(2);
+    expect(captureRatio(1280, 800, exportScale('showcase'))).toBe(3);
+    expect(captureRatio(2000, 1200, exportScale('showcase')) * 2000).toBeLessThanOrEqual(4096);
   });
 });
