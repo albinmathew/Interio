@@ -149,7 +149,7 @@ function roundBack(p: Parts, W: number, D: number, H: number, sy: number): THREE
     const az = seatZ + sz * seatR * 0.55;
     const bx = sx * (W / 2 - 0.035);
     const bz = sz > 0 ? D / 2 - 0.035 : -D / 2 + 0.07;
-    p.part('frame', taperRod([bx, 0, bz], [ax, top, az], 0.012, 0.018, 12));
+    p.part('frame', taperRod([bx, 0.005, bz], [ax, top, az], 0.012, 0.018, 12));
   }
   // Ring stretcher at the height where the legs pass through it.
   const ry = 0.2;
@@ -190,7 +190,7 @@ function shell(p: Parts, W: number, D: number, H: number, sy: number): THREE.Gro
     for (const sz of [-1, 1]) {
       const ax = sx * W * 0.2;
       const az = seatZ + sz * seatD * 0.2;
-      p.part('legs', taperRod([sx * (W / 2 - 0.03), 0, sz > 0 ? D / 2 - 0.035 : -D / 2 + 0.06], [ax, top - 0.02, az], 0.011, 0.016, 12));
+      p.part('legs', taperRod([sx * (W / 2 - 0.03), 0.005, sz > 0 ? D / 2 - 0.035 : -D / 2 + 0.06], [ax, top - 0.02, az], 0.011, 0.016, 12));
     }
   }
   p.fixed('metal.black', rod([-W * 0.2, top - 0.035, seatZ - seatD * 0.2], [W * 0.2, top - 0.035, seatZ + seatD * 0.2], 0.005, 6));
@@ -208,8 +208,8 @@ function cantilever(p: Parts, W: number, D: number, H: number, sy: number): THRE
   for (const s of [-1, 1]) {
     const X = s * x;
     const pts: [number, number, number][] = [
-      [X, r + 0.001, -D / 2 + 0.11],
-      [X, r + 0.001, front - 0.06],
+      [X, r + 0.003, -D / 2 + 0.11],
+      [X, r + 0.003, front - 0.06],
       [X, r + 0.012, front - 0.012],
       [X, 0.07, front],
       [X, sy - 0.11, front],
@@ -222,7 +222,7 @@ function cantilever(p: Parts, W: number, D: number, H: number, sy: number): THRE
     ];
     p.part('frame', tubePath(pts, r));
   }
-  p.part('frame', rod([-x, r + 0.001, -D / 2 + 0.11], [x, r + 0.001, -D / 2 + 0.11], r, 10));
+  p.part('frame', rod([-x, r + 0.003, -D / 2 + 0.11], [x, r + 0.003, -D / 2 + 0.11], r, 10));
   p.part('frame', rod([-x, sy - 0.045, D / 2 - 0.09], [x, sy - 0.045, D / 2 - 0.09], r * 0.8, 10));
   p.part('frame', rod([-x - r * 0.6, H - r - 0.001, -D / 2 + r + 0.003], [x + r * 0.6, H - r - 0.001, -D / 2 + r + 0.003], r, 10));
   // Seat and back pads.
