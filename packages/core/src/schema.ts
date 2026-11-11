@@ -8,6 +8,7 @@
  * - Angles are degrees, counter-clockwise in the plan frame (equals rotation about world +Y).
  */
 import { z } from 'zod';
+import type { FinishSlot } from './furnitureMaterials';
 
 export type Id = string;
 export type Mm = number;
@@ -48,6 +49,13 @@ export const WallSchema = z.object({
   b: z.string(),
   thickness: z.number().positive(),
   height: z.number().positive(),
+  /**
+   * Finish of one face of this wall, overriding the wall finish of the room it faces:
+   * an accent wall. A finish id from `MATERIALS` or a custom colour as `#rrggbb`.
+   * `Left` is the face on the CCW-normal side of a -> b.
+   */
+  finishLeft: z.string().optional(),
+  finishRight: z.string().optional(),
   /**
    * `wall` is full height; `low` is a parapet/half wall; `railing` is a balcony railing;
    * `divider` is a boundary between zones of an open-plan space (foyer / dining / living):
@@ -90,7 +98,7 @@ export const RoomSchema = z.object({
   seed: PtSchema,
   name: z.string(),
   type: RoomTypeSchema.default('other'),
-  /** Material ids resolve in the finishes palette (`MATERIALS` in `materials.ts`). */
+  /** Finish ids from the palette (`MATERIALS` in `materials.ts`) or a custom colour as `#rrggbb`. */
   floorMaterial: z.string().default('floor.oak'),
   wallMaterial: z.string().optional(),
   ceilingMaterial: z.string().optional(),
@@ -108,6 +116,11 @@ export const ItemSchema = z.object({
   /** CCW degrees. At 0 the item's front faces plan -y and its width runs along plan x. */
   rotationDeg: z.number().default(0),
   roomId: z.string().optional(),
+  /**
+   * The item's own finishes by slot id (see `CatalogEntry.slots`): a furniture material id
+   * or a custom colour as `#rrggbb`. Slots without an entry use the catalog default.
+   */
+  finishes: z.record(z.string(), z.string()).optional(),
   /** Optional per-item overrides. */
   scale: z.number().positive().optional(),
   variant: z.string().optional(),
@@ -226,6 +239,8 @@ export interface CatalogEntry {
   /** Default elevation of the underside for wall/ceiling anchored entries. */
   mountHeight?: Mm;
   model: CatalogModel;
+  /** Parts of the model whose material the user can change. Parametric entries only. */
+  slots?: FinishSlot[];
   thumbnail?: string;
   /** SPDX id plus source, e.g. "CC0-1.0 (Kenney Furniture Kit)". */
   licence: string;

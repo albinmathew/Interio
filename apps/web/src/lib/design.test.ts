@@ -103,6 +103,31 @@ describe('applying design operations', () => {
     expect(itemsIn(bath.id).map((i) => i.catalogId)).toEqual(['basin.pedestal']);
   });
 
+  it('refinishes parts of an item and paints with custom colours', () => {
+    const bed1 = room('Bedroom 1');
+    planStore.getState().addItem({ catalogId: 'bed.double', x: bed1.seed.x, y: bed1.seed.y, z: 0, rotationDeg: 0, roomId: bed1.id });
+    const bed = itemsIn(bed1.id)[0]!;
+    const results = applyDesignOps([
+      { op: 'set_item_finish', itemId: bed.id, slot: 'headboard', material: 'fabric.velvet.navy' },
+      { op: 'set_item_finish', itemId: bed.id, slot: 'frame', material: '#445566' },
+      { op: 'set_item_finish', itemId: bed.id, slot: 'headboard', material: 'fabric.velvet.navy' },
+      { op: 'set_item_finish', itemId: bed.id, slot: 'wheels', material: 'wood.walnut' },
+      { op: 'set_item_finish', itemId: bed.id, slot: 'frame', material: 'unobtainium' },
+      { op: 'set_room', roomId: bed1.id, wallMaterial: '#2F5D62', floorMaterial: 'floor.oak.smoked' },
+    ]);
+    expect(results.map((r) => r.ok)).toEqual([true, true, false, false, false, true]);
+    expect(results[0]!.message).toBe('Double bed: headboard in Navy velvet');
+    expect(results[1]!.message).toBe('Double bed: frame in Custom #445566');
+    expect(level().items[bed.id]!.finishes).toEqual({ headboard: 'fabric.velvet.navy', frame: '#445566' });
+    expect(level().rooms[bed1.id]).toMatchObject({ wallMaterial: '#2f5d62', floorMaterial: 'floor.oak.smoked' });
+    expect(results[5]!.message).toBe('Bedroom 1: floor: Smoked oak planks, walls: Custom #2f5d62');
+
+    const request = buildDesignRequest('x')!;
+    expect(request.catalog.find((c) => c.id === 'bed.double')!.slots!.map((s) => s.id)).toEqual(['frame', 'headboard', 'bedding', 'throw']);
+    expect(request.furnitureFinishes!.some((m) => m.id === 'fabric.velvet.navy' && m.kind === 'fabric')).toBe(true);
+    expect(request.home.rooms.find((r) => r.id === bed1.id)!.items[0]!.finishes).toEqual({ headboard: 'fabric.velvet.navy', frame: '#445566' });
+  });
+
   it('leaves no undo step when nothing could be applied', () => {
     const steps = planStore.getState().past.length;
     const results = applyDesignOps([{ op: 'remove_item', itemId: 'missing' }, { op: 'clear_room', roomId: room('Bedroom 1').id }]);

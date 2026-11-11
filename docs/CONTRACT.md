@@ -74,6 +74,14 @@ Features render inside a full-size container and read the store themselves. Use 
 - `@interio/catalog` `placeEntry(level, roomId, catalogId, opts)`: a free spot for one entry in a furnished room; the assistant never gives coordinates.
 - `Project.variants`: saved looks (`items`, per-room name/type/finishes, `settings`, small thumbnail). Store actions `saveVariant`, `applyVariant`, `updateVariant`, `renameVariant`, `deleteVariant`. The variant list is outside undo history; applying a variant is one undo step. Variants share the project's walls.
 
+## Finishes and the premium furniture set
+
+- **Furniture materials** (`packages/core/src/furnitureMaterials.ts`): `FURNITURE_MATERIAL_LIST` (fabrics, leathers, woods, lacquers, stones, metals, glass, ceramic, woven). A finish value is a material id or a custom colour as `#rrggbb`.
+- **Slots**: a parametric `CatalogEntry` declares `slots` (`id`, `label`, `kind`, `default`): the parts whose material the user can change. `Item.finishes` holds the item's own choice per slot. `buildParametric(entry, item.finishes)` builds the model; each slot is one mesh with `userData.slot`.
+- **Premium generators** live in `packages/catalog/src/premium/<family>.ts` and are built with `premium/kit.ts` (`Model`, `rbox`, `cushion`, `pillow`, `lathe`, `tube`...). `beds.ts` is the exemplar. Conventions: metres, bottom-centre origin, front +Z, bounding box equal to `entry.dims`, world-scaled UVs, no textures in generators: the renderer supplies them per material through `setFurnitureTextureResolver`.
+- **Surfaces**: room floor, wall and ceiling finishes are palette ids (`MATERIALS`) or `#rrggbb` (`resolveSurfaceFinish`). One face of a wall can override its room's wall finish with `Wall.finishLeft` / `finishRight` (`wallFaceFinish`): an accent wall.
+- The assistant can refinish parts of an item (`set_item_finish`) and use custom colours for rooms.
+
 ## Storage
 
 `lib/storage.ts` (IndexedDB): projects as JSON, assets under `<projectId>/<name>` (`pdf`, `underlay`). `lib/session.ts`: `openProject`, `createFromDraft`, `startAutosave`, `loadUnderlay`, export/import. Exported projects are a single gzipped `.interio` file that carries the project JSON, the underlay and the source PDF; plain project JSON from earlier versions still opens. `lib/useUnderlay.ts` gives the source-drawing underlay to the editor.

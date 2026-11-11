@@ -1,5 +1,6 @@
 /** Registers every parametric generator. Imported for its side effect by the package entry point. */
-import { registerGenerator } from '../parametric';
+import { registerGenerator, type Generator } from '../parametric';
+import { PREMIUM_GENERATORS } from '../premium';
 import {
   buildBuiltinOven,
   buildDishwasher,
@@ -52,6 +53,8 @@ export const GENERATORS = {
   dryingRack: buildDryingRack,
 } as const;
 
-export type GeneratorName = keyof typeof GENERATORS;
+/** Names of the first-generation generators above, plus any premium generator (`premium/`). */
+export type GeneratorName = keyof typeof GENERATORS | (string & {});
 
 for (const [name, fn] of Object.entries(GENERATORS)) registerGenerator(name, fn);
+for (const [name, fn] of Object.entries(PREMIUM_GENERATORS)) registerGenerator(name, fn as Generator);

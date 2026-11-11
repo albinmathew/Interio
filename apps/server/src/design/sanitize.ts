@@ -7,6 +7,7 @@ import { DesignOpSchema, ITEM_PLACEMENTS, ROOM_TYPES, type DesignEditRequest, ty
 
 const MAX_OPS = 60;
 const MAX_REPLY = 600;
+const HEX = /^#[0-9a-fA-F]{6}$/;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const str = (value: unknown): string | undefined => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
@@ -28,9 +29,13 @@ export function toDesignAnswer(raw: unknown, request: DesignEditRequest): Design
   // A ceiling may take a wall paint; a floor never takes a wall finish and the other way round.
   const finish = (value: unknown, surface: 'floor' | 'wall' | 'ceiling') => {
     const id = str(value);
+    if (id && HEX.test(id)) return id.toLowerCase();
     const got = id ? finishes.get(id) : undefined;
     return got && (got === surface || (surface === 'ceiling' && got === 'wall')) ? id : undefined;
   };
+  const furnitureFinishes = new Set((request.furnitureFinishes ?? []).map((m) => m.id));
+  const slotsOf = new Map(request.catalog.map((c) => [c.id, new Set((c.slots ?? []).map((s) => s.id))]));
+  const catalogIdOf = new Map(request.home.rooms.flatMap((r) => r.items.map((i) => [i.id, i.catalogId] as const)));
 
   const ops: DesignOp[] = [];
   let dropped = 0;
@@ -82,6 +87,15 @@ export function toDesignAnswer(raw: unknown, request: DesignEditRequest): Design
         return itemId && items.has(itemId) ? { op: 'remove_item', itemId } : null;
       case 'replace_item':
         return itemId && items.has(itemId) && catalogId && catalog.has(catalogId) ? { op: 'replace_item', itemId, catalogId } : null;
+      case 'set_item_finish': {
+        const slot = str(row.slot);
+        const value = str(row.material);
+        if (!itemId || !items.has(itemId) || !slot || !value) return null;
+        // The part must exist on that item's catalog entry, and the material must be listed or a plain colour.
+        if (!slotsOf.get(catalogIdOf.get(itemId) ?? '')?.has(slot)) return null;
+        if (HEX.test(value)) return { op: 'set_item_finish', itemId, slot, material: value.toLowerCase() };
+        return furnitureFinishes.has(value) ? { op: 'set_item_finish', itemId, slot, material: value } : null;
+      }
       case 'set_lighting': {
         const preset = str(row.preset);
         return preset && presets.has(preset) ? { op: 'set_lighting', preset } : null;

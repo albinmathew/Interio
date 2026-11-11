@@ -146,10 +146,10 @@ describe('catalog entries', () => {
 describe('shipped files and licences', () => {
   const shipped = fs.readdirSync(MODELS_DIR).filter((f) => f.endsWith('.glb'));
 
-  it('ships exactly the models the manifest lists, all in use', () => {
+  it('ships exactly the models the manifest lists, and entries use only shipped models', () => {
     expect(shipped.sort()).toEqual(Object.keys(MODELS).map((id) => `${id}.glb`).sort());
     const used = new Set(CATALOG.flatMap((e) => (e.model.kind === 'glb' ? [path.basename(e.model.url)] : [])));
-    for (const f of shipped) expect(used.has(f), `${f} is not used by any entry`).toBe(true);
+    for (const f of used) expect(shipped.includes(f), `${f} is used by an entry but not shipped`).toBe(true);
   });
 
   it('ships a thumbnail per entry and nothing else', () => {

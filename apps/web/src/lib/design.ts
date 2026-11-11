@@ -8,9 +8,12 @@
 import { CATALOG, autoFurnish, getEntry, placeEntry } from '@interio/catalog';
 import {
   DesignEditResponseSchema,
-  MATERIALS,
   defaultFloorFor,
   finishBriefs,
+  furnitureFinishBriefs,
+  isHexColor,
+  resolveFurnitureMaterial,
+  resolveSurfaceFinish,
   planStore,
   selectLevel,
   summariseHome,
@@ -76,6 +79,7 @@ function catalogBriefs(): CatalogBrief[] {
     roomTypes: e.roomTypes,
     size: [e.dims.w, e.dims.d, e.dims.h],
     anchor: e.anchor,
+    ...(e.slots?.length ? { slots: e.slots.map((s) => ({ id: s.id, label: s.label, kind: s.kind })) } : {}),
   }));
 }
 
@@ -90,6 +94,7 @@ export function buildDesignRequest(instruction: string, history: DesignTurn[] = 
     catalog: catalogBriefs(),
     finishes: finishBriefs(),
     lighting: LIGHTING_PRESETS.map((id) => ({ id, name: LIGHTING_LABELS[id] })),
+    furnitureFinishes: furnitureFinishBriefs(),
     ...(history.length ? { history: history.slice(-12) } : {}),
   };
 }
@@ -98,10 +103,13 @@ const level = (): Level | null => selectLevel(planStore.getState());
 
 function finish(id: string | undefined, surface: 'floor' | 'wall' | 'ceiling'): string | undefined {
   if (!id) return undefined;
-  const m = MATERIALS[id];
-  // Ceilings may take wall paints: the palette has a single ceiling finish.
+  if (isHexColor(id)) return id.toLowerCase();
+  const m = resolveSurfaceFinish(id, surface);
+  // Ceilings may take wall paints: the palette has few ceiling finishes.
   return m && (m.surface === surface || (surface === 'ceiling' && m.surface === 'wall')) ? id : undefined;
 }
+
+const finishName = (id: string, surface: 'floor' | 'wall' | 'ceiling'): string => resolveSurfaceFinish(id, surface)?.name ?? id;
 
 function applyOne(op: DesignOp): Omit<AppliedOp, 'op'> {
   const store = planStore.getState();
@@ -129,15 +137,15 @@ function applyOne(op: DesignOp): Omit<AppliedOp, 'op'> {
       const ceiling = finish(op.ceilingMaterial, 'ceiling');
       if (floor && floor !== room!.floorMaterial) {
         patch.floorMaterial = floor;
-        notes.push(`floor: ${MATERIALS[floor]!.name}`);
+        notes.push(`floor: ${finishName(floor, 'floor')}`);
       }
       if (wall && wall !== room!.wallMaterial) {
         patch.wallMaterial = wall;
-        notes.push(`walls: ${MATERIALS[wall]!.name}`);
+        notes.push(`walls: ${finishName(wall, 'wall')}`);
       }
       if (ceiling && ceiling !== room!.ceilingMaterial) {
         patch.ceilingMaterial = ceiling;
-        notes.push(`ceiling: ${MATERIALS[ceiling]!.name}`);
+        notes.push(`ceiling: ${finishName(ceiling, 'ceiling')}`);
       }
       if (notes.length === 0) return { ok: false, message: `${room!.name} already looks like that` };
       store.setRoomProps(op.roomId, patch);
@@ -210,6 +218,20 @@ function applyOne(op: DesignOp): Omit<AppliedOp, 'op'> {
       }
       store.addItem({ ...placed, roomId: item.roomId });
       return { ok: true, message: swapped };
+    }
+
+    case 'set_item_finish': {
+      const item = l.items[op.itemId];
+      const entry = item && getEntry(item.catalogId);
+      if (!item || !entry) return { ok: false, message: 'That item is no longer in the plan' };
+      const slot = entry.slots?.find((s) => s.id === op.slot);
+      if (!slot) return { ok: false, message: `${entry.name} has no part called "${op.slot}"` };
+      const material = resolveFurnitureMaterial(op.material, slot.kind);
+      if (!material) return { ok: false, message: `"${op.material}" is not a material` };
+      const current = item.finishes?.[slot.id] ?? slot.default;
+      if (current === material.id) return { ok: false, message: `${entry.name} ${slot.label.toLowerCase()} is already ${material.name}` };
+      store.updateItem(op.itemId, { finishes: { ...item.finishes, [slot.id]: material.id } });
+      return { ok: true, message: `${entry.name}: ${slot.label.toLowerCase()} in ${material.name}` };
     }
 
     case 'set_lighting': {

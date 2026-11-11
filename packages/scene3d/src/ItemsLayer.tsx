@@ -74,18 +74,19 @@ function useAppearance(root: THREE.Object3D, a: ItemAppearance | undefined): voi
   }, [root, opacity, emissive, intensity]);
 }
 
-function disposeObject(root: THREE.Object3D): void {
+/** Frees the geometry of a generated model. Its materials are shared by every item of that finish and stay. */
+function disposeGeometry(root: THREE.Object3D): void {
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    mesh.geometry.dispose();
-    (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((m) => m.dispose());
+    if (mesh.isMesh) mesh.geometry.dispose();
   });
 }
 
-function ParametricModel({ entry, appearance }: { entry: CatalogEntry; appearance?: ItemAppearance }) {
-  const object = useMemo(() => buildParametric(entry), [entry]);
-  useEffect(() => () => disposeObject(object), [object]);
+function ParametricModel({ entry, finishes, appearance }: { entry: CatalogEntry; finishes?: Record<string, string>; appearance?: ItemAppearance }) {
+  // Rebuild when the item's own finishes change (a new upholstery, another wood).
+  const finishKey = finishes ? JSON.stringify(finishes) : '';
+  const object = useMemo(() => buildParametric(entry, finishes), [entry, finishKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => disposeGeometry(object), [object]);
   useAppearance(object, appearance);
   return <primitive object={object} />;
 }
@@ -183,8 +184,8 @@ class ModelBoundary extends Component<BoundaryProps, BoundaryState> {
   }
 }
 
-function ItemModel({ entry, appearance }: { entry: CatalogEntry; appearance?: ItemAppearance }) {
-  if (entry.model.kind !== 'glb') return <ParametricModel entry={entry} appearance={appearance} />;
+function ItemModel({ entry, finishes, appearance }: { entry: CatalogEntry; finishes?: Record<string, string>; appearance?: ItemAppearance }) {
+  if (entry.model.kind !== 'glb') return <ParametricModel entry={entry} finishes={finishes} appearance={appearance} />;
   const box = <BoxModel entry={entry} appearance={appearance} />;
   return (
     <ModelBoundary resetKey={entry.model.url} fallback={box}>
@@ -210,7 +211,7 @@ export function ItemObject({ item, entry, appearance }: ItemObjectProps) {
       scale={[s, s, s]}
       userData={{ itemId: item.id }}
     >
-      <ItemModel entry={entry} appearance={appearance} />
+      <ItemModel entry={entry} finishes={item.finishes} appearance={appearance} />
     </group>
   );
 }

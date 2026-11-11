@@ -13,6 +13,7 @@ import './generators';
 
 export { CATALOG, entriesFor, getEntry } from './catalog';
 export { buildParametric, hasGenerator, registerGenerator, type Generator } from './parametric';
+export { furnitureMaterial, setFurnitureTextureResolver, type BuildContext, type FurnitureTextures } from './premium';
 export { fitToDims } from './fit';
 export { PALETTE, type MaterialSpec, type PaletteKey } from './palette';
 export { MODELS, PACKS, type ModelId, type ModelSpec, type SourcePack } from './models';

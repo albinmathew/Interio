@@ -1,5 +1,6 @@
 export * from './schema';
 export * from './materials';
+export * from './furnitureMaterials';
 export * from './migrate';
 export * as ops from './ops';
 export { newId, emptyLevel, buildLevel, wallEnds, wallLength, reconcileRooms } from './ops';

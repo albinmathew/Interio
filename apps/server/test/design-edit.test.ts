@@ -17,7 +17,7 @@ const REQUEST: DesignEditRequest = {
         depth: 1810,
         area: 3.3,
         floorMaterial: 'floor.oak',
-        items: [{ id: 'i_bed', catalogId: 'bed.single', name: 'Single bed' }],
+        items: [{ id: 'i_bed', catalogId: 'bed.single', name: 'Single bed', finishes: { frame: 'wood.oak' } }],
       },
       { id: 'r_utl', name: 'Utility', type: 'utility', width: 2075, depth: 1235, area: 2.6, floorMaterial: 'floor.tile.antiskid', items: [] },
     ],
@@ -27,11 +27,27 @@ const REQUEST: DesignEditRequest = {
     { id: 'kitchen.sink', name: 'Sink unit', category: 'kitchen', roomTypes: ['kitchen', 'utility'], size: [600, 600, 900], anchor: 'floor' },
     { id: 'washer.front', name: 'Front-load washing machine', category: 'appliances', roomTypes: ['utility'], size: [600, 600, 850], anchor: 'floor' },
     { id: 'bed.double', name: 'Double bed', category: 'beds', roomTypes: ['bedroom'], size: [1400, 2000, 700], anchor: 'floor' },
+    {
+      id: 'bed.single',
+      name: 'Single bed',
+      category: 'beds',
+      roomTypes: ['bedroom'],
+      size: [1000, 2080, 1000],
+      anchor: 'floor',
+      slots: [
+        { id: 'frame', label: 'Frame', kind: 'wood' },
+        { id: 'bedding', label: 'Bedding', kind: 'fabric' },
+      ],
+    },
   ],
   finishes: [
     { id: 'floor.tile.grey', name: 'Grey porcelain tile', surface: 'floor' },
     { id: 'wall.paint.sage', name: 'Sage', surface: 'wall' },
     { id: 'ceiling.white', name: 'White ceiling', surface: 'ceiling' },
+  ],
+  furnitureFinishes: [
+    { id: 'wood.walnut', name: 'Walnut', kind: 'wood' },
+    { id: 'fabric.velvet.navy', name: 'Navy velvet', kind: 'fabric' },
   ],
   lighting: [
     { id: 'daylight', name: 'Daylight' },
@@ -40,7 +56,7 @@ const REQUEST: DesignEditRequest = {
   history: [{ role: 'user', text: 'hello' }, { role: 'assistant', text: 'Hi. What would you like to change?' }],
 };
 
-const blank = { roomId: null, itemId: null, catalogId: null, count: null, place: null, nearItemId: null, name: null, type: null, floorMaterial: null, wallMaterial: null, ceilingMaterial: null, preset: null };
+const blank = { roomId: null, itemId: null, catalogId: null, count: null, place: null, nearItemId: null, name: null, type: null, floorMaterial: null, wallMaterial: null, ceilingMaterial: null, slot: null, material: null, preset: null };
 
 /** A plausible model answer in the flat wire shape. */
 const ANSWER = {
@@ -98,8 +114,8 @@ describe('POST /api/design-edit', () => {
     const text = content[0]!.text;
     // The model sees the home, what can be placed and chosen, the conversation, then the request.
     expect(text).toContain('room r_ser | "Service Room" | type bedroom | clear size 1825 x 1810 mm | 3.3 m2 | floor floor.oak');
-    expect(text).toContain('  item i_bed | bed.single | Single bed');
-    expect(text).toContain('kitchen.sink | Sink unit | kitchen | 600 x 600 x 900 | floor | kitchen, utility');
+    expect(text).toContain('  item i_bed | bed.single | Single bed | finishes now: frame=wood.oak');
+    expect(text).toContain('kitchen.sink | Sink unit | kitchen | 600 x 600 x 900 | floor | kitchen, utility | none');
     expect(text).toContain('wall.paint.sage | Sage | wall');
     expect(text).toContain('evening | Warm evening');
     expect(text).toContain('You: Hi. What would you like to change?');
@@ -135,6 +151,32 @@ describe('POST /api/design-edit', () => {
       { op: 'add_item', roomId: 'r_utl', catalogId: 'washer.front', count: 12 },
     ]);
     expect(logs.join('\n')).toContain('"dropped":7');
+  });
+
+  it('refinishes parts of an item and accepts custom colours, checked against the item and the lists', async () => {
+    const answer = {
+      reply: 'Done.',
+      ops: [
+        { ...blank, op: 'set_item_finish', itemId: 'i_bed', slot: 'frame', material: 'wood.walnut' },
+        { ...blank, op: 'set_item_finish', itemId: 'i_bed', slot: 'bedding', material: '#AA3355' },
+        { ...blank, op: 'set_item_finish', itemId: 'i_bed', slot: 'legs', material: 'wood.walnut' },
+        { ...blank, op: 'set_item_finish', itemId: 'i_bed', slot: 'frame', material: 'wood.unobtainium' },
+        { ...blank, op: 'set_item_finish', itemId: 'i_ghost', slot: 'frame', material: 'wood.walnut' },
+        { ...blank, op: 'set_room', roomId: 'r_utl', wallMaterial: '#2F5D62', floorMaterial: 'not-a-colour' },
+      ],
+    };
+    const { post, calls } = setup([reply(answer)]);
+    const { body } = await post(REQUEST);
+    expect(body.ops).toEqual([
+      { op: 'set_item_finish', itemId: 'i_bed', slot: 'frame', material: 'wood.walnut' },
+      { op: 'set_item_finish', itemId: 'i_bed', slot: 'bedding', material: '#aa3355' },
+      { op: 'set_room', roomId: 'r_utl', wallMaterial: '#2f5d62' },
+    ]);
+    const text = (calls[0]!.params.messages[0]!.content as { text: string }[])[0]!.text;
+    expect(text).toContain('bed.single | Single bed | beds | 1000 x 2080 x 1000 | floor | bedroom | frame:wood, bedding:fabric');
+    expect(text).toContain('kitchen.sink | Sink unit | kitchen | 600 x 600 x 900 | floor | kitchen, utility | none');
+    expect(text).toContain('fabric.velvet.navy | Navy velvet | fabric');
+    expect(text.indexOf('<furniture_materials>')).toBeLessThan(text.indexOf('<lighting_presets>'));
   });
 
   it('passes an answer with no operations through, for questions and refusals to change walls', async () => {

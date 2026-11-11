@@ -41,7 +41,7 @@ export interface PlanState {
   weldVertices(tol?: number): void;
   splitWall(wallId: Id, at: Pt): Id | null;
   removeWall(id: Id): void;
-  setWallProps(id: Id, patch: Partial<Pick<Wall, 'thickness' | 'height' | 'kind'>>): void;
+  setWallProps(id: Id, patch: Partial<Pick<Wall, 'thickness' | 'height' | 'kind' | 'finishLeft' | 'finishRight'>>): void;
 
   /* openings */
   addOpening(opening: Omit<Opening, 'id'>): Id | null;

@@ -1,0 +1,41 @@
+/** Catalog entries: appliances. Ids are stable: saved projects reference them. */
+import type { CatalogEntry } from '@interio/core';
+import { WORKTOP, ceiling, gen, glb, on, wall } from './helpers';
+import { MODELS } from '../models';
+
+export const APPLIANCES_ENTRIES: CatalogEntry[] = [
+  glb('fridge.single', 'Single-door refrigerator', 'appliances', ['kitchen', 'dining'], 'fridge-single', ['fridge', 'refrigerator', 'single door']),
+  glb('fridge.topfreezer', 'Top-freezer refrigerator', 'appliances', ['kitchen', 'dining'], 'fridge-top-freezer', ['fridge', 'refrigerator', 'double door', 'frost free']),
+  glb('fridge.double', 'Double-door refrigerator', 'appliances', ['kitchen', 'dining'], 'fridge-double', ['fridge', 'refrigerator', 'double door', 'side by side', 'french door']),
+  glb('fridge.mini', 'Mini refrigerator', 'appliances', ['kitchen', 'bedroom', 'study'], 'fridge-mini', ['fridge', 'refrigerator', 'bar fridge', 'minibar']),
+  glb('fridge.integrated', 'Integrated refrigerator', 'appliances', ['kitchen'], 'fridge-integrated', ['fridge', 'refrigerator', 'built-in', 'panelled']),
+  gen('hob.4burner', 'Four-burner hob', 'appliances', ['kitchen'], 'hob', [600, 520, 60], ['hob', 'cooktop', 'gas stove', 'burner'], { ...on(WORKTOP), params: { burners: 4 } }),
+  gen('hob.2burner', 'Two-burner hob', 'appliances', ['kitchen'], 'hob', [300, 520, 60], ['hob', 'cooktop', 'gas stove', 'burner', 'domino'], { ...on(WORKTOP), params: { burners: 2 } }),
+  gen('hob.5burner', 'Five-burner hob', 'appliances', ['kitchen'], 'hob', [900, 520, 60], ['hob', 'cooktop', 'gas stove', 'burner'], { ...on(WORKTOP), params: { burners: 5 } }),
+  gen('hob.induction', 'Induction hob', 'appliances', ['kitchen'], 'hob', [590, 520, 12], ['hob', 'cooktop', 'induction', 'electric'], { ...on(WORKTOP), params: { burners: 4, type: 'induction' } }),
+  glb('range.gas', 'Gas cooking range', 'appliances', ['kitchen'], 'range-gas', ['cooker', 'stove', 'oven', 'range']),
+  glb('range.electric', 'Electric cooking range', 'appliances', ['kitchen'], 'range-electric', ['cooker', 'stove', 'oven', 'range', 'ceramic']),
+  gen('oven.builtin', 'Built-in oven', 'appliances', ['kitchen'], 'builtinOven', [600, 600, WORKTOP], ['oven', 'built-in', 'otg', 'baking'], { params: { housing: 'base' } }),
+  gen('oven.tower', 'Oven and microwave tower', 'appliances', ['kitchen'], 'builtinOven', [600, 600, 2100], ['oven', 'built-in', 'microwave', 'tall unit'], { params: { housing: 'tall' } }),
+  glb('hood.chimney', 'Chimney hood', 'appliances', ['kitchen'], 'hood-chimney', ['chimney', 'extractor', 'cooker hood', 'exhaust'], wall(1600)),
+  glb('hood.canopy', 'Canopy hood', 'appliances', ['kitchen'], 'hood-canopy', ['chimney', 'extractor', 'cooker hood', 'exhaust'], wall(1550)),
+  glb('microwave', 'Microwave oven', 'appliances', ['kitchen'], 'microwave', ['microwave', 'oven', 'countertop'], on(WORKTOP)),
+  gen('dishwasher', 'Dishwasher', 'appliances', ['kitchen', 'utility'], 'dishwasher', [600, 600, 850], ['dish washer', 'freestanding']),
+  glb('washer.front', 'Front-load washing machine', 'appliances', ['utility', 'bathroom', 'balcony'], 'washer', ['washer', 'washing machine', 'laundry', 'front load']),
+  gen('washer.top', 'Top-load washing machine', 'appliances', ['utility', 'bathroom', 'balcony'], 'washerTop', [560, 580, 950], ['washer', 'washing machine', 'laundry', 'top load']),
+  glb('dryer', 'Tumble dryer', 'appliances', ['utility', 'bathroom', 'balcony'], 'dryer', ['dryer', 'laundry', 'clothes dryer']),
+  glb('washer.dryer.stack', 'Stacked washer and dryer', 'appliances', ['utility', 'bathroom'], 'washer-dryer-stack', ['washer', 'dryer', 'laundry', 'stacked']),
+  gen('tv.wall.43', 'Wall-mounted TV 43"', 'appliances', ['bedroom', 'living', 'study'], 'tvWall', [960, 60, 560], ['tv', 'television', 'led tv', 'wall mount'], wall(1100)),
+  gen('tv.wall.55', 'Wall-mounted TV 55"', 'appliances', ['living', 'bedroom'], 'tvWall', [1230, 60, 710], ['tv', 'television', 'led tv', 'wall mount'], wall(1000)),
+  gen('tv.wall.65', 'Wall-mounted TV 65"', 'appliances', ['living'], 'tvWall', [1450, 65, 830], ['tv', 'television', 'led tv', 'wall mount'], wall(950)),
+  glb('tv.stand', 'TV on stand 55"', 'appliances', ['living', 'bedroom'], 'tv-stand', ['tv', 'television', 'led tv', 'table top'], on(520)),
+  gen('ac.split', 'Split air conditioner', 'appliances', ['bedroom', 'living', 'study', 'dining'], 'acSplit', [900, 220, 300], ['ac', 'air conditioner', 'aircon', 'indoor unit', 'cooling'], wall(2300)),
+  glb('fan.ceiling', 'Ceiling fan', 'appliances', ['bedroom', 'living', 'dining', 'study', 'kitchen'], 'fan-ceiling', ['fan', 'ceiling fan', 'cooling'], ceiling(MODELS['fan-ceiling'].dims.h)),
+  gen('geyser', 'Water heater (geyser)', 'appliances', ['bathroom', 'utility', 'kitchen'], 'geyser', [400, 440, 600], ['geyser', 'water heater', 'storage heater', 'boiler'], wall(1900)),
+  gen('geyser.instant', 'Instant water heater', 'appliances', ['bathroom', 'kitchen', 'utility'], 'geyserInstant', [280, 130, 420], ['geyser', 'water heater', 'instant', 'tankless'], wall(1700)),
+  gen('purifier', 'Water purifier', 'appliances', ['kitchen', 'dining', 'utility'], 'purifier', [320, 250, 500], ['ro', 'water filter', 'purifier', 'aquaguard', 'drinking water'], wall(1300)),
+  glb('coffee.machine', 'Coffee machine', 'appliances', ['kitchen', 'dining'], 'coffee-machine', ['coffee maker', 'espresso', 'countertop'], on(WORKTOP)),
+  glb('toaster', 'Toaster', 'appliances', ['kitchen'], 'toaster', ['toaster', 'countertop'], on(WORKTOP)),
+  glb('blender', 'Blender', 'appliances', ['kitchen'], 'blender', ['mixer', 'grinder', 'juicer', 'countertop'], on(WORKTOP)),
+  glb('speaker.floor', 'Floor speaker', 'appliances', ['living', 'bedroom'], 'speaker-floor', ['speaker', 'audio', 'tower speaker', 'hi-fi']),
+];

@@ -4,13 +4,13 @@
  */
 import { ITEM_PLACEMENTS, ROOM_TYPES, type DesignEditRequest } from '@interio/core';
 
-export const DESIGN_OPS = ['set_room', 'refurnish_room', 'clear_room', 'add_item', 'remove_item', 'replace_item', 'set_lighting'] as const;
+export const DESIGN_OPS = ['set_room', 'refurnish_room', 'clear_room', 'add_item', 'remove_item', 'replace_item', 'set_item_finish', 'set_lighting'] as const;
 
 export const SYSTEM_PROMPT = `You are the design assistant of Interio, an app in which people furnish and style a 3D model of their own home. The user tells you in plain language what they want changed. You answer with a short reply and a list of operations; the app carries the operations out on the home and shows the user what changed.
 
 ## What you are given
 
-The user message contains, in this order: the home (every room with its id, name, type, clear size in millimetres, area, finishes and the items already in it, each with an item id), the catalog of furniture and appliances that can be placed (id, name, category, size in millimetres as width x depth x height, how it is mounted, and the room types it suits), the finishes that floors, walls and ceilings can take, the lighting presets, earlier turns of this conversation if there are any, and finally the request.
+The user message contains, in this order: the home (every room with its id, name, type, clear size in millimetres, area, finishes and the items already in it, each with an item id), the catalog of furniture and appliances that can be placed (id, name, category, size in millimetres as width x depth x height, how it is mounted, and the room types it suits), the finishes that floors, walls and ceilings can take, the materials that furniture parts can take, the lighting presets, earlier turns of this conversation if there are any, and finally the request.
 
 ## Operations
 
@@ -22,6 +22,7 @@ Use only these. Every id you write must be copied exactly from the lists you wer
 - add_item (roomId, catalogId, optionally count, place, nearItemId): adds an item. You do not give coordinates: the app finds a free spot that keeps doors and walkways clear. place is "wall" (back against a wall), "center" (in the open floor) or "auto" (the app decides; right for almost everything). nearItemId asks for a spot next to an item that is already in the room, for example chairs near a table or a nightstand near a bed. count adds several of the same.
 - remove_item (itemId): removes one item.
 - replace_item (itemId, catalogId): swaps an item for another catalog entry in the same spot. Use it for "a bigger sofa", "a double bed instead", "a different fridge". If the new piece is a different kind of thing, use remove_item and add_item instead.
+- set_item_finish (itemId, slot, material): changes the material or colour of one part of an item that is already in the home. slot is one of the part ids listed for that item's catalog entry (for example upholstery, frame, top, fronts, bedding). material is a furniture material id from the furniture materials list, or a custom colour written as #rrggbb when no listed material matches what the user asked for. Use one operation per part. To restyle a piece you are adding in the same answer, add it first: new items start in their default finish and cannot be finished in the same answer.
 - set_lighting (preset): changes the lighting of the whole home.
 
 Operations run in the order you list them, and each sees the result of the ones before it.
@@ -36,7 +37,9 @@ Pick catalog entries by what the user asked for, then by what suits the room typ
 
 Change only what was asked. Do not refurnish, restyle or tidy other rooms on your own initiative.
 
-You cannot move, add or remove walls, doors or windows, resize rooms, give exact positions, or recolour furniture. If the user asks for one of those, do the parts you can and say plainly which part is not possible here (walls, doors and windows are edited in Plan mode). If the request is not about the home at all, return no operations and say what you can help with.
+For colours and materials: floors, walls and ceilings take a finish id, or a custom colour written as #rrggbb when the user names a colour the list does not have. Furniture parts take a furniture material that suits the part (a fabric or leather for upholstery, a wood or lacquer for frames and fronts, a stone for tops), or a #rrggbb colour. "The sofa" or "the bed" means the item of that kind in the room being discussed; when a room has several and it matters which, ask.
+
+You cannot move, add or remove walls, doors or windows, resize rooms, give exact positions, or paint a single wall differently from the rest of its room. If the user asks for one of those, do the parts you can and say plainly which part is not possible here (walls, doors and windows are edited in Plan mode). If the request is not about the home at all, return no operations and say what you can help with.
 
 ## Reply
 
@@ -68,12 +71,14 @@ export const OUTPUT_SCHEMA = {
           nearItemId: nullable({ type: 'string' }, 'add_item: id of an item already in the room to stand next to.'),
           name: nullable({ type: 'string' }, 'set_room: new room name.'),
           type: nullable({ type: 'string', enum: [...ROOM_TYPES] }, 'set_room: new room type.'),
-          floorMaterial: nullable({ type: 'string' }, 'set_room: floor finish id.'),
-          wallMaterial: nullable({ type: 'string' }, 'set_room: wall finish id.'),
-          ceilingMaterial: nullable({ type: 'string' }, 'set_room: ceiling finish id.'),
+          floorMaterial: nullable({ type: 'string' }, 'set_room: floor finish id, or a colour as #rrggbb.'),
+          wallMaterial: nullable({ type: 'string' }, 'set_room: wall finish id, or a colour as #rrggbb.'),
+          ceilingMaterial: nullable({ type: 'string' }, 'set_room: ceiling finish id, or a colour as #rrggbb.'),
+          slot: nullable({ type: 'string' }, 'set_item_finish: part id of the item, from its catalog entry.'),
+          material: nullable({ type: 'string' }, 'set_item_finish: furniture material id, or a colour as #rrggbb.'),
           preset: nullable({ type: 'string' }, 'set_lighting: preset id.'),
         },
-        required: ['op', 'roomId', 'itemId', 'catalogId', 'count', 'place', 'nearItemId', 'name', 'type', 'floorMaterial', 'wallMaterial', 'ceilingMaterial', 'preset'],
+        required: ['op', 'roomId', 'itemId', 'catalogId', 'count', 'place', 'nearItemId', 'name', 'type', 'floorMaterial', 'wallMaterial', 'ceilingMaterial', 'slot', 'material', 'preset'],
         additionalProperties: false,
       },
     },
@@ -99,16 +104,28 @@ export function buildUserText(request: DesignEditRequest): string {
       `room ${room.id} | "${clean(room.name, 60)}" | type ${room.type} | clear size ${room.width} x ${room.depth} mm | ${room.area} m2 | floor ${room.floorMaterial}${room.wallMaterial ? ` | walls ${room.wallMaterial}` : ''}`,
     );
     if (room.items.length === 0) lines.push('  (empty)');
-    for (const item of room.items) lines.push(`  item ${item.id} | ${item.catalogId} | ${clean(item.name, 60)}`);
+    for (const item of room.items) {
+      const finishes = Object.entries(item.finishes ?? {}).map(([slot, value]) => `${clean(slot, 30)}=${clean(value, 40)}`);
+      lines.push(`  item ${item.id} | ${item.catalogId} | ${clean(item.name, 60)}${finishes.length ? ` | finishes now: ${finishes.join(', ')}` : ''}`);
+    }
   }
   if (request.home.lighting) lines.push(`lighting now: ${request.home.lighting}`);
-  lines.push('</home>', '', '<catalog>', 'id | name | category | width x depth x height mm | mounted | suits');
+  lines.push('</home>', '', '<catalog>', 'id | name | category | width x depth x height mm | mounted | suits | parts that can be refinished (id:kind)');
   for (const e of request.catalog) {
-    lines.push(`${e.id} | ${clean(e.name, 60)} | ${e.category} | ${e.size[0]} x ${e.size[1]} x ${e.size[2]} | ${e.anchor} | ${e.roomTypes.join(', ') || 'any room'}`);
+    const parts = (e.slots ?? []).map((s) => `${clean(s.id, 30)}:${clean(s.kind, 20)}`).join(', ');
+    lines.push(
+      `${e.id} | ${clean(e.name, 60)} | ${e.category} | ${e.size[0]} x ${e.size[1]} x ${e.size[2]} | ${e.anchor} | ${e.roomTypes.join(', ') || 'any room'} | ${parts || 'none'}`,
+    );
   }
   lines.push('</catalog>', '', '<finishes>');
   for (const f of request.finishes) lines.push(`${f.id} | ${clean(f.name, 60)} | ${f.surface}`);
-  lines.push('</finishes>', '', '<lighting_presets>');
+  lines.push('</finishes>');
+  if (request.furnitureFinishes?.length) {
+    lines.push('', '<furniture_materials>', 'id | name | kind');
+    for (const m of request.furnitureFinishes) lines.push(`${m.id} | ${clean(m.name, 60)} | ${m.kind}`);
+    lines.push('</furniture_materials>');
+  }
+  lines.push('', '<lighting_presets>');
   for (const l of request.lighting) lines.push(`${l.id} | ${clean(l.name, 40)}`);
   lines.push('</lighting_presets>');
   if (request.history?.length) {

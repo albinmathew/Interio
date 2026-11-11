@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { CatalogEntry } from '@interio/core';
+import { FURNITURE_MATERIALS, isHexColor, type CatalogEntry } from '@interio/core';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { describe, expect, it } from 'vitest';
@@ -44,11 +44,50 @@ describe('parametric generators', () => {
       expect(mesh.geometry.getAttribute('normal')).toBeDefined();
       const mat = mesh.material as THREE.MeshStandardMaterial;
       expect(mat.isMeshStandardMaterial).toBe(true);
-      expect(Object.keys(PALETTE)).toContain(mat.name);
+      // First-generation models use the catalog palette; premium ones use furniture materials or a custom colour.
+      expect(mat.name in PALETTE || mat.name in FURNITURE_MATERIALS || isHexColor(mat.name), `${entry.id} material ${mat.name}`).toBe(true);
     });
     // Merged by material: a placed item costs a handful of draw calls.
     expect(meshes).toBeGreaterThan(0);
     expect(meshes).toBeLessThanOrEqual(10);
+  });
+
+  const premium = parametric.filter((e) => e.slots?.length);
+
+  it.each(premium.map((e) => [e.id, e] as const))('%s has real, refinishable parts within the triangle budget', (_id, entry) => {
+    const slotIds = entry.slots!.map((s) => s.id);
+    expect(new Set(slotIds).size).toBe(slotIds.length);
+    for (const s of entry.slots!) {
+      expect(FURNITURE_MATERIALS[s.default], `${entry.id} slot ${s.id} default ${s.default}`).toBeDefined();
+      expect(s.label.length).toBeGreaterThan(0);
+    }
+    const partsOf = (object: THREE.Object3D) => {
+      const parts = new Map<string, THREE.Mesh>();
+      let triangles = 0;
+      object.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const pos = mesh.geometry.getAttribute('position');
+        triangles += (mesh.geometry.index?.count ?? pos.count) / 3;
+        // World-scaled UVs, so textures tile at their real size.
+        expect(mesh.geometry.getAttribute('uv'), `${entry.id} ${mesh.name} uv`).toBeDefined();
+        if (typeof mesh.userData.slot === 'string') parts.set(mesh.userData.slot, mesh);
+      });
+      return { parts, triangles };
+    };
+    const base = partsOf(buildParametric(entry));
+    // Every declared slot is a visible part, and every slotted part is declared.
+    expect([...base.parts.keys()].sort()).toEqual([...slotIds].sort());
+    for (const s of entry.slots!) expect((base.parts.get(s.id)!.material as THREE.Material).name).toBe(s.default);
+    // Detailed, but light enough for a home full of furniture on a laptop.
+    expect(base.triangles, `${entry.id} triangles`).toBeLessThanOrEqual(30_000);
+
+    // The item's own finishes replace the defaults, slot by slot; a custom colour works too.
+    const choice = Object.fromEntries(slotIds.map((id, i) => [id, i % 2 === 0 ? 'fabric.velvet.navy' : '#336699']));
+    const custom = partsOf(buildParametric(entry, choice));
+    for (const id of slotIds) expect((custom.parts.get(id)!.material as THREE.Material).name).toBe(choice[id]);
+    // Changing finishes never changes the shape.
+    expectFits(boxOf(buildParametric(entry, choice)), entry);
   });
 
   it('follows the entry dims, not fixed sizes', () => {

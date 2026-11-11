@@ -9,6 +9,7 @@
  */
 import { z } from 'zod';
 import { deriveRooms } from './geometry/rooms';
+import { FURNITURE_MATERIAL_LIST } from './furnitureMaterials';
 import { MATERIAL_LIST } from './materials';
 import { RoomTypeSchema, type Level } from './schema';
 
@@ -42,6 +43,12 @@ export const DesignOpSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('remove_item'), itemId: z.string() }),
   /** Swap an item for another catalog entry, keeping its position. */
   z.object({ op: z.literal('replace_item'), itemId: z.string(), catalogId: z.string() }),
+  /**
+   * Change the material or colour of one part of an item (its upholstery, frame, top...).
+   * `slot` is a slot id of the item's catalog entry; `material` is a furniture material id
+   * or a custom colour as `#rrggbb`.
+   */
+  z.object({ op: z.literal('set_item_finish'), itemId: z.string(), slot: z.string(), material: z.string() }),
   /** Lighting preset id (see `lighting` in the request). */
   z.object({ op: z.literal('set_lighting'), preset: z.string() }),
 ]);
@@ -58,6 +65,8 @@ export const CatalogBriefSchema = z.object({
   /** Width, depth, height in mm. */
   size: z.tuple([z.number(), z.number(), z.number()]),
   anchor: z.enum(['floor', 'wall', 'ceiling']),
+  /** Parts whose material can be changed, with the kind of material that suits each. */
+  slots: z.array(z.object({ id: z.string(), label: z.string(), kind: z.string() })).optional(),
 });
 export type CatalogBrief = z.infer<typeof CatalogBriefSchema>;
 
@@ -73,7 +82,15 @@ export const HomeSummarySchema = z.object({
       area: z.number(),
       floorMaterial: z.string(),
       wallMaterial: z.string().optional(),
-      items: z.array(z.object({ id: z.string(), catalogId: z.string(), name: z.string() })),
+      items: z.array(
+        z.object({
+          id: z.string(),
+          catalogId: z.string(),
+          name: z.string(),
+          /** The item's current finish per slot, when it has customisable parts. */
+          finishes: z.record(z.string(), z.string()).optional(),
+        }),
+      ),
     }),
   ),
   lighting: z.string().optional(),
@@ -90,6 +107,8 @@ export const DesignEditRequestSchema = z.object({
   catalog: z.array(CatalogBriefSchema).max(1000),
   finishes: z.array(z.object({ id: z.string(), name: z.string(), surface: z.enum(['floor', 'wall', 'ceiling']) })).max(200),
   lighting: z.array(z.object({ id: z.string(), name: z.string() })).max(20),
+  /** Materials that furniture parts can take (see `FURNITURE_MATERIAL_LIST`). */
+  furnitureFinishes: z.array(z.object({ id: z.string(), name: z.string(), kind: z.string() })).max(300).optional(),
   /** Earlier turns of this conversation, oldest first, so follow-ups ("make it bigger") make sense. */
   history: z.array(DesignTurnSchema).max(20).optional(),
 });
@@ -123,10 +142,15 @@ export function summariseHome(level: Level, itemName: (catalogId: string) => str
       ...(room.wallMaterial ? { wallMaterial: room.wallMaterial } : {}),
       items: Object.values(level.items)
         .filter((i) => i.roomId === room.id)
-        .map((i) => ({ id: i.id, catalogId: i.catalogId, name: itemName(i.catalogId) })),
+        .map((i) => ({ id: i.id, catalogId: i.catalogId, name: itemName(i.catalogId), ...(i.finishes && Object.keys(i.finishes).length ? { finishes: i.finishes } : {}) })),
     };
   });
   return { rooms, ...(lighting ? { lighting } : {}) };
+}
+
+/** The furniture materials in the shape the request carries. */
+export function furnitureFinishBriefs(): NonNullable<DesignEditRequest['furnitureFinishes']> {
+  return FURNITURE_MATERIAL_LIST.map((m) => ({ id: m.id, name: m.name, kind: m.kind }));
 }
 
 /** The finishes palette in the shape the request carries. */
