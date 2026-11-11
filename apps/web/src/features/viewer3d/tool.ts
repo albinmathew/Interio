@@ -251,8 +251,15 @@ export function usePointerTool(): void {
       } else if (p.kind === 'empty' && !p.moved && lv) {
         aim(e);
         const hit = hitLevel();
-        const roomId = hit && (hit.group.kind === 'floor' || hit.group.kind === 'wallSide') ? hit.group.roomId : null;
-        planStore.getState().select(roomId ? { kind: 'room', id: roomId } : null);
+        const g = hit?.group;
+        const face = g?.kind === 'wallSide' && g.wallId && g.side ? { wallId: g.wallId, side: g.side, roomId: g.roomId ?? null } : null;
+        ui.setWallFace(face);
+        // Alt-click (or a click on an outside face, which has no room) goes straight to that face of the wall.
+        if (face && (e.altKey || !face.roomId)) planStore.getState().select({ kind: 'wall', id: face.wallId });
+        else {
+          const roomId = g && (g.kind === 'floor' || g.kind === 'wallSide') ? g.roomId : null;
+          planStore.getState().select(roomId ? { kind: 'room', id: roomId } : null);
+        }
       }
       release(e);
     };

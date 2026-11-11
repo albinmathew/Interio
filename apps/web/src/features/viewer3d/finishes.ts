@@ -55,6 +55,7 @@ export function currentFinish(room: Pick<Room, 'floorMaterial' | 'wallMaterial' 
 
 /** Name for a finish id, also for ids the palette no longer has. */
 export function finishName(id: string): string {
+  if (/^#[0-9a-fA-F]{6}$/.test(id)) return `Custom ${id.toLowerCase()}`;
   return MATERIALS[id]?.name ?? 'Custom';
 }
 

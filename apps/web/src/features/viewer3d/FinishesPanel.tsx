@@ -3,29 +3,27 @@
  * Every pick is written straight to the plan, so the 3D view follows and undo steps
  * back one pick at a time.
  */
-import type { Level, MaterialDef, Room } from '@interio/core';
-import { Check, CopyCheck, RotateCcw } from 'lucide-react';
-import { Button, cn, toast } from '../../ui';
+import { isHexColor, planStore, type Level, type MaterialDef, type Room } from '@interio/core';
+import { CopyCheck, PanelLeft, RotateCcw } from 'lucide-react';
+import { Button, Kbd, cn, toast } from '../../ui';
 import { applyFinishesFrom, resetFinishes, setFinish } from './actions';
-import { applyFinishes, currentFinish, finishGroups, finishName, hasDefaultFinishes, pluralRoomType, type Surface } from './finishes';
+import { ColorPick } from './ColorPick';
+import { finishSections, surfaceFinishName } from './customise';
+import { applyFinishes, currentFinish, finishGroups, hasDefaultFinishes, pluralRoomType, type Surface } from './finishes';
+import { Tick } from './ItemFinishes';
+import { useViewer } from './state';
 import { useSwatch } from './swatch';
 
 const GROUPS = finishGroups();
 
 const HINT: Partial<Record<Surface, string>> = { ceiling: 'in Walk mode' };
 
-/** Perceived lightness of an sRGB hex colour, 0..1: picks a tick colour that shows on the swatch. */
-function lightness(hex: string): number {
-  const n = Number.parseInt(hex.slice(1), 16);
-  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
-}
-
-function Swatch({ def, surface, active, onPick }: { def: MaterialDef; surface: Surface; active: boolean; onPick: () => void }) {
+function Swatch({ def, surface, active, onPick, testId = 'finish-swatch' }: { def: MaterialDef; surface: Surface; active: boolean; onPick: () => void; testId?: string }) {
   const image = useSwatch(def.id);
   return (
     <button
       type="button"
-      data-testid="finish-swatch"
+      data-testid={testId}
       data-surface={surface}
       data-finish-id={def.id}
       data-textured={image ? 'true' : 'false'}
@@ -39,17 +37,75 @@ function Swatch({ def, surface, active, onPick }: { def: MaterialDef; surface: S
       )}
       style={{ backgroundColor: def.color, backgroundImage: image ? `url(${image})` : undefined }}
     >
-      {active && (
-        <span
-          className={cn(
-            'absolute right-0.5 bottom-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full',
-            lightness(def.color) > 0.55 ? 'bg-ink/70 text-white' : 'bg-white/85 text-ink',
-          )}
-        >
-          <Check className="h-2.5 w-2.5" strokeWidth={3.5} />
-        </span>
-      )}
+      {active && <Tick color={def.color} />}
     </button>
+  );
+}
+
+/**
+ * Every finish of a surface in short labelled sections, then a custom colour. `current`
+ * is marked; `onPick` gets a palette id or `#rrggbb`.
+ */
+export function SurfaceSwatches({
+  surface,
+  options,
+  current,
+  onPick,
+  testId,
+  customTestId,
+}: {
+  surface: Surface;
+  options: readonly MaterialDef[];
+  current: string | undefined;
+  onPick: (value: string) => void;
+  testId?: string;
+  customTestId: string;
+}) {
+  const custom = !!current && isHexColor(current);
+  return (
+    <div className="flex flex-col gap-1.5">
+      {finishSections(surface, options).map((section) => (
+        <div key={section.label}>
+          <div className="mb-1 text-[11px] text-ink-faint">{section.label}</div>
+          <div className="grid grid-cols-7 gap-1.5">
+            {section.options.map((def) => (
+              <Swatch key={def.id} def={def} surface={surface} testId={testId} active={def.id === current} onPick={() => onPick(def.id)} />
+            ))}
+          </div>
+        </div>
+      ))}
+      <div>
+        <div className="mb-1 text-[11px] text-ink-faint">Custom colour</div>
+        <div className="grid grid-cols-7 gap-1.5">
+          <ColorPick data-testid={customTestId} data-surface={surface} value={custom ? current : undefined} active={custom} onPick={onPick} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Offers the wall face clicked last on its own, or says how to pick one. */
+function WallFaceLink({ room }: { room: Room }) {
+  const face = useViewer((s) => s.wallFace);
+  if (face?.roomId === room.id)
+    return (
+      <div className="border-b border-line px-3 py-2">
+        <Button
+          size="sm"
+          className="w-full"
+          icon={<PanelLeft className="h-4 w-4" />}
+          data-testid="room-wall-face"
+          title="Give only the wall you clicked its own finish: an accent wall"
+          onClick={() => planStore.getState().select({ kind: 'wall', id: face.wallId })}
+        >
+          Finish this wall only
+        </Button>
+      </div>
+    );
+  return (
+    <p className="border-b border-line px-3 py-2 text-xs text-ink-faint" data-testid="room-wall-face-hint">
+      Click one of the room&apos;s walls to give it a finish of its own. <Kbd>Alt</Kbd>-click goes straight there.
+    </p>
   );
 }
 
@@ -69,6 +125,7 @@ export function FinishesPanel({ level, room }: { level: Level; room: Room }) {
   };
   return (
     <div data-testid="finishes-panel">
+      <WallFaceLink room={room} />
       <div className="flex flex-col gap-3 p-3">
         {GROUPS.map(({ surface, label, options }) => {
           const current = currentFinish(room, surface);
@@ -80,14 +137,10 @@ export function FinishesPanel({ level, room }: { level: Level; room: Room }) {
                   {HINT[surface] && <span className="ml-1.5 font-normal text-ink-faint">{HINT[surface]}</span>}
                 </h3>
                 <span className="truncate text-xs text-ink" data-testid={`finish-current-${surface}`}>
-                  {finishName(current)}
+                  {surfaceFinishName(current)}
                 </span>
               </div>
-              <div className="grid grid-cols-7 gap-1.5">
-                {options.map((def) => (
-                  <Swatch key={def.id} def={def} surface={surface} active={def.id === current} onPick={() => setFinish(room.id, surface, def.id)} />
-                ))}
-              </div>
+              <SurfaceSwatches surface={surface} options={options} current={current} customTestId="finish-custom" onPick={(v) => setFinish(room.id, surface, v)} />
             </section>
           );
         })}

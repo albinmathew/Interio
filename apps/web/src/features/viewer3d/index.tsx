@@ -70,6 +70,15 @@ function Hint({ level }: { level: Level }) {
         Drag to move · <Kbd>R</Kbd> turn · arrows nudge · <Kbd>⌘D</Kbd> duplicate · <Kbd>Del</Kbd> remove
       </>
     );
+  } else if (selection?.kind === 'room') {
+    body = (
+      <>
+        Finishes tab styles the room · click a wall, then <span className="font-medium text-ink">Finish this wall only</span> · <Kbd>Alt</Kbd>-click a wall
+        goes straight there
+      </>
+    );
+  } else if (selection?.kind === 'wall') {
+    body = <>Pick a finish or a colour for this wall · <Kbd>Esc</Kbd> done</>;
   } else {
     body = <>Pick something from the catalog, or click a room · drag to orbit · scroll to zoom</>;
   }

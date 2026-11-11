@@ -27,6 +27,14 @@ export interface Placing {
   fromDrag: boolean;
 }
 
+/** One face of a wall: the last one clicked in the view. */
+export interface WallFace {
+  wallId: Id;
+  side: 'left' | 'right';
+  /** The room the face looks into; null for an outside face. */
+  roomId: Id | null;
+}
+
 export interface LiveDrag {
   id: Id;
   mode: 'move' | 'rotate';
@@ -56,6 +64,8 @@ export interface ViewerState {
   roomTab: RoomTab;
   /** The docked panel that is open, if any. */
   dock: Dock | null;
+  /** The wall face clicked last: the room panel offers to finish just that face, and a wall selection edits it. */
+  wallFace: WallFace | null;
 
   setView(view: ViewMode): void;
   toggleCutaway(): void;
@@ -72,6 +82,7 @@ export interface ViewerState {
   setQuality(quality: 'high' | 'low'): void;
   setRoomTab(roomTab: RoomTab): void;
   setDock(dock: Dock | null): void;
+  setWallFace(face: WallFace | null): void;
   /** Opens the panel, or closes it when it is the one showing. */
   toggleDock(dock: Dock): void;
 }
@@ -90,6 +101,7 @@ export const useViewer = create<ViewerState>((set) => ({
   quality: 'high',
   roomTab: 'furnish',
   dock: null,
+  wallFace: null,
 
   setView: (view) => set({ view }),
   toggleCutaway: () => set((s) => ({ cutaway: !s.cutaway })),
@@ -107,6 +119,7 @@ export const useViewer = create<ViewerState>((set) => ({
   setQuality: (quality) => set({ quality }),
   setRoomTab: (roomTab) => set({ roomTab }),
   setDock: (dock) => set({ dock }),
+  setWallFace: (wallFace) => set({ wallFace }),
   toggleDock: (dock) => set((s) => ({ dock: s.dock === dock ? null : dock })),
 }));
 

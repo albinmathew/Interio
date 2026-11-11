@@ -7,6 +7,8 @@ import { Badge, Button, Field, IconButton, NumberInput, Panel, PanelHeader, Segm
 import { autoFurnishRoom, clearRoom, duplicateSelection, removeSelection, replaceEntry, rotateSelection, setElevation, setRotation } from './actions';
 import { currentFinish, finishName } from './finishes';
 import { FinishesPanel } from './FinishesPanel';
+import { ItemFinishes } from './ItemFinishes';
+import { WallFacePanel } from './WallFacePanel';
 import type { Overlap } from './placement';
 import { entryOrPlaceholder, useViewer, type RoomTab } from './state';
 
@@ -89,6 +91,9 @@ function ItemPanel({ level, item, overlap }: { level: Level; item: Item; overlap
             ))}
           </Select>
         </Field>
+      </div>
+      <ItemFinishes level={level} item={item} entry={entry} />
+      <div className="flex flex-col border-t border-line p-3">
         <Button variant="danger" size="sm" icon={<Trash2 className="h-4 w-4" />} onClick={removeSelection} data-testid="item-remove">
           Remove
         </Button>
@@ -180,9 +185,11 @@ export function SidePanel({
   style?: CSSProperties;
 }) {
   const selection = usePlanStore((s) => s.selection);
+  const face = useViewer((s) => s.wallFace);
   const item = selection?.kind === 'item' ? items[selection.id] : undefined;
   const room = selection?.kind === 'room' ? level.rooms[selection.id] : undefined;
-  if (!item && !room) return null;
+  const wall = selection?.kind === 'wall' && face?.wallId === selection.id ? level.walls[selection.id] : undefined;
+  if (!item && !room && !wall) return null;
   return (
     <div data-testid="side-panel" className={cn('flex flex-col', className)} style={style}>
       <Panel className="flex min-h-0 flex-col overflow-hidden">
@@ -192,6 +199,8 @@ export function SidePanel({
           </div>
         ) : room ? (
           <RoomPanel level={level} room={room} />
+        ) : wall && face ? (
+          <WallFacePanel level={level} wall={wall} face={face} />
         ) : null}
       </Panel>
     </div>

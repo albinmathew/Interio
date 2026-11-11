@@ -3,7 +3,7 @@
  * their selection and warning states, the placement ghost, and the camera.
  */
 import { planStore, selectLevelMesh, usePlanStore, type Item, type Level } from '@interio/core';
-import { ItemObject, LevelMeshes, SceneLighting, lightingRig, type ItemAppearance } from '@interio/scene3d';
+import { ItemObject, LevelMeshes, SceneLighting, geometryFromMesh, lightingRig, type ItemAppearance } from '@interio/scene3d';
 import { Line, OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react';
@@ -109,6 +109,25 @@ function Selection({ items, overlaps }: { items: Record<string, Item>; overlaps:
   const item = selection?.kind === 'item' ? items[selection.id] : undefined;
   if (!item) return null;
   return <Outline item={item} color={overlaps.has(item.id) ? WARN : ACCENT} handle />;
+}
+
+/** A soft accent over the wall face being edited. */
+function WallFaceHighlight({ level }: { level: Level }) {
+  const selection = usePlanStore((s) => s.selection);
+  const face = useViewer((s) => s.wallFace);
+  const mesh = selectLevelMesh(level);
+  const key = selection?.kind === 'wall' && face?.wallId === selection.id ? `wall:${face.wallId}:${face.side}` : null;
+  const geometry = useMemo(() => {
+    const group = key ? mesh.groups.find((g) => g.key === key) : undefined;
+    return group ? geometryFromMesh(group.geometry) : null;
+  }, [mesh, key]);
+  useEffect(() => () => geometry?.dispose(), [geometry]);
+  if (!geometry) return null;
+  return (
+    <mesh name="wall-face-highlight" geometry={geometry} renderOrder={18} layers={HELPER_LAYER} raycast={() => null}>
+      <meshBasicMaterial color={ACCENT} transparent opacity={0.18} depthWrite={false} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
+    </mesh>
+  );
 }
 
 function Ghost({ level }: { level: Level }) {
@@ -407,6 +426,7 @@ export function Scene({ level }: { level: Level }) {
       <Items items={items} overlaps={overlaps} />
       <Ghost level={level} />
       <Selection items={items} overlaps={overlaps} />
+      <WallFaceHighlight level={level} />
       <CameraRig box={box} />
       <Effects box={box} />
       <CaptureBridge />
