@@ -13,7 +13,7 @@ export const DECOR_ENTRIES: CatalogEntry[] = [
     params: { fringe: true, band: false },
   }),
   gen('rug.doormat', 'Doormat', 'decor', ['foyer', 'balcony', 'bathroom'], 'decorRug', [750, 450, 18], ['mat', 'entry mat', 'bath mat'], { slots: RUG_SLOTS.coir, params: { band: false } }),
-  gen('plant.potted', 'Fiddle-leaf fig', 'decor', ['living', 'bedroom', 'foyer', 'balcony', 'study', 'dining'], 'decorPlant', [600, 600, 1450], ['plant', 'indoor plant', 'snake plant', 'greenery', 'fig'], {
+  gen('plant.potted', 'Fiddle-leaf fig', 'decor', ['living', 'bedroom', 'foyer', 'balcony', 'study', 'dining'], 'decorPlant', [480, 480, 1450], ['plant', 'indoor plant', 'snake plant', 'greenery', 'fig'], {
     slots: PLANT_SLOTS.floor,
     params: { species: 'fiddle' },
   }),
