@@ -186,6 +186,69 @@ function useLite(root: THREE.Object3D, lite: boolean): void {
   }, [root, lite]);
 }
 
+let screenGradient: THREE.Texture | null = null;
+
+/** A soft diagonal sheen across a switched-off screen (sRGB, drawn once). */
+function sheen(): THREE.Texture | null {
+  if (screenGradient || typeof document === 'undefined') return screenGradient;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createLinearGradient(0, 0, 64, 64);
+  grad.addColorStop(0, '#3a424c');
+  grad.addColorStop(0.45, '#14181d');
+  grad.addColorStop(1, '#0c0e11');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  screenGradient = new THREE.CanvasTexture(c);
+  screenGradient.colorSpace = THREE.SRGBColorSpace;
+  return screenGradient;
+}
+
+const screens = new Map<string, THREE.MeshPhysicalMaterial>();
+
+/** A switched-off screen: black glass with a faint sheen and the room's reflections, instead of a flat black slab. */
+function screenMaterial(source: THREE.Material): THREE.MeshPhysicalMaterial {
+  let m = screens.get(source.name);
+  if (!m) {
+    m = new THREE.MeshPhysicalMaterial({
+      name: source.name,
+      color: '#ffffff',
+      map: sheen(),
+      roughness: 0.06,
+      metalness: 0,
+      clearcoat: 1,
+      clearcoatRoughness: 0.03,
+      envMapIntensity: 2.2,
+    });
+    screens.set(source.name, m);
+  }
+  return m;
+}
+
+/**
+ * Screens (a `screen` slot left on its default gloss black) get `screenMaterial`. Applied
+ * to the built model once; the item's own finish for the slot, when it has one, is kept.
+ */
+function tuneScreens(root: THREE.Object3D): void {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    const m = mesh.material as THREE.Material | undefined;
+    if (mesh.isMesh && m && !Array.isArray(m) && mesh.userData.slot === 'screen' && m.name === 'lacquer.black.gloss' && mesh.geometry.getAttribute('uv')) {
+      // The sheen spans the screen: map its UVs (metres) onto 0..1.
+      mesh.geometry.computeBoundingBox();
+      const b = mesh.geometry.boundingBox!;
+      const uv = mesh.geometry.getAttribute('uv') as THREE.BufferAttribute;
+      const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const w = Math.max(b.max.x - b.min.x, 1e-3);
+      const h = Math.max(b.max.y - b.min.y, 1e-3);
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, (pos.getX(i) - b.min.x) / w, (pos.getY(i) - b.min.y) / h);
+      uv.needsUpdate = true;
+      mesh.material = screenMaterial(m);
+    }
+  });
+}
+
 /** Frees the geometry of a generated model. Its materials are shared by every item of that finish and stay. */
 function disposeGeometry(root: THREE.Object3D): void {
   root.traverse((o) => {
@@ -212,6 +275,7 @@ function ParametricModel({
   const object = useMemo(() => {
     const built = buildParametric(entry, finishes);
     tuneGlass(built);
+    tuneScreens(built);
     return built;
   }, [entry, finishKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => disposeGeometry(object), [object]);
