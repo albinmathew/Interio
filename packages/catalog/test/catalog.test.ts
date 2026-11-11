@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CATALOG_CATEGORIES, ROOM_TYPES, type CatalogEntry } from '@interio/core';
 import { describe, expect, it } from 'vitest';
-import { LICENCE_DOC, MODELS_DIR, PUBLIC_CATALOG, THUMBS_DIR } from '../scripts/lib/paths';
-import { CATALOG, MODELS, PACKS, entriesFor, getEntry, hasGenerator } from '../src/index';
+import { LICENCE_DOC, PUBLIC_CATALOG, THUMBS_DIR } from '../scripts/lib/paths';
+import { CATALOG, entriesFor, getEntry, hasGenerator } from '../src/index';
 
 const publicFile = (url: string) => path.join(PUBLIC_CATALOG, url.replace(/^\/catalog\//, ''));
 const furniture = CATALOG.filter((e) => e.category !== 'appliances');
@@ -144,12 +144,9 @@ describe('catalog entries', () => {
 });
 
 describe('shipped files and licences', () => {
-  const shipped = fs.readdirSync(MODELS_DIR).filter((f) => f.endsWith('.glb'));
-
-  it('ships exactly the models the manifest lists, and entries use only shipped models', () => {
-    expect(shipped.sort()).toEqual(Object.keys(MODELS).map((id) => `${id}.glb`).sort());
-    const used = new Set(CATALOG.flatMap((e) => (e.model.kind === 'glb' ? [path.basename(e.model.url)] : [])));
-    for (const f of used) expect(shipped.includes(f), `${f} is used by an entry but not shipped`).toBe(true);
+  it('builds every entry in code: no model files are shipped', () => {
+    expect(CATALOG.every((e) => e.model.kind === 'parametric')).toBe(true);
+    expect(fs.existsSync(path.join(PUBLIC_CATALOG, 'models'))).toBe(false);
   });
 
   it('ships a thumbnail per entry and nothing else', () => {
@@ -158,19 +155,12 @@ describe('shipped files and licences', () => {
 
   it('keeps the payload modest', () => {
     const bytes = (dir: string) => fs.readdirSync(dir).reduce((s, f) => s + fs.statSync(path.join(dir, f)).size, 0);
-    expect(bytes(MODELS_DIR) + bytes(THUMBS_DIR)).toBeLessThan(20 * 1024 * 1024);
+    expect(bytes(THUMBS_DIR)).toBeLessThan(10 * 1024 * 1024);
   });
 
-  it('accepts only CC0 packs and records every file', () => {
+  it('records the licence of every entry', () => {
     const doc = fs.readFileSync(LICENCE_DOC, 'utf8');
-    for (const [id, pack] of Object.entries(PACKS)) {
-      expect(pack.licence, id).toBe('CC0-1.0');
-      expect(doc).toContain(pack.url);
-      expect(doc).toContain(pack.name);
-    }
-    for (const [id, model] of Object.entries(MODELS)) {
-      expect(doc, `${id} missing from docs/assets/catalog.md`).toContain(`\`${id}.glb\` | \`${model.source}.glb\``);
-      expect(PACKS[model.pack]).toBeDefined();
-    }
+    for (const e of CATALOG) expect(e.licence, e.id).toMatch(/^CC0-1\.0 /);
+    expect(doc).toContain('Interio parametric');
   });
 });

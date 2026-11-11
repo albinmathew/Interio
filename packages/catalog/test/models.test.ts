@@ -1,12 +1,7 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { FURNITURE_MATERIALS, isHexColor, type CatalogEntry } from '@interio/core';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { describe, expect, it } from 'vitest';
-import { boundsSize, glbBounds, parseGlb, triangleCount } from '../scripts/lib/glb';
-import { PUBLIC_CATALOG } from '../scripts/lib/paths';
-import { CATALOG, PALETTE, buildParametric, fitToDims } from '../src/index';
+import { CATALOG, buildParametric, fitToDims } from '../src/index';
 
 /** Bounding box must match `dims` within 2% per axis, with the origin at the bottom centre. */
 function expectFits(box: { min: number[]; max: number[] }, entry: CatalogEntry): void {
@@ -27,7 +22,6 @@ const boxOf = (object: THREE.Object3D) => {
 };
 
 const parametric = CATALOG.filter((e) => e.model.kind === 'parametric');
-const glbs = CATALOG.filter((e) => e.model.kind === 'glb');
 
 describe('parametric generators', () => {
   it.each(parametric.map((e) => [e.id, e] as const))('%s builds at its stated size', (_id, entry) => {
@@ -45,7 +39,7 @@ describe('parametric generators', () => {
       const mat = mesh.material as THREE.MeshStandardMaterial;
       expect(mat.isMeshStandardMaterial).toBe(true);
       // First-generation models use the catalog palette; premium ones use furniture materials or a custom colour.
-      expect(mat.name in PALETTE || mat.name in FURNITURE_MATERIALS || isHexColor(mat.name), `${entry.id} material ${mat.name}`).toBe(true);
+      expect(mat.name in FURNITURE_MATERIALS || isHexColor(mat.name), `${entry.id} material ${mat.name}`).toBe(true);
     });
     // Merged by material: a placed item costs a handful of draw calls.
     expect(meshes).toBeGreaterThan(0);
@@ -100,50 +94,6 @@ describe('parametric generators', () => {
   it('falls back to a box for an unknown generator', () => {
     const entry: CatalogEntry = { ...parametric[0]!, model: { kind: 'parametric', generator: 'does-not-exist' } };
     expectFits(boxOf(buildParametric(entry)), entry);
-  });
-});
-
-describe('GLB models', () => {
-  const read = (entry: CatalogEntry) => {
-    if (entry.model.kind !== 'glb') throw new Error('not a glb entry');
-    return new Uint8Array(fs.readFileSync(path.join(PUBLIC_CATALOG, entry.model.url.replace(/^\/catalog\//, ''))));
-  };
-
-  it.each(glbs.map((e) => [e.id, e] as const))('%s is a valid GLB baked to its dims', (_id, entry) => {
-    const glb = parseGlb(read(entry));
-    const { json, bin } = glb;
-    expect(json.asset.version).toBe('2.0');
-    expect(json.asset.copyright).toMatch(/^CC0-1\.0 /);
-    expect(json.buffers).toHaveLength(1);
-    expect(json.buffers[0].byteLength).toBe(bin.byteLength);
-    expect(json.images ?? []).toHaveLength(0);
-    expect(json.extensionsRequired ?? []).toHaveLength(0);
-    for (const view of json.bufferViews) expect(view.byteOffset + view.byteLength).toBeLessThanOrEqual(bin.byteLength);
-    for (const prim of json.meshes[0].primitives) {
-      expect(prim.attributes.POSITION).toBeDefined();
-      expect(prim.attributes.NORMAL).toBeDefined();
-      expect(json.accessors[prim.indices].count % 3).toBe(0);
-      expect(Object.keys(PALETTE)).toContain(json.materials[prim.material].name);
-    }
-    expect(triangleCount(glb)).toBeGreaterThan(8);
-    expect(triangleCount(glb)).toBeLessThan(5000);
-    const bounds = glbBounds(glb);
-    expectFits(bounds, entry);
-    expect(boundsSize(bounds).every((v) => v > 0)).toBe(true);
-  });
-
-  it.each(glbs.map((e) => [e.id, e] as const))('%s loads with GLTFLoader and needs no further fitting', async (_id, entry) => {
-    const data = read(entry);
-    const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
-    const gltf = await new GLTFLoader().parseAsync(buffer, '');
-    let meshes = 0;
-    gltf.scene.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) meshes++;
-    });
-    expect(meshes).toBeGreaterThan(0);
-    expectFits(boxOf(gltf.scene), entry);
-    // The renderer's fit step must leave a baked model where it is.
-    expectFits(boxOf(fitToDims(gltf.scene, entry)), entry);
   });
 });
 

@@ -19,6 +19,7 @@ export function hasGenerator(name: string): boolean {
   return generators.has(name);
 }
 
+/** Flat colours for the box stand-in (unknown generators, models still loading). */
 const CATEGORY_COLORS: Record<string, string> = {
   seating: '#7d8fa3',
   tables: '#a98462',
