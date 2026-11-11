@@ -222,7 +222,10 @@ test.describe('walkthrough', () => {
     expect(end.visited).toEqual(roomIds);
     expect(seenLabels.size).toBeGreaterThanOrEqual(5);
     await expect(page.getByTestId('walk-tour-start')).toHaveText('Tour again');
-    await expectCanvasRendered(page.locator('canvas'));
+    // Still drawing after the tour. The last stop may face a plain wall, which under the
+    // reduced quality of software renderers (CI) shows only a few colours: check for a live,
+    // non-blank view rather than a busy one.
+    await expectCanvasRendered(page.locator('canvas'), 4);
   });
 
   test('view options: field of view, eye height and a PNG of the view', async ({ page }) => {
