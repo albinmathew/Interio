@@ -4,11 +4,12 @@
  */
 import { getEntry } from '@interio/catalog';
 import { usePlanStore, type CatalogCategory, type CatalogEntry, type Id } from '@interio/core';
-import { lightingFromSettings, type LightingPreset } from '@interio/scene3d';
+import { detectSoftwareRenderer, lightingFromSettings, type LightingPreset } from '@interio/scene3d';
 import { create } from 'zustand';
 import { normalizeDeg, type Placement } from './placement';
 
-export type ViewMode = 'orbit' | 'top';
+/** `showcase`: a steep three-quarter view from above, drawn at the best quality, for pictures. */
+export type ViewMode = 'orbit' | 'top' | 'showcase';
 
 /** Panels that dock on the right: the design assistant and the saved variants. One at a time. */
 export type Dock = 'assistant' | 'variants';
@@ -122,6 +123,21 @@ export const useViewer = create<ViewerState>((set) => ({
   setWallFace: (wallFace) => set({ wallFace }),
   toggleDock: (dock) => set((s) => ({ dock: s.dock === dock ? null : dock })),
 }));
+
+/**
+ * Rendering tier of the Design view: `low` on software renderers (always), `medium` once a
+ * GPU could not hold the frame rate, `high` otherwise. See `Effects.tsx`.
+ */
+export type RenderTier = 'high' | 'medium' | 'low';
+
+export function renderTier(software: boolean, quality: ViewerState['quality']): RenderTier {
+  return software ? 'low' : quality === 'high' ? 'high' : 'medium';
+}
+
+export function useRenderTier(): RenderTier {
+  const quality = useViewer((s) => s.quality);
+  return renderTier(detectSoftwareRenderer(), quality);
+}
 
 /** The lighting preset saved with the open project (`project.settings`), daylight by default. */
 export function useLightingPreset(): LightingPreset {

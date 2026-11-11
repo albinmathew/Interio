@@ -3,11 +3,19 @@ import type { RenderQuality } from './quality';
 import { useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { DEFAULT_LIGHTING_PRESET, MAX_INTERIOR_LIGHTS, interiorLights, lightSlots, lightingRig, type LightingPreset } from './lighting';
 
 /** Default image-based light: a soft overcast sky (CC0, Poly Haven). See docs/assets/scene3d.md. */
 export const DEFAULT_ENVIRONMENT_URL = '/env/kloofendal_overcast_puresky_1k.hdr';
+
+/**
+ * `envUrl` value for a neutral studio room (three's `RoomEnvironment`, built on the GPU, no
+ * download): soft, even, slightly warm reflections that make glass, mirrors, metal and
+ * lacquer read as such indoors.
+ */
+export const ROOM_ENVIRONMENT = 'room';
 
 export interface SceneLightingProps {
   level: Level;
@@ -22,6 +30,8 @@ export interface SceneLightingProps {
   shadows?: boolean;
   /** Shadow map size in pixels. Default 2048. */
   shadowMapSize?: number;
+  /** Blur radius of the sun's shadow edge (PCF), in shadow-map texels. Default 2.5. */
+  shadowSoftness?: number;
   /** Time of day. Default `daylight`, the look both views always had. */
   preset?: LightingPreset;
   /** Lets lamps placed from the catalog light their rooms in the evening and night presets. */
@@ -36,6 +46,22 @@ export interface SceneLightingProps {
 }
 
 const environments = new Map<string, Promise<THREE.Texture>>();
+
+const rooms = new WeakMap<THREE.WebGLRenderer, THREE.Texture>();
+
+/** A prefiltered neutral room for image-based light, built once per renderer. */
+function roomEnvironment(gl: THREE.WebGLRenderer): THREE.Texture {
+  let texture = rooms.get(gl);
+  if (!texture) {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const room = new RoomEnvironment();
+    texture = pmrem.fromScene(room, 0.035).texture;
+    room.dispose();
+    pmrem.dispose();
+    rooms.set(gl, texture);
+  }
+  return texture;
+}
 
 function loadEnvironment(url: string): Promise<THREE.Texture> {
   let p = environments.get(url);
@@ -59,13 +85,14 @@ function loadEnvironment(url: string): Promise<THREE.Texture> {
 /** Sets `scene.environment` while mounted. Returns true once the map is in place. */
 function useEnvironment(url: string | null, intensity: number): boolean {
   const scene = useThree((s) => s.scene);
+  const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     if (!url) return;
     let alive = true;
     const previous = scene.environment;
-    loadEnvironment(url)
+    (url === ROOM_ENVIRONMENT ? Promise.resolve(roomEnvironment(gl)) : loadEnvironment(url))
       .then((texture) => {
         if (!alive) return;
         scene.environment = texture;
@@ -80,7 +107,7 @@ function useEnvironment(url: string | null, intensity: number): boolean {
       scene.environment = previous;
       setLoaded(false);
     };
-  }, [url, scene, invalidate]);
+  }, [url, scene, gl, invalidate]);
   useEffect(() => {
     const previous = scene.environmentIntensity;
     scene.environmentIntensity = intensity;
@@ -100,9 +127,10 @@ interface SunProps {
   direction: [number, number, number];
   shadows: boolean;
   mapSize: number;
+  softness: number;
 }
 
-function Sun({ level, intensity, color, direction, shadows, mapSize }: SunProps) {
+function Sun({ level, intensity, color, direction, shadows, mapSize, softness }: SunProps) {
   const light = useMemo(() => new THREE.DirectionalLight(), []);
   const invalidate = useThree((s) => s.invalidate);
   const { min, max } = selectLevelMesh(level).bounds;
@@ -137,10 +165,11 @@ function Sun({ level, intensity, color, direction, shadows, mapSize }: SunProps)
     cam.updateProjectionMatrix();
     shadow.bias = -0.0004;
     shadow.normalBias = 0.03;
-    shadow.radius = 2.5;
+    shadow.radius = softness;
+    shadow.blurSamples = 12;
     shadow.intensity = 0.8;
     invalidate();
-  }, [light, invalidate, intensity, color, dx, dy, dz, shadows, mapSize, x0, x1, z0, z1, y1]);
+  }, [light, invalidate, intensity, color, dx, dy, dz, shadows, mapSize, softness, x0, x1, z0, z1, y1]);
   useEffect(() => () => light.dispose(), [light]);
   return <primitive object={light} />;
 }
@@ -190,6 +219,7 @@ export function SceneLighting({
   envUrl = DEFAULT_ENVIRONMENT_URL,
   shadows = true,
   shadowMapSize = 2048,
+  shadowSoftness = 2.5,
   preset = DEFAULT_LIGHTING_PRESET,
   resolveEntry,
   maxLamps = MAX_INTERIOR_LIGHTS,
@@ -208,7 +238,7 @@ export function SceneLighting({
       {/* Light bounced off the floor: keeps ceilings, door heads and the undersides of furniture from going grey. */}
       {bounce.intensity > 0 && <directionalLight position={[0, -1, 0]} intensity={bounce.intensity} color={bounce.color} />}
       {/* Under ceilings the sun only gets in through windows (ceilings cast shadows), so the rooms have lamps of their own. */}
-      {sun && <Sun level={level} intensity={sun.intensity} color={sun.color} direction={sun.direction} shadows={shadows && !low} mapSize={shadowMapSize} />}
+      {sun && <Sun level={level} intensity={sun.intensity} color={sun.color} direction={sun.direction} shadows={shadows && !low} mapSize={shadowMapSize} softness={shadowSoftness} />}
       {lamps && !low && (
         <Lamps
           level={level}

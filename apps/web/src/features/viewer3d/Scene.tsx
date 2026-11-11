@@ -3,16 +3,16 @@
  * their selection and warning states, the placement ghost, and the camera.
  */
 import { planStore, selectLevelMesh, usePlanStore, type Item, type Level } from '@interio/core';
-import { ItemObject, LevelMeshes, SceneLighting, geometryFromMesh, lightingRig, type ItemAppearance } from '@interio/scene3d';
+import { ItemObject, LevelMeshes, ROOM_ENVIRONMENT, SceneLighting, geometryFromMesh, lightingRig, type ItemAppearance } from '@interio/scene3d';
 import { Line, OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react';
 import * as THREE from 'three';
-import { captureBridge, capturePng, captureThumbnail } from './capture';
+import { captureBridge, capturePng, captureThumbnail, pipeline } from './capture';
 import { Effects, HELPER_LAYER } from './Effects';
-import { clampTarget, fitOrbit, fitTop, freeView, type Box, type CameraPose } from './camera';
+import { SHOWCASE_DIRECTION, clampTarget, fitOrbit, fitTop, freeView, type Box, type CameraPose } from './camera';
 import { findOverlaps, itemSize, type Overlap } from './placement';
-import { DOCK_WIDTH, cameraState, entryOrPlaceholder, registerEntry, resolveEntry, useLightingPreset, useViewer, type ViewMode } from './state';
+import { DOCK_WIDTH, cameraState, entryOrPlaceholder, registerEntry, resolveEntry, useLightingPreset, useRenderTier, useViewer, type ViewMode } from './state';
 import { HANDLE_RADIUS, handlePosition, usePointerTool } from './tool';
 
 const ACCENT = '#0f766e';
@@ -190,7 +190,7 @@ function Ground({ box }: { box: Box }) {
 }
 
 /** Field of view per mode. The top view uses a long lens so it reads almost like a plan. */
-const FOV: Record<ViewMode, number> = { orbit: 38, top: 15 };
+const FOV: Record<ViewMode, number> = { orbit: 38, top: 15, showcase: 26 };
 
 interface Viewport {
   width: number;
@@ -204,7 +204,8 @@ function insetsFor(size: Viewport, docked: boolean) {
 
 function poseFor(view: ViewMode, box: Box, size: Viewport): CameraPose {
   const free = freeView(size.width, size.height, FOV[view], insetsFor(size, useViewer.getState().dock !== null));
-  return view === 'top' ? fitTop(box, free.fov, free.aspect) : fitOrbit(box, free.fov, free.aspect);
+  if (view === 'top') return fitTop(box, free.fov, free.aspect);
+  return view === 'showcase' ? fitOrbit(box, free.fov, free.aspect, SHOWCASE_DIRECTION, 1.04) : fitOrbit(box, free.fov, free.aspect);
 }
 
 /** Orbit, pan and zoom with limits; animated moves between the dollhouse and the top view. */
@@ -307,13 +308,14 @@ function CameraRig({ box }: { box: Box }) {
 
   const reach = Math.hypot(box.max[0] - box.min[0], box.max[2] - box.min[2]);
   const top = view === 'top';
+  const showcase = view === 'showcase';
   return (
     <OrbitControls
       ref={controls}
       makeDefault
       enableRotate={!top}
       minPolarAngle={0}
-      maxPolarAngle={top ? 0.002 : 1.45}
+      maxPolarAngle={top ? 0.002 : showcase ? 0.75 : 1.45}
       minDistance={2}
       maxDistance={Math.max(30, reach * (top ? 12 : 4))}
       zoomSpeed={0.9}
@@ -394,8 +396,27 @@ function DebugHook() {
         get().invalidate();
       },
       /** Cost of the last frame: draw calls and triangles (shadow and contact-shadow passes included). */
-      stats(): { calls: number; triangles: number } {
-        return { calls: gl.info.render.calls, triangles: gl.info.render.triangles };
+      /**
+       * Cost of the last frame, every pass included (shadow maps, occlusion, the main view):
+       * draw calls and triangles, and `ms`, the time to draw the frame again, measured
+       * synchronously (five frames, each read back so the GPU has finished).
+       */
+      stats(): { calls: number; triangles: number; ms: number } {
+        const calls = gl.info.render.calls;
+        const triangles = gl.info.render.triangles;
+        const ctx = gl.getContext();
+        const px = new Uint8Array(4);
+        const draw = () => {
+          gl.info.reset();
+          if (pipeline.render) pipeline.render();
+          else gl.render(scene, camera);
+          ctx.readPixels(0, 0, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, px);
+        };
+        draw();
+        const t0 = performance.now();
+        for (let i = 0; i < 5; i++) draw();
+        const ms = Math.round(((performance.now() - t0) / 5) * 10) / 10;
+        return { calls, triangles, ms };
       },
     };
     window.__interio = hook;
@@ -410,6 +431,7 @@ export function Scene({ level }: { level: Level }) {
   usePointerTool();
   const view = useViewer((s) => s.view);
   const cutaway = useViewer((s) => s.cutaway);
+  const tier = useRenderTier();
   const lighting = useLightingPreset();
   const items = useLiveItems(level);
   const overlaps = useOverlaps(level, items);
@@ -420,7 +442,15 @@ export function Scene({ level }: { level: Level }) {
   return (
     <>
       <color attach="background" args={[lightingRig(lighting, 'dollhouse').background]} />
-      <SceneLighting level={level} mode="dollhouse" preset={lighting} resolveEntry={resolveEntry} />
+      <SceneLighting
+        level={level}
+        mode="dollhouse"
+        preset={lighting}
+        resolveEntry={resolveEntry}
+        envUrl={tier === 'low' || new URLSearchParams(window.location.search).get('env') === 'sky' ? undefined : ROOM_ENVIRONMENT}
+        shadowMapSize={tier === 'low' ? 1024 : view === 'showcase' ? 4096 : 2048}
+        shadowSoftness={Number(new URLSearchParams(window.location.search).get('soft') ?? (tier === 'low' ? 2 : view === 'showcase' ? 5 : 3.5))}
+      />
       <LevelMeshes level={level} cutaway={cutaway && view === 'orbit'} />
       <Ground box={box} />
       <Items items={items} overlaps={overlaps} />
@@ -446,7 +476,7 @@ declare global {
       describeItem(id: string): { min: number[]; max: number[]; meshes: string[]; materials: Record<string, string> } | null;
       describeSurfaces(): Record<string, { finish: string; color: string }>;
       look(position: [number, number, number], target: [number, number, number]): void;
-      stats(): { calls: number; triangles: number };
+      stats(): { calls: number; triangles: number; ms: number };
     };
   }
 }

@@ -17,7 +17,7 @@ import { markFirstLayoutDone, saveFirstLayout } from './firstLayout';
 import { nudgeDirection } from './placement';
 import { Scene, useLiveItems, useOverlaps } from './Scene';
 import { SidePanel } from './SidePanel';
-import { DOCK_WIDTH, cameraState, entryOrPlaceholder, useViewer } from './state';
+import { DOCK_WIDTH, cameraState, entryOrPlaceholder, useRenderTier, useViewer } from './state';
 import { Toolbar } from './Toolbar';
 
 function isTyping(target: EventTarget | null): boolean {
@@ -161,7 +161,8 @@ export default function Viewer3D() {
   // Real textures for furniture materials; registered once, before the first model is built.
   installFurnitureTextures();
   const level = useLevel();
-  const quality = useViewer((s) => s.quality);
+  const tier = useRenderTier();
+  const view = useViewer((s) => s.view);
   useKeyboard();
   // Leaving the view drops any half-finished placement.
   useEffect(() => () => useViewer.setState({ placing: null, ghost: null, drag: null }), []);
@@ -182,7 +183,7 @@ export default function Viewer3D() {
       <Canvas
         shadows="percentage"
         frameloop="demand"
-        dpr={quality === 'high' ? [1, 2] : 1}
+        dpr={tier === 'high' || (view === 'showcase' && tier !== 'low') ? [1, 2] : 1}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         camera={{ fov: 38, near: 0.1, far: 600, position: [12, 14, 12] }}
       >

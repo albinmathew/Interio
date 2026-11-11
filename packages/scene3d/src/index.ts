@@ -2,7 +2,7 @@ export { geometryFromMesh } from './geometry';
 export { LevelMeshes, type LevelMeshesProps } from './LevelMeshes';
 export { ItemObject, ItemsLayer, type ItemAppearance, type ItemObjectProps, type ItemsLayerProps } from './ItemsLayer';
 export { PlanScene, type PlanSceneProps } from './PlanScene';
-export { SceneLighting, DEFAULT_ENVIRONMENT_URL, type SceneLightingProps } from './SceneLighting';
+export { SceneLighting, DEFAULT_ENVIRONMENT_URL, ROOM_ENVIRONMENT, type SceneLightingProps } from './SceneLighting';
 export {
   DEFAULT_LIGHTING_PRESET,
   LIGHTING_LABELS,

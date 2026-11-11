@@ -3,11 +3,11 @@
  */
 import { planStore, selectLevel, type Level } from '@interio/core';
 import { LIGHTING_LABELS, LIGHTING_PRESETS, LIGHTING_SETTING, type LightingPreset } from '@interio/scene3d';
-import { Box, Camera, Eraser, Layers, Maximize, Moon, ScanLine, Sparkles, Sun, Sunset } from 'lucide-react';
+import { Aperture, Box, Camera, Eraser, Layers, Maximize, Moon, ScanLine, Sparkles, Sun, Sunset } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { clearFurniture, furnishHome } from '../../lib/furnish';
 import { Button, Dialog, IconButton, Panel, Segmented, toast } from '../../ui';
-import { captureBridge, captureFileName, downloadDataUrl } from './capture';
+import { captureBridge, captureFileName, downloadDataUrl, exportScale } from './capture';
 import { saveFirstLayout } from './firstLayout';
 import { useLightingPreset, useViewer, type ViewMode } from './state';
 
@@ -31,7 +31,7 @@ function exportPicture(): void {
   const capture = captureBridge.capture;
   if (!capture) return;
   try {
-    downloadDataUrl(capture(2), captureFileName(planStore.getState().project?.name ?? 'home'));
+    downloadDataUrl(capture(exportScale(useViewer.getState().view)), captureFileName(planStore.getState().project?.name ?? 'home'));
     toast.success('Picture saved to your downloads');
   } catch {
     toast.error('Could not save a picture of this view');
@@ -93,6 +93,16 @@ export function Toolbar({ level }: { level: Level }) {
                 </>
               ),
             },
+            {
+              value: 'showcase',
+              title: 'Showcase: a presentation view from above at the best quality; pictures are saved large',
+              label: (
+                <>
+                  <Aperture className="h-4 w-4" />
+                  Showcase
+                </>
+              ),
+            },
           ]}
         />
         <IconButton label="Fit the home in view" size="sm" className="shrink-0" onClick={ui.requestFit}>
@@ -103,7 +113,7 @@ export function Toolbar({ level }: { level: Level }) {
           size="sm"
           className="shrink-0"
           active={cutaway}
-          disabled={view === 'top'}
+          disabled={view !== 'orbit'}
           onClick={ui.toggleCutaway}
         >
           <Layers className="h-4 w-4" />
