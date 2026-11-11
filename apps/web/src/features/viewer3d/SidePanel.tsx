@@ -132,7 +132,7 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
           ]}
         />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className={cn('min-h-0 flex-1', tab === 'finishes' ? 'flex flex-col' : 'overflow-y-auto')}>
         {tab === 'finishes' ? (
           <FinishesPanel level={level} room={room} />
         ) : (

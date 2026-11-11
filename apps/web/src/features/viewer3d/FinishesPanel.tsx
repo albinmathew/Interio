@@ -89,7 +89,7 @@ function WallFaceLink({ room }: { room: Room }) {
   const face = useViewer((s) => s.wallFace);
   if (face?.roomId === room.id)
     return (
-      <div className="border-b border-line px-3 py-2">
+      <div className="shrink-0 border-b border-line px-3 py-2">
         <Button
           size="sm"
           className="w-full"
@@ -103,7 +103,7 @@ function WallFaceLink({ room }: { room: Room }) {
       </div>
     );
   return (
-    <p className="border-b border-line px-3 py-2 text-xs text-ink-faint" data-testid="room-wall-face-hint">
+    <p className="shrink-0 border-b border-line px-3 py-2 text-xs text-ink-faint" data-testid="room-wall-face-hint">
       Click one of the room&apos;s walls to give it a finish of its own. <Kbd>Alt</Kbd>-click goes straight there.
     </p>
   );
@@ -124,9 +124,9 @@ export function FinishesPanel({ level, room }: { level: Level; room: Room }) {
     toast.success(changed === 0 ? 'Those rooms already match' : `Finishes applied to ${plural(changed)}`);
   };
   return (
-    <div data-testid="finishes-panel">
+    <div data-testid="finishes-panel" className="flex min-h-0 flex-1 flex-col">
       <WallFaceLink room={room} />
-      <div className="flex flex-col gap-3 p-3">
+      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3">
         {GROUPS.map(({ surface, label, options }) => {
           const current = currentFinish(room, surface);
           return (
@@ -145,7 +145,7 @@ export function FinishesPanel({ level, room }: { level: Level; room: Room }) {
           );
         })}
       </div>
-      <div className="flex flex-col gap-1.5 border-t border-line p-3">
+      <div className="flex shrink-0 flex-col gap-1.5 border-t border-line p-3">
         <Button
           size="sm"
           icon={<CopyCheck className="h-4 w-4" />}

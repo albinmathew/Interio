@@ -172,7 +172,7 @@ function Swatch({ id, surface, onPick }: { id: string | undefined; surface: 'flo
     return () => el.removeEventListener('change', onChange);
   }, []);
   return (
-    <label
+    <span
       className="relative h-8 w-8 shrink-0 cursor-pointer rounded-md border border-line"
       style={{ background: colour ?? 'transparent' }}
       title={`Custom ${surface} colour`}
@@ -185,7 +185,7 @@ function Swatch({ id, surface, onPick }: { id: string | undefined; surface: 'flo
         defaultValue={colour ?? '#cccccc'}
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       />
-    </label>
+    </span>
   );
 }
 
@@ -216,8 +216,7 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
           </Select>
         </Field>
         <Field label="Floor finish">
-          <span className="flex gap-2">
-            <Swatch id={room.floorMaterial} surface="floor" onPick={(floorMaterial) => floorMaterial !== room.floorMaterial && set({ floorMaterial })} />
+          <span className="flex flex-row-reverse gap-2">
             <Select value={room.floorMaterial} onChange={(e) => set({ floorMaterial: e.currentTarget.value })}>
               {customOption(room.floorMaterial)}
               {FLOORS.map((m) => (
@@ -226,11 +225,11 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
                 </option>
               ))}
             </Select>
+            <Swatch id={room.floorMaterial} surface="floor" onPick={(floorMaterial) => floorMaterial !== room.floorMaterial && set({ floorMaterial })} />
           </span>
         </Field>
         <Field label="Wall finish">
-          <span className="flex gap-2">
-            <Swatch id={room.wallMaterial ?? DEFAULT_WALL_MATERIAL} surface="wall" onPick={(wallMaterial) => wallMaterial !== room.wallMaterial && set({ wallMaterial })} />
+          <span className="flex flex-row-reverse gap-2">
             <Select value={room.wallMaterial ?? DEFAULT_WALL_MATERIAL} onChange={(e) => set({ wallMaterial: e.currentTarget.value })}>
               {customOption(room.wallMaterial)}
               {WALLS.map((m) => (
@@ -239,6 +238,7 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
                 </option>
               ))}
             </Select>
+            <Swatch id={room.wallMaterial ?? DEFAULT_WALL_MATERIAL} surface="wall" onPick={(wallMaterial) => wallMaterial !== room.wallMaterial && set({ wallMaterial })} />
           </span>
         </Field>
       </Section>
