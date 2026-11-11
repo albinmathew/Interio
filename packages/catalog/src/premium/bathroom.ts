@@ -186,10 +186,6 @@ export function buildToilet(entry: CatalogEntry, ctx?: BuildContext): THREE.Obje
   const lhd = shd - 0.003;
   const lrc = Math.max(0.01, src - 0.003);
   m.part('ceramic', egg(sweep(lid, lhw, lhd, lrc, 0, 0, scz, square ? 5 : 10)));
-  if (lhw > lrc + 0.001 && lhd > lrc + 0.001) {
-    // A square lid's top closes over the rectangle its corners leave.
-    m.part('ceramic', egg(plate(rrect(2 * (lhw - lrc) + 0.002, 2 * (lhd - lrc) + 0.002, 0, 0, scz), 0.001, rim + 0.049)));
-  }
   // Hinge posts at the back of the seat.
   for (const s of [-1, 1]) m.part('fittings', cyl(0.009, 0.009, 0.014, s * hw * 0.55, rim + 0.004, sb + 0.012, 'y', 14));
 

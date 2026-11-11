@@ -94,8 +94,8 @@ export function withHoles(shape: THREE.Shape, ...holes: THREE.Shape[]): THREE.Sh
 /**
  * Sweeps a profile around a rounded rectangle, like `lathe` around a circle.
  * `profile` is [offset, height] pairs, the offset measured outwards from the
- * outline (half sizes `hw` by `hd`, corner radius `rc`); a negative offset
- * moves inwards and is clamped at the corner centres. Profiles drawn bottom to
+ * outline (half sizes `hw` by `hd`, corner radius `rc`): offset o gives the
+ * rounded rectangle hw + o by hd + o with radius rc + o (never below 0). Profiles drawn bottom to
  * top on the outside face outwards, as with `lathe`; continue the same profile
  * over a rim and down inside to get a basin whose inner face is visible.
  * Smooth normals; the bottom of a basin is left open for a flat floor piece.
@@ -109,16 +109,19 @@ export function sweep(profile: [number, number][], hw: number, hd: number, rc: n
     [-1, -1],
     [-1, 1],
   ];
-  const ring: { cx: number; cz: number; phi: number }[] = [];
+  const ring: { sx: number; sz: number; phi: number }[] = [];
   corners.forEach(([sx, sz], k) => {
-    for (let s = 0; s <= cornerSegments; s++) ring.push({ cx: sx * (hw - r0), cz: sz * (hd - r0), phi: (k + s / cornerSegments) * (PI / 2) });
+    for (let s = 0; s <= cornerSegments; s++) ring.push({ sx, sz, phi: (k + s / cornerSegments) * (PI / 2) });
   });
   const P = profile.length;
   const N = ring.length;
   const pos: number[] = [];
-  for (const { cx, cz, phi } of ring) {
+  for (const { sx, sz, phi } of ring) {
     for (const [o, h] of profile) {
+      // The outline offset by o: half sizes hw + o and hd + o, corner radius rc + o (at least 0).
       const r = Math.max(r0 + o, 0);
+      const cx = sx * Math.max(hw + o - r, 0);
+      const cz = sz * Math.max(hd + o - r, 0);
       pos.push(x + cx + r * Math.sin(phi), y + h, z + cz + r * Math.cos(phi));
     }
   }
