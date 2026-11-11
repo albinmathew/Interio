@@ -4,9 +4,10 @@
  * `beds.ts` for the conventions; shared parts live in `seating.parts.ts`.
  */
 import type { CatalogEntry, FinishKind, FinishSlot } from '@interio/core';
-import type * as THREE from 'three';
-import { Model, cyl, param, rbox, type BuildContext } from './kit';
-import { Parts, clamp, placeBox, rod, softBox, taperLeg, uprightPillow } from './seating.parts';
+import * as THREE from 'three';
+import { Model, cyl, lathe, param, rbox, turn, type BuildContext } from './kit';
+import { CHAIR_GENERATORS } from './seating.chairs';
+import { Parts, beam, clamp, placeBox, ring, rod, softBox, taperLeg, uprightPillow } from './seating.parts';
 
 /* -------------------------------------------------------------------- slots */
 
@@ -166,7 +167,7 @@ export function buildSofa(entry: CatalogEntry, ctx?: BuildContext): THREE.Object
           const u = s.a + cw * (i + 0.5);
           const w = cw - 0.012;
           const r0 = Math.min(0.045, seatH * 0.4);
-          add('upholstery', softBox(w, seatH, v1 - v0, u, deckY, (v0 + v1) / 2, seatPuff, r0, 3));
+          add('upholstery', softBox(w, seatH, v1 - v0, u, deckY, (v0 + v1) / 2, seatPuff, r0, 2));
           const py = deckY + seatH - r0 + r0 * 0.72;
           const pz = v1 - r0 + r0 * 0.72;
           add('upholstery', rod([u - w / 2 + r0, py, pz], [u + w / 2 - r0, py, pz], 0.0055, 6));
@@ -178,7 +179,7 @@ export function buildSofa(entry: CatalogEntry, ctx?: BuildContext): THREE.Object
       for (let i = 0; i < backs; i++) {
         const u = s.a + bw * (i + 0.5);
         const hb = H - seatTop + 0.07;
-        const g = softBox(bw - 0.014, bt, hb, 0, 0, 0, 0.32, 0.05, 3);
+        const g = softBox(bw - 0.014, bt, hb, 0, 0, 0, 0.24, 0.05, 2);
         g.translate(0, 0, 0).rotateX(Math.PI / 2).rotateX(-lean);
         add('upholstery', placeBox(g, { cx: u, maxY: H, minZ: backT - 0.025 }));
       }
@@ -195,7 +196,7 @@ export function buildSofa(entry: CatalogEntry, ctx?: BuildContext): THREE.Object
         // Scroll face at the front.
         add('upholstery', cyl(rr * 0.82, rr * 0.82, 0.02, u, armTop - rr, len - 0.016, 'z', 20));
       } else if (arm === 'wide') {
-        add('upholstery', softBox(armW, armTop - legH, len, u, legH, len / 2, 0.02, Math.min(0.07, armW * 0.35), 3));
+        add('upholstery', softBox(armW, armTop - legH, len, u, legH, len / 2, 0.02, Math.min(0.07, armW * 0.35), 2));
       }
     };
     const a0 = Math.min(...r.segs.map((s) => s.a));
@@ -289,7 +290,157 @@ export function buildSofa(entry: CatalogEntry, ctx?: BuildContext): THREE.Object
   return p.build();
 }
 
+/* ------------------------------------------------------- ottoman and pouf */
+
+/** An upholstered piece on legs or a base: `upholstery` and `legs`. */
+export function upholsteredSlots(upholstery: string, legs: string, legKind: FinishKind = 'wood', legLabel = 'Legs', kind: FinishKind = 'fabric'): FinishSlot[] {
+  return [
+    { id: 'upholstery', label: 'Upholstery', kind, default: upholstery },
+    { id: 'legs', label: legLabel, kind: legKind, default: legs },
+  ];
+}
+
+/**
+ * An ottoman: a buttoned, piped cushion top on an upholstered body and tapered
+ * legs; or (`shape: 'round'`) a drum pouf with piped seams on a recessed base.
+ */
+export function buildOttoman(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3D {
+  const m = new Model(entry, ctx);
+  const { W, D, H } = m;
+  const p = new Parts(m);
+  const shape = param<'square' | 'round'>(entry, 'shape', 'square');
+  if (shape === 'round') {
+    const baseH = clamp(H * 0.07, 0.02, 0.035);
+    const R = W / 2;
+    const sz = D / W;
+    const h = H - baseH;
+    p.part('legs', cyl(R * 0.8, R * 0.76, baseH + 0.01, 0, 0, 0, 'y', 32).scale(1, 1, sz));
+    const prof: [number, number][] = [
+      [0, 0],
+      [R * 0.86, 0],
+      [R * 0.95, h * 0.06],
+      [R * 0.99, h * 0.25],
+      [R, h * 0.5],
+      [R * 0.99, h * 0.75],
+      [R * 0.955, h * 0.92],
+      [R * 0.86, h * 0.985],
+      [R * 0.5, h * 1.0],
+      [0, h],
+    ];
+    p.part('upholstery', lathe(prof, 0, baseH, 0, 40).scale(1, 1, sz));
+    p.part('upholstery', ring(R * 0.94, 0.0065, 0, baseH + h * 0.94, 0, 40, sz));
+    p.part('upholstery', ring(R * 0.94, 0.0065, 0, baseH + h * 0.05, 0, 40, sz));
+    // A covered button in the dip of the top.
+    p.part('upholstery', new THREE.SphereGeometry(0.014, 10, 6).scale(1, 0.5, 1).translate(0, H - 0.006, 0));
+    return p.build();
+  }
+  const legH = clamp(H * 0.22, 0.06, 0.12);
+  const topH = clamp(H * 0.3, 0.08, 0.14);
+  const puff = 0.12;
+  const topY = H - topH * (1 + puff);
+  p.part('upholstery', rbox(W, topY - legH + 0.012, D, 0.03, 0, legH, 0, 3));
+  p.part('upholstery', softBox(W - 0.006, topH, D - 0.006, 0, topY, 0, puff, 0.04, 3));
+  const e = 0.0058;
+  const y = topY + 0.006;
+  const hx = W / 2 - 0.008;
+  const hz = D / 2 - 0.008;
+  p.part('upholstery', rod([-hx, y, hz], [hx, y, hz], e, 6));
+  p.part('upholstery', rod([-hx, y, -hz], [hx, y, -hz], e, 6));
+  p.part('upholstery', rod([hx, y, -hz], [hx, y, hz], e, 6));
+  p.part('upholstery', rod([-hx, y, -hz], [-hx, y, hz], e, 6));
+  // Buttons, sunk into the top.
+  const nx = W > D * 1.3 ? 3 : 2;
+  for (let i = 0; i < nx; i++) {
+    for (const sz of [-1, 1]) {
+      const bx = (i - (nx - 1) / 2) * (W / (nx + 0.6));
+      const bz = (sz * D) / 4;
+      const dome = Math.max(0, 1 - (bx / (W / 2)) ** 2) * Math.max(0, 1 - (bz / (D / 2)) ** 2);
+      const sy = topY + topH * (1 + puff * dome);
+      p.part('upholstery', new THREE.SphereGeometry(0.009, 8, 6).scale(1, 0.6, 1).translate(bx, sy - 0.003, bz));
+    }
+  }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.part('legs', taperLeg(sx * (W / 2 - 0.07), sz * (D / 2 - 0.07), legH + 0.012, 0.02, 0.013));
+  return p.build();
+}
+
+/* ----------------------------------------------------------------- recliner */
+
+/**
+ * A recliner with its footrest out: padded arms, a seat cushion, a tall back
+ * of three stacked pillow rolls leaning back, the footrest on a scissor
+ * mechanism, all on a recessed base. `footrest: false` closes it (the depth is
+ * then the chair alone). Slots `upholstery` and `legs` (the base and mechanism).
+ */
+export function buildRecliner(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3D {
+  const m = new Model(entry, ctx);
+  const { W, D, H } = m;
+  const p = new Parts(m);
+  const open = param<boolean>(entry, 'footrest', true);
+  const bodyD = open ? clamp(D * 0.72, 0.7, 1.0) : D;
+  const baseH = 0.05;
+  const seatTop = clamp(H * 0.45, 0.4, 0.5);
+  const seatH = 0.13;
+  const armW = clamp(W * 0.17, 0.12, 0.2);
+  const armTop = seatTop + 0.2;
+  const z0 = -D / 2;
+  const innerW = W - 2 * armW;
+
+  p.part('legs', rbox(W - 0.14, baseH + 0.01, bodyD - 0.16, 0.012, 0, 0, z0 + bodyD / 2 - 0.02, 1));
+  // Deck and seat cushion.
+  const deckY = seatTop - seatH * 1.12;
+  p.part('upholstery', rbox(innerW + 0.01, deckY - baseH + 0.01, bodyD - 0.12, 0.03, 0, baseH, z0 + 0.12 + (bodyD - 0.12) / 2, 2));
+  const sd = bodyD - 0.22;
+  p.part('upholstery', softBox(innerW - 0.01, seatH, sd, 0, deckY, z0 + bodyD - 0.01 - sd / 2, 0.12, 0.045, 2));
+  // Padded arms with a pillow top.
+  for (const s of [-1, 1]) {
+    const ax = s * (W / 2 - armW / 2);
+    p.part('upholstery', softBox(armW, armTop - baseH - 0.07, bodyD - 0.02, ax, baseH, z0 + 0.01 + (bodyD - 0.02) / 2, 0.02, 0.05, 2));
+    p.part('upholstery', softBox(armW - 0.004, 0.08, bodyD - 0.05, ax, armTop - 0.08 - 0.08 * 0.25, z0 + 0.03 + (bodyD - 0.05) / 2, 0.25, 0.035, 2));
+    p.part('upholstery', rod([ax - s * (armW / 2 - 0.02), armTop - 0.085, z0 + bodyD - 0.02], [ax - s * (armW / 2 - 0.02), armTop - 0.085, z0 + 0.06], 0.005, 6));
+  }
+  // The back: a shell with three pillow rolls, leaning back.
+  const tilt = 0.24;
+  const t = 0.16;
+  const hb = (H - baseH - 0.02 - t * Math.sin(tilt)) / Math.cos(tilt);
+  const back: THREE.BufferGeometry[] = [rbox(innerW + 0.1, hb, t, 0.05, 0, 0, 0, 3)];
+  const rollsFrom = seatTop - baseH + 0.02;
+  const rollH = (hb - rollsFrom - 0.07) / 3;
+  const rolls: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 3; i++) {
+    const g = softBox(innerW - 0.02, 0.11, rollH + 0.02, 0, 0, 0, 0.4, 0.05, 3).rotateX(Math.PI / 2);
+    placeBox(g, { cx: 0, minY: rollsFrom + i * rollH, minZ: t / 2 - 0.02 });
+    rolls.push(g);
+  }
+  const all = [...back, ...rolls];
+  for (const g of all) g.rotateX(-tilt);
+  const box = new THREE.Box3();
+  for (const g of all) {
+    g.computeBoundingBox();
+    box.union(g.boundingBox!);
+  }
+  for (const g of all) g.translate(0, H - box.max.y, z0 - box.min.z);
+  for (const g of back) p.part('upholstery', g);
+  for (const g of rolls) p.part('upholstery', g);
+  // Footrest on its scissor arms.
+  if (open) {
+    const fd = D - bodyD + 0.02;
+    const fy = seatTop - 0.16;
+    const g = softBox(innerW - 0.03, 0.1, fd, 0, 0, 0, 0.2, 0.04, 2);
+    turn(g, -0.08, 0, 0);
+    p.part('upholstery', placeBox(g, { cx: 0, minY: fy, maxZ: D / 2 }));
+    for (const s of [-1, 1]) {
+      const x = s * (innerW / 2 - 0.08);
+      p.part('legs', beam([x, baseH + 0.03, z0 + bodyD - 0.2], [x, fy + 0.02, D / 2 - fd * 0.45], 0.018, 0.03, 0.004));
+      p.part('legs', beam([x + s * 0.02, fy - 0.07, z0 + bodyD - 0.12], [x + s * 0.02, fy + 0.03, D / 2 - fd * 0.8], 0.018, 0.03, 0.004));
+    }
+  }
+  return p.build();
+}
+
 /** Generators of this family, registered by `premium/index.ts`. */
 export const SEATING_GENERATORS: Record<string, (entry: CatalogEntry, ctx?: BuildContext) => THREE.Object3D> = {
   sofa: buildSofa,
+  ottoman: buildOttoman,
+  recliner: buildRecliner,
+  ...CHAIR_GENERATORS,
 };
