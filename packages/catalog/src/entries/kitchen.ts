@@ -24,7 +24,7 @@ export const KITCHEN_ENTRIES: CatalogEntry[] = [
   gen('kitchen.base.end', 'Rounded end cabinet', 'kitchen', ['kitchen'], 'kitchenEnd', [600, 600, WORKTOP], ['base unit', 'counter', 'end unit', 'modular'], {
     slots: KITCHEN_OPEN_SLOTS,
   }),
-  gen('kitchen.sink', 'Sink unit', 'kitchen', ['kitchen', 'utility'], 'kitchenBase', [600, 600, 1150], ['sink', 'tap', 'faucet', 'basin'], {
+  gen('kitchen.sink', 'Sink unit', 'kitchen', ['kitchen', 'utility'], 'kitchenBase', [600, 600, 1000], ['sink', 'tap', 'faucet', 'basin'], {
     ...base,
     params: { rows: [doors(1)], sink: 'inset', counter: WORKTOP },
   }),
