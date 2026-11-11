@@ -161,7 +161,8 @@ export function frontGrid(
         const right = pair ? c % 2 === 0 : opensRight;
         const hx = cx + (right ? 1 : -1) * (fw / 2 - 0.035);
         const len = Math.min(0.2, fh * 0.45);
-        const hy = o.edge === 'bottom' ? fy0 + 0.04 + len / 2 : fy1 - 0.05 - len / 2;
+        // Doors above eye level (wall units, the top of a tall unit) are pulled from their bottom edge.
+        const hy = o.edge === 'bottom' || (fy0 + fy1) / 2 > 1.3 ? fy0 + 0.04 + len / 2 : fy1 - 0.05 - len / 2;
         barHandle(m, hx, hy, len, true, o.face);
       }
     }
