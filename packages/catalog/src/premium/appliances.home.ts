@@ -46,7 +46,6 @@ export const SPEAKER_SLOTS: FinishSlot[] = [
 ];
 
 const RED = '#ff5a3c';
-const LAMP = '#fff4dc';
 
 /** A lathe about the z axis (profile [radius, depth] from the back), standing at (x, y) from z. */
 function latheZ(profile: [number, number][], x: number, y: number, z: number, segments = 40): THREE.BufferGeometry {
