@@ -52,7 +52,9 @@ export function books(p: Parts, x: number, y: number, z: number, n: number, w = 
   }
 }
 
-/** Places a slab of `shape` so its top is at y. */
+/** Height kept for the styling on a coffee table top. */
+const DECOR_H = 0.03;
+
 /** A flat slab `w` x `d` with corner radius `r` and a bevelled edge, its top at y = `top`. The bevel stays inside the outline. */
 export const slabTop = (w: number, d: number, r: number, t: number, top: number, bevel: number) => slab(roundedRect(w - 2 * bevel, d - 2 * bevel, Math.max(0.001, r - bevel)), t, 0, top - t, 0, bevel);
 
@@ -61,7 +63,8 @@ export const slabTop = (w: number, d: number, r: number, t: number, top: number,
 /**
  * A coffee table (rectangular or square from its dims).
  * `material: 'wood'`: a soft-cornered oak top on tapered legs with aprons, a
- * lower shelf and a few books on it (`top`, `legs`).
+ * lower shelf and a few books on it (`top`, `legs`). `styled`: a book stack and a
+ * walnut tray with two pebbles on top, within the height.
  * `material: 'glass'`: a glass top showing its thickness in a slim black steel
  * frame, with a timber lower shelf (`top`, `frame`, `shelf`).
  */
@@ -93,12 +96,25 @@ export function buildCoffeeTable(entry: CatalogEntry, ctx?: BuildContext): THREE
   }
   const topT = 0.034;
   const r = Math.min(W, D) * 0.14;
-  p.part('top', slabTop(W, D, r, topT, H, 0.008));
+  // Styled: a book and a low tray on top. The table is then `DECOR_H` lower, so its height stays the entry's.
+  const styled = param<boolean>(entry, 'styled', false);
+  const T = styled ? H - DECOR_H : H;
+  p.part('top', slabTop(W, D, r, topT, T, 0.008));
   const ix = W / 2 - Math.max(0.07, r * 0.75);
   const iz = D / 2 - Math.max(0.07, r * 0.75);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.part('legs', taperLeg(sx * ix, sz * iz, H - topT + 0.002, 0.024, 0.016, 0, 16));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.part('legs', taperLeg(sx * ix, sz * iz, T - topT + 0.002, 0.024, 0.016, 0, 16));
+  if (styled) {
+    const bw = Math.min(0.3, W * 0.28);
+    const bd = Math.min(0.23, D * 0.38);
+    p.fixed('lacquer.sage', rbox(bw, 0.014, bd, 0.003, 0, T, 0, 1).rotateY(0.18).translate(-W * 0.18, 0, -D * 0.06));
+    p.fixed('lacquer.cream', rbox(bw * 0.9, 0.013, bd * 0.92, 0.002, 0, T + 0.014, 0, 1).rotateY(0.3).translate(-W * 0.18 + 0.01, 0, -D * 0.06));
+    const tr = Math.min(0.15, Math.min(W, D) * 0.24);
+    p.fixed('wood.walnut', lathe([[0, 0], [tr - 0.01, 0], [tr, 0.004], [tr, DECOR_H - 0.006], [tr - 0.006, DECOR_H - 0.006], [tr - 0.006, 0.008], [0, 0.008]], W * 0.2, T, D * 0.04, 40));
+    p.fixed('ceramic.terracotta', new THREE.SphereGeometry(0.045, 16, 10).scale(1, 0.22, 1).translate(W * 0.2 - tr * 0.3, T + 0.008 + 0.0099, D * 0.04 + tr * 0.25));
+    p.fixed('ceramic.white', new THREE.SphereGeometry(0.035, 16, 10).scale(1, 0.26, 1).translate(W * 0.2 + tr * 0.35, T + 0.008 + 0.0091, D * 0.04 - tr * 0.2));
+  }
   // Aprons between the legs, under the top.
-  const ay = H - topT - 0.055;
+  const ay = T - topT - 0.055;
   for (const s of [-1, 1]) {
     p.part('legs', rbox(2 * ix, 0.055, 0.02, 0.004, 0, ay, s * iz, 1));
     p.part('legs', rbox(0.02, 0.055, 2 * iz, 0.004, s * ix, ay, 0, 1));

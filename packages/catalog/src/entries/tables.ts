@@ -17,12 +17,12 @@ const DINING_GLASS = diningSlots('glass.clear', 'metal.black', 'glass', 'metal')
 const DINING_ROUND = diningSlots('stone.marble.white', 'wood.walnut', 'stone', 'wood');
 
 export const TABLES_ENTRIES: CatalogEntry[] = [
-  gen('table.coffee', 'Coffee table', 'tables', ['living'], 'coffeeTable', [1100, 600, 400], ['centre table', 'center table', 'wooden'], { slots: COFFEE_WOOD_SLOTS }),
+  gen('table.coffee', 'Coffee table', 'tables', ['living'], 'coffeeTable', [1100, 600, 400], ['centre table', 'center table', 'wooden'], { slots: COFFEE_WOOD_SLOTS, params: { styled: true } }),
   gen('table.coffee.glass', 'Glass coffee table', 'tables', ['living'], 'coffeeTable', [1100, 600, 400], ['centre table', 'center table', 'glass'], {
     slots: COFFEE_GLASS_SLOTS,
     params: { material: 'glass' },
   }),
-  gen('table.coffee.square', 'Square coffee table', 'tables', ['living'], 'coffeeTable', [750, 750, 400], ['centre table', 'center table', 'wooden'], { slots: COFFEE_WOOD_SLOTS }),
+  gen('table.coffee.square', 'Square coffee table', 'tables', ['living'], 'coffeeTable', [750, 750, 400], ['centre table', 'center table', 'wooden'], { slots: COFFEE_WOOD_SLOTS, params: { styled: true } }),
   gen('table.coffee.glass.square', 'Square glass coffee table', 'tables', ['living'], 'coffeeTable', [750, 750, 400], ['centre table', 'center table', 'glass'], {
     slots: COFFEE_GLASS_SLOTS,
     params: { material: 'glass' },
@@ -47,11 +47,11 @@ export const TABLES_ENTRIES: CatalogEntry[] = [
   }),
   gen('table.dining.trestle', 'Trestle dining table', 'tables', ['dining', 'living', 'balcony'], 'diningTable', [1800, 900, 750], ['dining', '6 seater', 'farmhouse'], {
     slots: DINING_OAK,
-    params: { base: 'trestle' },
+    params: { base: 'trestle', runner: true },
   }),
   gen('table.dining.glass', 'Glass dining table', 'tables', ['dining', 'living'], 'diningTable', [1700, 900, 750], ['dining', '6 seater', 'glass'], {
     slots: DINING_GLASS,
-    params: { base: 'sled', top: 'glass' },
+    params: { base: 'sled', top: 'glass', settings: 6 },
   }),
   gen('table.dining.round', 'Round dining table', 'tables', ['dining', 'kitchen', 'living'], 'diningTable', [1100, 1100, 750], ['dining', '4 seater', 'pedestal'], {
     slots: DINING_ROUND,
