@@ -109,3 +109,18 @@ lights are lit at once (`MAX_INTERIOR_LIGHTS`); each room keeps its main light f
 3. Point finish ids at the set in `materialSpecs.ts` (`size` is metres per repeat; `avg` is
    the average colour of `color.jpg`, used to tint the texture towards the finish colour).
 4. Add a row to the table above.
+
+## Rendering tiers (no assets)
+
+The Design view picks a tier (`apps/web/src/features/viewer3d/Effects.tsx`):
+
+- `high`, a GPU holding its frame rate: an EffectComposer with a multisampled HDR target,
+  three's GTAO pass and an OutputPass; the neutral studio environment for reflections; soft
+  sun shadows (2048 px, 4096 px in the Showcase view); pixel ratio up to 2.
+- `medium`, a GPU that drops frames (`PerformanceMonitor` steps down): contact shadows in
+  place of the occlusion pass, pixel ratio 1.
+- `low`, software renderers (SwiftShader, llvmpipe): the plain forward render without
+  multisampling, a 1024 px shadow map, furniture drawn with standard materials and small
+  colour maps only (no normal or roughness maps). Walk mode applies the same savings.
+
+The Showcase view uses the composer on any GPU. Tone mapping is Khronos PBR Neutral.
