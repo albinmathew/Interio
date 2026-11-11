@@ -44,6 +44,7 @@ describe('markdown reader', () => {
       'Edit the plan',
       'Furnish in 3D',
       'Finishes',
+      'Customise furniture and walls',
       'Lighting and pictures',
       'Ask the assistant',
       'Variants',

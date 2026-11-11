@@ -3,16 +3,16 @@
  * their selection and warning states, the placement ghost, and the camera.
  */
 import { planStore, selectLevelMesh, usePlanStore, type Item, type Level } from '@interio/core';
-import { ItemObject, LevelMeshes, SceneLighting, lightingRig, type ItemAppearance } from '@interio/scene3d';
+import { ItemObject, LevelMeshes, ROOM_ENVIRONMENT, SceneLighting, geometryFromMesh, lightingRig, type ItemAppearance } from '@interio/scene3d';
 import { Line, OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from 'react';
 import * as THREE from 'three';
-import { captureBridge, capturePng, captureThumbnail } from './capture';
+import { captureBridge, capturePng, captureThumbnail, pipeline } from './capture';
 import { Effects, HELPER_LAYER } from './Effects';
-import { clampTarget, fitOrbit, fitTop, freeView, type Box, type CameraPose } from './camera';
+import { SHOWCASE_DIRECTION, clampTarget, fitOrbit, fitTop, freeView, type Box, type CameraPose } from './camera';
 import { findOverlaps, itemSize, type Overlap } from './placement';
-import { DOCK_WIDTH, cameraState, entryOrPlaceholder, registerEntry, resolveEntry, useLightingPreset, useViewer, type ViewMode } from './state';
+import { DOCK_WIDTH, cameraState, entryOrPlaceholder, registerEntry, resolveEntry, useLightingPreset, useRenderTier, useViewer, type ViewMode } from './state';
 import { HANDLE_RADIUS, handlePosition, usePointerTool } from './tool';
 
 const ACCENT = '#0f766e';
@@ -38,11 +38,11 @@ const GHOST_NAME = 'placement-ghost';
 
 const WARNING: ItemAppearance = { emissive: WARN, emissiveIntensity: 0.55 };
 
-function Items({ items, overlaps }: { items: Record<string, Item>; overlaps: Map<string, Overlap> }) {
+function Items({ items, overlaps, lit, lite }: { items: Record<string, Item>; overlaps: Map<string, Overlap>; lit: boolean; lite: boolean }) {
   return (
     <group name="items">
       {Object.values(items).map((item) => (
-        <ItemObject key={item.id} item={item} entry={entryOrPlaceholder(item.catalogId)} appearance={overlaps.has(item.id) ? WARNING : undefined} />
+        <ItemObject key={item.id} item={item} entry={entryOrPlaceholder(item.catalogId)} appearance={overlaps.has(item.id) ? WARNING : undefined} lit={lit} lite={lite} />
       ))}
     </group>
   );
@@ -111,6 +111,25 @@ function Selection({ items, overlaps }: { items: Record<string, Item>; overlaps:
   return <Outline item={item} color={overlaps.has(item.id) ? WARN : ACCENT} handle />;
 }
 
+/** A soft accent over the wall face being edited. */
+function WallFaceHighlight({ level }: { level: Level }) {
+  const selection = usePlanStore((s) => s.selection);
+  const face = useViewer((s) => s.wallFace);
+  const mesh = selectLevelMesh(level);
+  const key = selection?.kind === 'wall' && face?.wallId === selection.id ? `wall:${face.wallId}:${face.side}` : null;
+  const geometry = useMemo(() => {
+    const group = key ? mesh.groups.find((g) => g.key === key) : undefined;
+    return group ? geometryFromMesh(group.geometry) : null;
+  }, [mesh, key]);
+  useEffect(() => () => geometry?.dispose(), [geometry]);
+  if (!geometry) return null;
+  return (
+    <mesh name="wall-face-highlight" geometry={geometry} renderOrder={18} layers={HELPER_LAYER} raycast={() => null}>
+      <meshBasicMaterial color={ACCENT} transparent opacity={0.18} depthWrite={false} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
+    </mesh>
+  );
+}
+
 function Ghost({ level }: { level: Level }) {
   const placing = useViewer((s) => s.placing);
   const ghost = useViewer((s) => s.ghost);
@@ -171,7 +190,7 @@ function Ground({ box }: { box: Box }) {
 }
 
 /** Field of view per mode. The top view uses a long lens so it reads almost like a plan. */
-const FOV: Record<ViewMode, number> = { orbit: 38, top: 15 };
+const FOV: Record<ViewMode, number> = { orbit: 38, top: 15, showcase: 26 };
 
 interface Viewport {
   width: number;
@@ -185,7 +204,8 @@ function insetsFor(size: Viewport, docked: boolean) {
 
 function poseFor(view: ViewMode, box: Box, size: Viewport): CameraPose {
   const free = freeView(size.width, size.height, FOV[view], insetsFor(size, useViewer.getState().dock !== null));
-  return view === 'top' ? fitTop(box, free.fov, free.aspect) : fitOrbit(box, free.fov, free.aspect);
+  if (view === 'top') return fitTop(box, free.fov, free.aspect);
+  return view === 'showcase' ? fitOrbit(box, free.fov, free.aspect, SHOWCASE_DIRECTION, 1.04) : fitOrbit(box, free.fov, free.aspect);
 }
 
 /** Orbit, pan and zoom with limits; animated moves between the dollhouse and the top view. */
@@ -288,13 +308,14 @@ function CameraRig({ box }: { box: Box }) {
 
   const reach = Math.hypot(box.max[0] - box.min[0], box.max[2] - box.min[2]);
   const top = view === 'top';
+  const showcase = view === 'showcase';
   return (
     <OrbitControls
       ref={controls}
       makeDefault
       enableRotate={!top}
       minPolarAngle={0}
-      maxPolarAngle={top ? 0.002 : 1.45}
+      maxPolarAngle={top ? 0.002 : showcase ? 0.75 : 1.45}
       minDistance={2}
       maxDistance={Math.max(30, reach * (top ? 12 : 4))}
       zoomSpeed={0.9}
@@ -323,6 +344,7 @@ function DebugHook() {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
+  const get = useThree((s) => s.get);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const hook = {
@@ -337,28 +359,71 @@ function DebugHook() {
         const r = gl.domElement.getBoundingClientRect();
         return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
       },
-      /** World bounds (metres) and mesh names of a placed item as it is drawn right now. */
-      describeItem(id: string): { min: number[]; max: number[]; meshes: string[] } | null {
+      /** World bounds (metres), mesh names and, per mesh, the material it is drawn with (the finish id), of a placed item as drawn now. */
+      describeItem(id: string): { min: number[]; max: number[]; meshes: string[]; materials: Record<string, string> } | null {
         const object = scene.getObjectByName(`item:${id}`);
         if (!object) return null;
         object.updateWorldMatrix(true, true);
         const box = new THREE.Box3().setFromObject(object);
         const meshes: string[] = [];
+        const materials: Record<string, string> = {};
         object.traverse((o) => {
-          if ((o as THREE.Mesh).isMesh) meshes.push(o.name);
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          meshes.push(o.name);
+          const m = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+          if (m) materials[o.name] = m.name;
         });
-        return { min: box.min.toArray(), max: box.max.toArray(), meshes };
+        return { min: box.min.toArray(), max: box.max.toArray(), meshes, materials };
+      },
+      /** The finish (material name) and colour each wall, floor and ceiling mesh is drawn with, by mesh group key. */
+      describeSurfaces(): Record<string, { finish: string; color: string }> {
+        const out: Record<string, { finish: string; color: string }> = {};
+        scene.getObjectByName('level')?.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          const m = mesh.material as THREE.MeshStandardMaterial | undefined;
+          if (mesh.isMesh && mesh.userData.group && m && !Array.isArray(m)) out[o.name] = { finish: m.name, color: `#${m.color.getHexString()}` };
+        });
+        return out;
+      },
+      /** Points the camera from `position` at `target` (world metres): for close-up screenshots. */
+      look(position: [number, number, number], target: [number, number, number]): void {
+        const controls = get().controls as { target: THREE.Vector3; update(): void } | null;
+        camera.position.set(...position);
+        controls?.target.set(...target);
+        controls?.update();
+        camera.lookAt(...target);
+        get().invalidate();
       },
       /** Cost of the last frame: draw calls and triangles (shadow and contact-shadow passes included). */
-      stats(): { calls: number; triangles: number } {
-        return { calls: gl.info.render.calls, triangles: gl.info.render.triangles };
+      /**
+       * Cost of the last frame, every pass included (shadow maps, occlusion, the main view):
+       * draw calls and triangles, and `ms`, the time to draw the frame again, measured
+       * synchronously (five frames, each read back so the GPU has finished).
+       */
+      stats(): { calls: number; triangles: number; ms: number } {
+        const calls = gl.info.render.calls;
+        const triangles = gl.info.render.triangles;
+        const ctx = gl.getContext();
+        const px = new Uint8Array(4);
+        const draw = () => {
+          gl.info.reset();
+          if (pipeline.render) pipeline.render();
+          else gl.render(scene, camera);
+          ctx.readPixels(0, 0, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, px);
+        };
+        draw();
+        const t0 = performance.now();
+        for (let i = 0; i < 5; i++) draw();
+        const ms = Math.round(((performance.now() - t0) / 5) * 10) / 10;
+        return { calls, triangles, ms };
       },
     };
     window.__interio = hook;
     return () => {
       if (window.__interio === hook) delete window.__interio;
     };
-  }, [camera, gl, scene]);
+  }, [camera, gl, scene, get]);
   return null;
 }
 
@@ -366,6 +431,7 @@ export function Scene({ level }: { level: Level }) {
   usePointerTool();
   const view = useViewer((s) => s.view);
   const cutaway = useViewer((s) => s.cutaway);
+  const tier = useRenderTier();
   const lighting = useLightingPreset();
   const items = useLiveItems(level);
   const overlaps = useOverlaps(level, items);
@@ -373,15 +439,30 @@ export function Scene({ level }: { level: Level }) {
   const [x0, , z0] = bounds.min;
   const [x1, y1, z1] = bounds.max;
   const box = useMemo<Box>(() => ({ min: [x0, 0, z0], max: [x1, y1, z1] }), [x0, z0, x1, y1, z1]);
+  // `?env=sky` and `?soft=<texels>` override the environment and the shadow edge, for comparing looks.
+  const overrides = useMemo(() => {
+    const q = new URLSearchParams(window.location.search);
+    const soft = Number(q.get('soft'));
+    return { sky: q.get('env') === 'sky', soft: q.has('soft') && Number.isFinite(soft) && soft >= 0 ? soft : null };
+  }, []);
   return (
     <>
       <color attach="background" args={[lightingRig(lighting, 'dollhouse').background]} />
-      <SceneLighting level={level} mode="dollhouse" preset={lighting} resolveEntry={resolveEntry} />
+      <SceneLighting
+        level={level}
+        mode="dollhouse"
+        preset={lighting}
+        resolveEntry={resolveEntry}
+        envUrl={tier === 'low' || overrides.sky ? undefined : ROOM_ENVIRONMENT}
+        shadowMapSize={tier === 'low' ? 1024 : view === 'showcase' ? 4096 : 2048}
+        shadowSoftness={overrides.soft ?? (tier === 'low' ? 2 : view === 'showcase' ? 5 : 3.5)}
+      />
       <LevelMeshes level={level} cutaway={cutaway && view === 'orbit'} />
       <Ground box={box} />
-      <Items items={items} overlaps={overlaps} />
+      <Items items={items} overlaps={overlaps} lit={lighting !== 'daylight'} lite={tier === 'low'} />
       <Ghost level={level} />
       <Selection items={items} overlaps={overlaps} />
+      <WallFaceHighlight level={level} />
       <CameraRig box={box} />
       <Effects box={box} />
       <CaptureBridge />
@@ -398,8 +479,10 @@ declare global {
       ui: typeof useViewer;
       registerEntry: typeof registerEntry;
       project(x: number, y: number, z?: number): { x: number; y: number };
-      describeItem(id: string): { min: number[]; max: number[]; meshes: string[] } | null;
-      stats(): { calls: number; triangles: number };
+      describeItem(id: string): { min: number[]; max: number[]; meshes: string[]; materials: Record<string, string> } | null;
+      describeSurfaces(): Record<string, { finish: string; color: string }>;
+      look(position: [number, number, number], target: [number, number, number]): void;
+      stats(): { calls: number; triangles: number; ms: number };
     };
   }
 }

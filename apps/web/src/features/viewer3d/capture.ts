@@ -8,6 +8,11 @@ import * as THREE from 'three';
 /** Longest side of an exported picture, in pixels. */
 export const MAX_CAPTURE_SIZE = 4096;
 
+/** Pixels per CSS pixel of an exported picture: twice the view, three times in the Showcase view (within `MAX_CAPTURE_SIZE`). */
+export function exportScale(view: 'orbit' | 'top' | 'showcase'): number {
+  return view === 'showcase' ? 3 : 2;
+}
+
 /**
  * Pixel ratio for an export of a `width` x `height` (CSS px) canvas: `scale`, or less
  * when the picture would be longer than `limit` pixels on a side.
@@ -78,6 +83,12 @@ export interface CaptureOptions {
 }
 
 /**
+ * Set while a post-processing pipeline draws the view (the occlusion composer): pictures
+ * go through it too, resized to the picture's pixel ratio.
+ */
+export const pipeline: { render: (() => void) | null; setPixelRatio: ((ratio: number) => void) | null } = { render: null, setPixelRatio: null };
+
+/**
  * Renders `scene` once at `scale` times the canvas size and returns the PNG as a data
  * URL. The renderer, camera and scene are put back exactly as they were, and the view
  * is drawn again at its own size before the browser paints.
@@ -90,20 +101,24 @@ export function capturePng(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: 
   const view = lens.view?.enabled ? { ...lens.view } : null;
   const layers = (opts.hideLayers ?? []).filter((l) => camera.layers.isEnabled(l));
   const hidden = (opts.hideObjects ?? []).flatMap((name) => scene.getObjectByName(name) ?? []).filter((o) => o.visible);
+  const draw = () => (pipeline.render ? pipeline.render() : gl.render(scene, camera));
   try {
-    gl.setPixelRatio(captureRatio(size.x, size.y, opts.scale ?? 2, limit));
+    const r = captureRatio(size.x, size.y, opts.scale ?? 2, limit);
+    gl.setPixelRatio(r);
+    pipeline.setPixelRatio?.(r);
     // The live view is shifted to clear the side panels; the picture has none, so centre it.
     if (view) lens.clearViewOffset();
     for (const l of layers) camera.layers.disable(l);
     for (const o of hidden) o.visible = false;
-    gl.render(scene, camera);
+    draw();
     return opts.read ? opts.read(gl.domElement) : gl.domElement.toDataURL('image/png');
   } finally {
     for (const o of hidden) o.visible = true;
     for (const l of layers) camera.layers.enable(l);
     if (view) lens.setViewOffset(view.fullWidth, view.fullHeight, view.offsetX, view.offsetY, view.width, view.height);
     gl.setPixelRatio(ratio);
-    gl.render(scene, camera);
+    pipeline.setPixelRatio?.(ratio);
+    draw();
   }
 }
 

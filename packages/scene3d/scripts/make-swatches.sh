@@ -11,6 +11,8 @@ trap 'rm -rf "$TMP"' EXIT
 
 for dir in "$DEST"/*/; do
   set_name="$(basename "$dir")"
+  # Cloth, leather and brushed metal have no colour map: the palette shades their normal map instead.
+  [ -f "$dir/color.jpg" ] || continue
   cp "$dir/color.jpg" "$TMP/$set_name.jpg"
   sips -c 384 384 "$TMP/$set_name.jpg" >/dev/null
   sips -s format jpeg -s formatOptions 78 -Z 96 "$TMP/$set_name.jpg" --out "$dir/swatch.jpg" >/dev/null

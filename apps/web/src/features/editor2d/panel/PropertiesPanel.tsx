@@ -4,6 +4,7 @@ import {
   DEFAULT_WALL_MATERIAL,
   MATERIAL_LIST,
   MATERIALS,
+  resolveSurfaceFinish,
   OPENING_KINDS,
   ROOM_TYPES,
   ops,
@@ -21,7 +22,7 @@ import {
   type WallKind,
 } from '@interio/core';
 import { FlipHorizontal2, FlipVertical2, Trash2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { dims, squareFeet, squareMetres } from '../../../lib/format';
 import { Button, Field, IconButton, Panel, PanelHeader, Segmented, Select } from '../../../ui';
 import { useController } from '../context';
@@ -157,10 +158,39 @@ function OpeningPanel({ level, opening }: { level: Level; opening: Opening }) {
   );
 }
 
-function Swatch({ id }: { id: string | undefined }) {
-  const colour = id ? MATERIALS[id]?.color : undefined;
-  return <span className="h-8 w-8 shrink-0 rounded-md border border-line" style={{ background: colour ?? 'transparent' }} aria-hidden="true" />;
+/** The finish's colour; clicking it picks a custom colour (committed when the picker closes). */
+function Swatch({ id, surface, onPick }: { id: string | undefined; surface: 'floor' | 'wall'; onPick: (hex: string) => void }) {
+  const colour = resolveSurfaceFinish(id, surface)?.color;
+  const input = useRef<HTMLInputElement>(null);
+  const pick = useRef(onPick);
+  pick.current = onPick;
+  useEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    const onChange = () => pick.current(el.value.toLowerCase());
+    el.addEventListener('change', onChange);
+    return () => el.removeEventListener('change', onChange);
+  }, []);
+  return (
+    <span
+      className="relative h-8 w-8 shrink-0 cursor-pointer rounded-md border border-line"
+      style={{ background: colour ?? 'transparent' }}
+      title={`Custom ${surface} colour`}
+    >
+      <input
+        ref={input}
+        type="color"
+        aria-label={`Custom ${surface} colour`}
+        data-testid={`plan-custom-${surface}`}
+        defaultValue={colour ?? '#cccccc'}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+    </span>
+  );
 }
+
+const customOption = (value: string | undefined) =>
+  value && !MATERIALS[value] ? <option value={value}>{/^#[0-9a-fA-F]{6}$/.test(value) ? `Custom ${value.toLowerCase()}` : value}</option> : null;
 
 const FLOORS = MATERIAL_LIST.filter((m) => m.surface === 'floor');
 const WALLS = MATERIAL_LIST.filter((m) => m.surface === 'wall');
@@ -186,28 +216,29 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
           </Select>
         </Field>
         <Field label="Floor finish">
-          <span className="flex gap-2">
-            <Swatch id={room.floorMaterial} />
+          <span className="flex flex-row-reverse gap-2">
             <Select value={room.floorMaterial} onChange={(e) => set({ floorMaterial: e.currentTarget.value })}>
-              {!MATERIALS[room.floorMaterial] && <option value={room.floorMaterial}>{room.floorMaterial}</option>}
+              {customOption(room.floorMaterial)}
               {FLOORS.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
                 </option>
               ))}
             </Select>
+            <Swatch id={room.floorMaterial} surface="floor" onPick={(floorMaterial) => floorMaterial !== room.floorMaterial && set({ floorMaterial })} />
           </span>
         </Field>
         <Field label="Wall finish">
-          <span className="flex gap-2">
-            <Swatch id={room.wallMaterial ?? DEFAULT_WALL_MATERIAL} />
+          <span className="flex flex-row-reverse gap-2">
             <Select value={room.wallMaterial ?? DEFAULT_WALL_MATERIAL} onChange={(e) => set({ wallMaterial: e.currentTarget.value })}>
+              {customOption(room.wallMaterial)}
               {WALLS.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
                 </option>
               ))}
             </Select>
+            <Swatch id={room.wallMaterial ?? DEFAULT_WALL_MATERIAL} surface="wall" onPick={(wallMaterial) => wallMaterial !== room.wallMaterial && set({ wallMaterial })} />
           </span>
         </Field>
       </Section>

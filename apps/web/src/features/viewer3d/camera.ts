@@ -15,6 +15,9 @@ export interface CameraPose {
 /** Direction from the target to the camera in the default dollhouse view: from the south-east, about 45 degrees up. */
 export const DOLLHOUSE_DIRECTION: Vec3 = [0.34, 0.72, 0.6];
 
+/** The Showcase view: steep, from the south-east, about 75 degrees above the horizon, like an architect's presentation render. */
+export const SHOWCASE_DIRECTION: Vec3 = [0.13, 0.97, 0.21];
+
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /** Half-angles of the view frustum: vertical from the field of view, horizontal from the aspect ratio. */

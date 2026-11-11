@@ -3,6 +3,7 @@
  * down, place entries from the catalog, then move, turn, duplicate and remove them.
  */
 import { planStore, useLevel, usePlanStore, type Level } from '@interio/core';
+import { installFurnitureTextures } from '@interio/scene3d';
 import { Canvas } from '@react-three/fiber';
 import { PencilRuler } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
@@ -16,7 +17,7 @@ import { markFirstLayoutDone, saveFirstLayout } from './firstLayout';
 import { nudgeDirection } from './placement';
 import { Scene, useLiveItems, useOverlaps } from './Scene';
 import { SidePanel } from './SidePanel';
-import { DOCK_WIDTH, cameraState, entryOrPlaceholder, useViewer } from './state';
+import { DOCK_WIDTH, cameraState, entryOrPlaceholder, useRenderTier, useViewer } from './state';
 import { Toolbar } from './Toolbar';
 
 function isTyping(target: EventTarget | null): boolean {
@@ -69,6 +70,15 @@ function Hint({ level }: { level: Level }) {
         Drag to move · <Kbd>R</Kbd> turn · arrows nudge · <Kbd>⌘D</Kbd> duplicate · <Kbd>Del</Kbd> remove
       </>
     );
+  } else if (selection?.kind === 'room') {
+    body = (
+      <>
+        Finishes tab styles the room · click a wall, then <span className="font-medium text-ink">Finish this wall only</span> · <Kbd>Alt</Kbd>-click a wall
+        goes straight there
+      </>
+    );
+  } else if (selection?.kind === 'wall') {
+    body = <>Pick a finish or a colour for this wall · <Kbd>Esc</Kbd> done</>;
   } else {
     body = <>Pick something from the catalog, or click a room · drag to orbit · scroll to zoom</>;
   }
@@ -148,8 +158,11 @@ function Overlay({ level }: { level: Level }) {
 }
 
 export default function Viewer3D() {
+  // Real textures for furniture materials; registered once, before the first model is built.
+  installFurnitureTextures();
   const level = useLevel();
-  const quality = useViewer((s) => s.quality);
+  const tier = useRenderTier();
+  const view = useViewer((s) => s.view);
   useKeyboard();
   // Leaving the view drops any half-finished placement.
   useEffect(() => () => useViewer.setState({ placing: null, ghost: null, drag: null }), []);
@@ -170,8 +183,9 @@ export default function Viewer3D() {
       <Canvas
         shadows="percentage"
         frameloop="demand"
-        dpr={quality === 'high' ? [1, 2] : 1}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        dpr={tier === 'high' || (view === 'showcase' && tier !== 'low') ? [1, 2] : 1}
+        // No multisampling on software rasterisers (the costliest part of their frame); the occlusion composer has its own.
+        gl={{ antialias: tier !== 'low', powerPreference: 'high-performance' }}
         camera={{ fov: 38, near: 0.1, far: 600, position: [12, 14, 12] }}
       >
         <Scene level={level} />

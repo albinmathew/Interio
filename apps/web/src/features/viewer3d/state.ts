@@ -4,11 +4,12 @@
  */
 import { getEntry } from '@interio/catalog';
 import { usePlanStore, type CatalogCategory, type CatalogEntry, type Id } from '@interio/core';
-import { lightingFromSettings, type LightingPreset } from '@interio/scene3d';
+import { detectSoftwareRenderer, lightingFromSettings, type LightingPreset } from '@interio/scene3d';
 import { create } from 'zustand';
 import { normalizeDeg, type Placement } from './placement';
 
-export type ViewMode = 'orbit' | 'top';
+/** `showcase`: a steep three-quarter view from above, drawn at the best quality, for pictures. */
+export type ViewMode = 'orbit' | 'top' | 'showcase';
 
 /** Panels that dock on the right: the design assistant and the saved variants. One at a time. */
 export type Dock = 'assistant' | 'variants';
@@ -25,6 +26,14 @@ export interface Placing {
   rotationDeg: number;
   /** Started by dragging a card out of the catalog: releasing over the floor places it. */
   fromDrag: boolean;
+}
+
+/** One face of a wall: the last one clicked in the view. */
+export interface WallFace {
+  wallId: Id;
+  side: 'left' | 'right';
+  /** The room the face looks into; null for an outside face. */
+  roomId: Id | null;
 }
 
 export interface LiveDrag {
@@ -56,6 +65,8 @@ export interface ViewerState {
   roomTab: RoomTab;
   /** The docked panel that is open, if any. */
   dock: Dock | null;
+  /** The wall face clicked last: the room panel offers to finish just that face, and a wall selection edits it. */
+  wallFace: WallFace | null;
 
   setView(view: ViewMode): void;
   toggleCutaway(): void;
@@ -72,6 +83,7 @@ export interface ViewerState {
   setQuality(quality: 'high' | 'low'): void;
   setRoomTab(roomTab: RoomTab): void;
   setDock(dock: Dock | null): void;
+  setWallFace(face: WallFace | null): void;
   /** Opens the panel, or closes it when it is the one showing. */
   toggleDock(dock: Dock): void;
 }
@@ -90,6 +102,7 @@ export const useViewer = create<ViewerState>((set) => ({
   quality: 'high',
   roomTab: 'furnish',
   dock: null,
+  wallFace: null,
 
   setView: (view) => set({ view }),
   toggleCutaway: () => set((s) => ({ cutaway: !s.cutaway })),
@@ -107,8 +120,24 @@ export const useViewer = create<ViewerState>((set) => ({
   setQuality: (quality) => set({ quality }),
   setRoomTab: (roomTab) => set({ roomTab }),
   setDock: (dock) => set({ dock }),
+  setWallFace: (wallFace) => set({ wallFace }),
   toggleDock: (dock) => set((s) => ({ dock: s.dock === dock ? null : dock })),
 }));
+
+/**
+ * Rendering tier of the Design view: `low` on software renderers (always), `medium` once a
+ * GPU could not hold the frame rate, `high` otherwise. See `Effects.tsx`.
+ */
+export type RenderTier = 'high' | 'medium' | 'low';
+
+export function renderTier(software: boolean, quality: ViewerState['quality']): RenderTier {
+  return software ? 'low' : quality === 'high' ? 'high' : 'medium';
+}
+
+export function useRenderTier(): RenderTier {
+  const quality = useViewer((s) => s.quality);
+  return renderTier(detectSoftwareRenderer(), quality);
+}
 
 /** The lighting preset saved with the open project (`project.settings`), daylight by default. */
 export function useLightingPreset(): LightingPreset {

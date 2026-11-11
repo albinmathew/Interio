@@ -1,8 +1,8 @@
 export { geometryFromMesh } from './geometry';
 export { LevelMeshes, type LevelMeshesProps } from './LevelMeshes';
-export { ItemObject, ItemsLayer, type ItemAppearance, type ItemObjectProps, type ItemsLayerProps } from './ItemsLayer';
+export { BULB_MATERIAL, ItemObject, ItemsLayer, type ItemAppearance, type ItemObjectProps, type ItemsLayerProps } from './ItemsLayer';
 export { PlanScene, type PlanSceneProps } from './PlanScene';
-export { SceneLighting, DEFAULT_ENVIRONMENT_URL, type SceneLightingProps } from './SceneLighting';
+export { SceneLighting, DEFAULT_ENVIRONMENT_URL, ROOM_ENVIRONMENT, type SceneLightingProps } from './SceneLighting';
 export {
   DEFAULT_LIGHTING_PRESET,
   LIGHTING_LABELS,
@@ -24,8 +24,12 @@ export {
 export { ContactShade, OpeningsLayer, RailingsLayer, SkirtingLayer, type OpeningsLayerProps } from './Joinery';
 export { contactShading, type ContactShading, type ShadeQuad } from './shading';
 export { applyFit, fitModel, rotateBoundsY, type Bounds, type ModelFit } from './fit';
-export { createSurfaceMaterial, setTextureBaseUrl, type SurfaceFallback } from './materials';
-export { SURFACE_TEXTURES, textureSpecFor, tintToward, type TextureSpec } from './materialSpecs';
+export { createSurfaceMaterial, setTextureBaseUrl, type SurfaceFallback, type SurfaceMaterialOptions } from './materials';
+export { CUSTOM_FLOOR_TEXTURE, SURFACE_TEXTURES, isFlatFinish, textureSpecFor, tintToward, type PatternSpec, type TextureSpec } from './materialSpecs';
+export { CUSTOM_TEXTURES, FURNITURE_SETS, FURNITURE_TEXTURES, furnitureSets, furnitureTextureSpec, type FurnitureTextureSpec } from './furnitureSpecs';
+export { furnitureSwatch, furnitureTexturesInstalled, installFurnitureTextures, type FurnitureTextureOptions } from './furnitureTextures';
+export { WALL_CUT_COLOR } from './LevelMeshes';
+export { DEFAULT_FLOOR, surfaceFinish, type SurfaceFinish } from './surfaces';
 export { DOOR_OPEN_DEG, doorLeafAngle, openingParts, railingParts, skirtingBoxes, type BoxSpec, type OpeningParts } from './parts';
 export { isFaded, wallHidesRoom, type FadeWall } from './wallFade';
 export { detectSoftwareRenderer, isSoftwareRenderer, type RenderQuality } from './quality';

@@ -95,7 +95,7 @@ Plan mode is a 2D editor. Walls meet at shared corners, and a closed loop of wal
 
 ## Furnish in 3D
 
-Design mode shows the home as a dollhouse. Drag to orbit, scroll to zoom, and use the toolbar at the top to switch between **3D** and **Top**, fit the home in view, or hide the walls that block the view.
+Design mode shows the home as a dollhouse. Drag to orbit, scroll to zoom, and use the toolbar at the top to switch between **3D**, **Top** and **Showcase**, fit the home in view, or hide the walls that block the view.
 
 - **Place furniture.** Pick an entry in the catalog on the left and click the floor, or drag the entry into a room. Furniture snaps to walls and turns to face the room; hold `Alt` to place it freely. Wall-mounted entries attach to the nearest wall at their mounting height.
 - **Find things.** Search the catalog by name, or narrow it by category. Selecting a room narrows the catalog to what suits that room.
@@ -123,11 +123,20 @@ Every room has a floor finish, a wall finish and a ceiling colour. The 3D view a
 - **Apply to all rooms** and **Apply to all rooms of this type** copy the choice across the home. **Reset to default** restores the finish that suits the room type.
 - In Plan mode, click inside a room and choose **Floor finish** and **Wall finish** in the panel on the right.
 - Changing a room's type in Plan mode suggests a floor finish that suits it, such as tiles for a bathroom.
+- The swatches are grouped (wood, stone and tile, paint, panelling and paper). The last swatch of each surface, with the pipette, picks any colour.
+
+## Customise furniture and walls
+
+- **Furniture.** Select an item and scroll to **Finishes** in its panel. Each part you can change (frame, upholstery, top, bedding) has a row of swatches of the materials that suit it; **More** opens every other material, the pipette picks any colour, and **Default** puts the part back. Every pick is one undo step.
+- **Apply to all.** **Apply to all ... in this home** gives every item of the same kind these finishes, in one undo step.
+- **One wall.** Click a wall, open the room's **Finishes** tab and press **Finish this wall only**, or `Alt`-click the wall to go straight there. Pick a finish or a colour for that face of the wall; **Use the room's finish** hands it back to the room. Outside faces of the home work the same way.
+- Older catalog models that have no parts to change show no Finishes section.
 
 ## Lighting and pictures
 
 - **Lighting.** The Design toolbar switches between **Daylight**, **Warm evening** and **Night**. The choice is saved with the project and Walk mode follows it. Lamps and ceiling lights you place light their rooms in the evening and at night.
 - **Picture.** The camera button in the Design toolbar saves a high-resolution picture of the current view without the panels.
+- **Showcase.** The **Showcase** view in the Design toolbar looks down on the home at a steep angle at the best quality the device allows; its picture is saved three times the size of the view.
 
 ## Ask the assistant
 

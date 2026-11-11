@@ -3,6 +3,7 @@
  */
 import { autoFurnish } from '@interio/catalog';
 import { planStore, selectLevel, selectRooms, type Id, type Item, type Level } from '@interio/core';
+import { facePatch, faceFinish, finishesAfterPick, sameEntryTargets, type WallSide } from './customise';
 import { applyFinishes, currentFinish, finishPatch, resetPatch, type ApplyScope, type Surface } from './finishes';
 import { findOverlaps, itemAxes, normalizeDeg, placeEntry, rotateStep, roomIdAt, type Placement, type Pose } from './placement';
 import { entryOrPlaceholder, resolveEntry, useViewer } from './state';
@@ -153,8 +154,9 @@ export function clearRoom(roomId: Id): number {
 }
 
 /** Gives one surface of a room a finish. One undo step; picking the current finish again does nothing. */
-export function setFinish(roomId: Id, surface: Surface, finishId: string): void {
+export function setFinish(roomId: Id, surface: Surface, value: string): void {
   const room = selectLevel(planStore.getState())?.rooms[roomId];
+  const finishId = /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : value;
   if (!room || currentFinish(room, surface) === finishId) return;
   planStore.getState().setRoomProps(roomId, finishPatch(surface, finishId));
 }
@@ -176,4 +178,38 @@ export function applyFinishesFrom(roomId: Id, scope: ApplyScope): number {
 export function resetFinishes(roomId: Id): void {
   const room = selectLevel(planStore.getState())?.rooms[roomId];
   if (room) planStore.getState().setRoomProps(roomId, resetPatch(room));
+}
+
+/* ------------------------------------------------------------- customising */
+
+/** Gives one slot of an item a finish (a material id or `#rrggbb`), or with null puts it back on the default. One undo step. */
+export function setItemFinish(itemId: Id, slotId: string, value: string | null): void {
+  const item = selectLevel(planStore.getState())?.items[itemId];
+  if (!item) return;
+  const finishes = finishesAfterPick(item, slotId, value);
+  if (finishes === null) return;
+  planStore.getState().updateItem(itemId, { finishes });
+}
+
+/** Copies an item's finishes to every other item of the same catalog entry, as one undo step. Returns how many changed. */
+export function applyItemFinishesToAll(itemId: Id): number {
+  const level = selectLevel(planStore.getState());
+  const item = level?.items[itemId];
+  if (!level || !item) return 0;
+  const targets = sameEntryTargets(level, itemId);
+  if (targets.length === 0) return 0;
+  const store = planStore.getState();
+  store.transact(() => {
+    for (const id of targets) store.updateItem(id, { finishes: item.finishes ? { ...item.finishes } : undefined });
+  });
+  return targets.length;
+}
+
+/** Gives one face of a wall its own finish, or with null hands it back to its room's wall finish. One undo step. */
+export function setWallFaceFinish(wallId: Id, side: WallSide, value: string | null): void {
+  const wall = selectLevel(planStore.getState())?.walls[wallId];
+  if (!wall) return;
+  const patch = facePatch(side, value);
+  if (faceFinish(wall, side) === Object.values(patch)[0]) return;
+  planStore.getState().setWallProps(wallId, patch);
 }
