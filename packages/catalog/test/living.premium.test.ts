@@ -5,7 +5,7 @@ import { OFFICE_ENTRIES } from '../src/entries/office';
 import { OUTDOOR_ENTRIES } from '../src/entries/outdoor';
 import { SEATING_ENTRIES } from '../src/entries/seating';
 import { TABLES_ENTRIES } from '../src/entries/tables';
-import { GENERATORS } from '../src/generators';
+import { PREMIUM_GENERATORS } from '../src/premium';
 import { buildParametric, getEntry } from '../src/index';
 import { OFFICE_GENERATORS } from '../src/premium/office';
 import { OUTDOOR_GENERATORS } from '../src/premium/outdoor';
@@ -56,7 +56,8 @@ describe('premium living, dining, office and outdoor families', () => {
 
   it('does not shadow a first-generation generator', () => {
     const names = [SEATING_GENERATORS, TABLES_GENERATORS, OFFICE_GENERATORS, OUTDOOR_GENERATORS].flatMap((g) => Object.keys(g));
-    for (const name of names) expect(Object.keys(GENERATORS), name).not.toContain(name);
+    // Every name is registered once (premium/index.ts refuses duplicates across families).
+    for (const name of names) expect(Object.keys(PREMIUM_GENERATORS), name).toContain(name);
     expect(new Set(names).size).toBe(names.length);
   });
 

@@ -10,11 +10,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "models": "tsx scripts/normalise-models.ts",
     "thumbnails": "tsx scripts/thumbnails.ts",
-    "render-rooms": "tsx scripts/render-rooms.ts",
-    "preview-kit": "tsx scripts/preview-kit.ts",
-    "licence-doc": "tsx scripts/licence-doc.ts"
+    "render-rooms": "tsx scripts/render-rooms.ts"
   },
   "dependencies": {
     "@interio/core": "workspace:*",

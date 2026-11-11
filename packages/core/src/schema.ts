@@ -242,7 +242,7 @@ export interface CatalogEntry {
   /** Parts of the model whose material the user can change. Parametric entries only. */
   slots?: FinishSlot[];
   thumbnail?: string;
-  /** SPDX id plus source, e.g. "CC0-1.0 (Kenney Furniture Kit)". */
+  /** SPDX id plus source, e.g. "CC0-1.0 (Interio parametric)". */
   licence: string;
   tags?: string[];
 }

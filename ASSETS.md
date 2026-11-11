@@ -5,7 +5,7 @@ Only CC0-1.0 assets (or assets authored for this project) are accepted.
 
 | Area | Record |
 |---|---|
-| Furniture and appliance models, thumbnails | [docs/assets/catalog.md](docs/assets/catalog.md) |
+| Furniture and appliance models (built in code), thumbnails | [docs/assets/catalog.md](docs/assets/catalog.md) |
 | Textures and environment lighting | [docs/assets/scene3d.md](docs/assets/scene3d.md) |
 
-Parametric models (hobs, ovens, wall TVs, split AC, geysers and others) are generated in `packages/catalog` and are part of this project (Apache-2.0).
+Every furniture and appliance model is generated in `packages/catalog/src/premium` and is part of this project. No third-party model files are shipped.

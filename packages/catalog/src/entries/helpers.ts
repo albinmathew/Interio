@@ -1,9 +1,8 @@
 /**
  * The catalog. Ids are stable: saved projects reference them.
  *
- * Two kinds of entry:
- * - `glb`: a model from `models.ts`, cut from a CC0 kit and baked to `dims`.
- * - `gen`: a parametric model built by a generator from `generators/`.
+ * Every entry is `gen`: a premium parametric model built by a generator from
+ * `premium/`, with finish slots the user can change per item.
  *
  * `mountHeight` is the default elevation of the underside: wall and ceiling
  * pieces, and things that normally sit on a worktop, desk or bedside table.
@@ -11,42 +10,18 @@
  * `level.ceilingHeight - dims.h` when it knows the level.
  */
 import type { CatalogCategory, CatalogEntry, RoomType } from '@interio/core';
-import type { GeneratorName } from '../generators';
-import { MODELS, PACKS, modelUrl, type ModelId } from '../models';
 
 export type Extra = Partial<Pick<CatalogEntry, 'anchor' | 'mountHeight' | 'slots'>>;
 
 export const INTERIO_LICENCE = 'CC0-1.0 (Interio parametric)';
 export const thumb = (id: string) => `/catalog/thumbs/${id}.webp`;
 
-export const glb = (
-  id: string,
-  name: string,
-  category: CatalogCategory,
-  roomTypes: RoomType[],
-  model: ModelId,
-  tags: string[],
-  extra: Extra = {},
-): CatalogEntry => ({
-  id,
-  name,
-  category,
-  roomTypes,
-  dims: { ...MODELS[model].dims },
-  anchor: 'floor',
-  model: { kind: 'glb', url: modelUrl(model) },
-  thumbnail: thumb(id),
-  licence: `${PACKS[MODELS[model].pack].licence} (${PACKS[MODELS[model].pack].name})`,
-  tags,
-  ...extra,
-});
-
 export const gen = (
   id: string,
   name: string,
   category: CatalogCategory,
   roomTypes: RoomType[],
-  generator: GeneratorName,
+  generator: string,
   [w, d, h]: [number, number, number],
   tags: string[],
   extra: Extra & { params?: Record<string, unknown> } = {},
