@@ -54,7 +54,7 @@ export function books(p: Parts, x: number, y: number, z: number, n: number, w = 
 
 /** Places a slab of `shape` so its top is at y. */
 /** A flat slab `w` x `d` with corner radius `r` and a bevelled edge, its top at y = `top`. The bevel stays inside the outline. */
-const slabTop = (w: number, d: number, r: number, t: number, top: number, bevel: number) => slab(roundedRect(w - 2 * bevel, d - 2 * bevel, Math.max(0.001, r - bevel)), t, 0, top - t, 0, bevel);
+export const slabTop = (w: number, d: number, r: number, t: number, top: number, bevel: number) => slab(roundedRect(w - 2 * bevel, d - 2 * bevel, Math.max(0.001, r - bevel)), t, 0, top - t, 0, bevel);
 
 /* ------------------------------------------------------------- coffee table */
 
