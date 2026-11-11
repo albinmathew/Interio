@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampTarget, fitOrbit, fitTop, freeView, halfAngles, type Box, type CameraPose, type Vec3 } from './camera';
+import { clampTarget, fitOrbit, fitTop, freeView, halfAngles, showcaseDirection, type Box, type CameraPose, type Vec3 } from './camera';
 
 const box: Box = { min: [0, 0, -9], max: [12, 3, 1.5] };
 
@@ -96,5 +96,22 @@ describe('camera framing', () => {
     expect(clampTarget([6, 0, -4], box)).toEqual([6, 0, -4]);
     expect(clampTarget([40, 9, 30], box)).toEqual([14, 3, 3.5]);
     expect(clampTarget([-40, -2, -30], box)).toEqual([-2, 0, -11]);
+  });
+});
+
+describe('showcaseDirection', () => {
+  const long = (alongX: number, alongZ: number): Box => ({ min: [0, 0, 0], max: [alongX, 3, alongZ] });
+  it('tilts along one plan axis only, steeply, so the home stays square to the frame', () => {
+    for (const d of [showcaseDirection(long(12, 6), 1.6), showcaseDirection(long(6, 14), 1.6), showcaseDirection(long(6, 14), 0.7)]) {
+      expect(d[0] === 0 || d[2] === 0).toBe(true);
+      expect(d[1]).toBeGreaterThan(3 * Math.max(Math.abs(d[0]), Math.abs(d[2])));
+    }
+  });
+
+  it('runs the long side of the plan along the long side of the frame', () => {
+    // Tilting along x puts world z across the frame.
+    expect(showcaseDirection(long(6, 14), 1.6)[2]).toBe(0);
+    expect(showcaseDirection(long(14, 6), 1.6)[0]).toBe(0);
+    expect(showcaseDirection(long(6, 14), 0.7)[0]).toBe(0);
   });
 });

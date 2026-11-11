@@ -18,6 +18,19 @@ export const DOLLHOUSE_DIRECTION: Vec3 = [0.34, 0.72, 0.6];
 /** The Showcase view: steep, from the south-east, about 75 degrees above the horizon, like an architect's presentation render. */
 export const SHOWCASE_DIRECTION: Vec3 = [0.13, 0.97, 0.21];
 
+/**
+ * Showcase direction for a plan: steep, and tilted along one plan axis only, so the
+ * home stays square to the frame instead of lying on a diagonal. The tilt is chosen
+ * so the plan's longer side runs along the frame's longer side.
+ */
+export function showcaseDirection(box: Box, aspect: number): Vec3 {
+  const alongX = box.max[0] - box.min[0];
+  const alongZ = box.max[2] - box.min[2];
+  // Tilting along x puts world z across the frame; tilting along z puts world x across it.
+  const zAcross = (alongZ >= alongX) === aspect >= 1;
+  return zAcross ? [0.24, 0.97, 0] : [0, 0.97, 0.24];
+}
+
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /** Half-angles of the view frustum: vertical from the field of view, horizontal from the aspect ratio. */

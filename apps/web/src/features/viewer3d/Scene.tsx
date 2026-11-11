@@ -10,7 +10,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef } from '
 import * as THREE from 'three';
 import { captureBridge, capturePng, captureThumbnail, pipeline } from './capture';
 import { Effects, HELPER_LAYER } from './Effects';
-import { SHOWCASE_DIRECTION, clampTarget, fitOrbit, fitTop, freeView, type Box, type CameraPose } from './camera';
+import { clampTarget, fitOrbit, fitTop, freeView, showcaseDirection, type Box, type CameraPose } from './camera';
 import { findOverlaps, itemSize, type Overlap } from './placement';
 import { DOCK_WIDTH, cameraState, entryOrPlaceholder, registerEntry, resolveEntry, useLightingPreset, useRenderTier, useViewer, type ViewMode } from './state';
 import { HANDLE_RADIUS, handlePosition, usePointerTool } from './tool';
@@ -38,10 +38,12 @@ const GHOST_NAME = 'placement-ghost';
 
 const WARNING: ItemAppearance = { emissive: WARN, emissiveIntensity: 0.55 };
 
-function Items({ items, overlaps, lit, lite }: { items: Record<string, Item>; overlaps: Map<string, Overlap>; lit: boolean; lite: boolean }) {
+function Items({ items, overlaps, lit, lite, overhead }: { items: Record<string, Item>; overlaps: Map<string, Overlap>; lit: boolean; lite: boolean; overhead: boolean }) {
+  // Seen from above (Top and Showcase), ceiling pieces would only cover the rooms: leave them out, as plan renders do.
+  const shown = overhead ? Object.values(items).filter((i) => entryOrPlaceholder(i.catalogId).anchor !== 'ceiling') : Object.values(items);
   return (
     <group name="items">
-      {Object.values(items).map((item) => (
+      {shown.map((item) => (
         <ItemObject key={item.id} item={item} entry={entryOrPlaceholder(item.catalogId)} appearance={overlaps.has(item.id) ? WARNING : undefined} lit={lit} lite={lite} />
       ))}
     </group>
@@ -205,7 +207,7 @@ function insetsFor(size: Viewport, docked: boolean) {
 function poseFor(view: ViewMode, box: Box, size: Viewport): CameraPose {
   const free = freeView(size.width, size.height, FOV[view], insetsFor(size, useViewer.getState().dock !== null));
   if (view === 'top') return fitTop(box, free.fov, free.aspect);
-  return view === 'showcase' ? fitOrbit(box, free.fov, free.aspect, SHOWCASE_DIRECTION, 1.04) : fitOrbit(box, free.fov, free.aspect);
+  return view === 'showcase' ? fitOrbit(box, free.fov, free.aspect, showcaseDirection(box, free.aspect), 1.02) : fitOrbit(box, free.fov, free.aspect);
 }
 
 /** Orbit, pan and zoom with limits; animated moves between the dollhouse and the top view. */
@@ -459,7 +461,7 @@ export function Scene({ level }: { level: Level }) {
       />
       <LevelMeshes level={level} cutaway={cutaway && view === 'orbit'} />
       <Ground box={box} />
-      <Items items={items} overlaps={overlaps} lit={lighting !== 'daylight'} lite={tier === 'low'} />
+      <Items items={items} overlaps={overlaps} lit={lighting !== 'daylight'} lite={tier === 'low'} overhead={view === 'top' || view === 'showcase'} />
       <Ghost level={level} />
       <Selection items={items} overlaps={overlaps} />
       <WallFaceHighlight level={level} />
