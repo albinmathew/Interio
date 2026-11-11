@@ -116,6 +116,12 @@ export class Fit {
     return this;
   }
 
+  /** Applies a matrix to every part collected so far. */
+  transform(matrix: THREE.Matrix4): this {
+    for (const it of this.items) it.g.applyMatrix4(matrix);
+    return this;
+  }
+
   /** Current bounds of everything collected. */
   bounds(): THREE.Box3 {
     const b = new THREE.Box3();
