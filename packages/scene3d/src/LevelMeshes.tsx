@@ -1,6 +1,4 @@
 import {
-  DEFAULT_CEILING_MATERIAL,
-  DEFAULT_WALL_MATERIAL,
   EXTERIOR_WALL_COLOR,
   selectLevelMesh,
   type Id,
@@ -13,6 +11,7 @@ import * as THREE from 'three';
 import { geometryFromMesh } from './geometry';
 import { ContactShade, OpeningsLayer, RailingsLayer, SkirtingLayer, WallStubs } from './Joinery';
 import { createSurfaceMaterial } from './materials';
+import { surfaceFinish } from './surfaces';
 import { fadeWalls, WallFadeController } from './wallFade';
 
 export interface LevelMeshesProps {
@@ -31,20 +30,20 @@ export interface LevelMeshesProps {
   textures?: boolean;
 }
 
-const WALL_CUT_COLOR = '#77726b';
+/** The cut tops of full-height walls: a neutral mid grey, as on an architectural section. */
+export const WALL_CUT_COLOR = '#8b8b89';
 const TRIM = { color: '#f1eee8', roughness: 0.9 };
-const DEFAULT_FLOOR = 'floor.tile.white';
 
 function material(level: Level, g: MeshGroup, textures: boolean): THREE.MeshStandardMaterial {
-  const room = g.roomId ? level.rooms[g.roomId] : undefined;
+  const { finish, surface } = surfaceFinish(level, g);
   switch (g.kind) {
     case 'floor':
-      return createSurfaceMaterial(room?.floorMaterial ?? DEFAULT_FLOOR, { color: '#eeeae4', roughness: 0.4 }, { textures });
+      return createSurfaceMaterial(finish, { color: '#eeeae4', roughness: 0.4 }, { textures, surface });
     case 'ceiling':
-      return createSurfaceMaterial(room?.ceilingMaterial ?? DEFAULT_CEILING_MATERIAL, { color: '#fafaf8', roughness: 0.95 }, { textures });
+      return createSurfaceMaterial(finish, { color: '#fafaf8', roughness: 0.95 }, { textures, surface });
     case 'wallSide':
-      if (!room) return createSurfaceMaterial(undefined, { color: EXTERIOR_WALL_COLOR, roughness: 0.9 });
-      return createSurfaceMaterial(room.wallMaterial ?? DEFAULT_WALL_MATERIAL, TRIM, { textures });
+      if (!finish) return createSurfaceMaterial(undefined, { color: EXTERIOR_WALL_COLOR, roughness: 0.9 });
+      return createSurfaceMaterial(finish, TRIM, { textures, surface });
     case 'wallTop':
       return createSurfaceMaterial(undefined, g.wallKind === 'wall' ? { color: WALL_CUT_COLOR, roughness: 0.9 } : TRIM);
     default:
@@ -61,15 +60,16 @@ function material(level: Level, g: MeshGroup, textures: boolean): THREE.MeshStan
 export function LevelMeshes({ level, showCeilings = false, cutaway = false, doorsOpen = true, closedDoors, details = true, textures = true }: LevelMeshesProps) {
   const mesh = selectLevelMesh(level);
   const rooms = level.rooms;
+  const walls = level.walls;
   const parts = useMemo(
     () =>
       mesh.groups.map((group) => ({
         group,
         geometry: geometryFromMesh(group.geometry),
-        // Read through `level` at build time: rooms are part of the mesh cache key, so this stays in step.
-        material: material({ rooms } as Level, group, textures),
+        // Read through `level` at build time: rooms and walls are part of the mesh cache key, so this stays in step.
+        material: material({ rooms, walls } as Level, group, textures),
       })),
-    [mesh, rooms, textures],
+    [mesh, rooms, walls, textures],
   );
   useEffect(
     () => () =>
@@ -81,7 +81,6 @@ export function LevelMeshes({ level, showCeilings = false, cutaway = false, door
   );
 
   const fade = useMemo(() => new WallFadeController(), []);
-  const walls = level.walls;
   const vertices = level.vertices;
   useEffect(() => {
     fade.setWalls(fadeWalls({ walls, vertices } as Level, mesh));

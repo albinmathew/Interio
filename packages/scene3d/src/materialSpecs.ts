@@ -5,9 +5,24 @@
  * `docs/assets/scene3d.md`).
  */
 
+/** A relief drawn in code over one repeat (see `PATTERNS` in `texturePixels.ts`). */
+export interface PatternSpec {
+  kind: 'flutes' | 'slats' | 'wainscot';
+  /** Flutes, boards or panels across one repeat. */
+  count: number;
+  /** Wainscot: height of the panelling as a share of the repeat. */
+  top?: number;
+  /** Strength of the relief in the normal map. Default 1. */
+  depth?: number;
+}
+
 export interface TextureSpec {
-  /** Folder name of the texture set. */
-  set: string;
+  /** Folder name of the texture set, or null for a pattern drawn in code on a plain colour. */
+  set: string | null;
+  /** The set has no colour map: the finish colour shows through the normal and roughness maps. */
+  noColor?: boolean;
+  /** Relief drawn over the set (or over plain colour). */
+  pattern?: PatternSpec;
   /** Metres of surface covered by one repeat of the texture. Mesh UVs are in metres. */
   size: number;
   /** Rotation of the pattern in degrees. */
@@ -35,6 +50,22 @@ const SETS = {
   marble: { set: 'marble', size: 2.4, avg: '#adaeb7', normalScale: 0.4 },
   terrazzo: { set: 'terrazzo', size: 1.6, avg: '#d8dddc', normalScale: 0.5 },
   carpet: { set: 'carpet', size: 1.4, avg: '#bcb094' },
+  // About 9 cm boards laid in chevron, 1.8 m per repeat.
+  chevron: { set: 'chevron', size: 1.8, avg: '#98785b' },
+  travertine: { set: 'travertine', size: 1.2, avg: '#decaab', normalScale: 0.5 },
+  // Large-format slate tiles.
+  slate: { set: 'slate', size: 2.3, avg: '#4d4d4d' },
+  marbleBlack: { set: 'marble-black', size: 2.4, avg: '#3d3e3d' },
+  // Trowelled plaster: microcement, and the floor a custom colour gets.
+  microcement: { set: 'plaster', size: 2, avg: '#d6d2ce', normalScale: 0.5 },
+  // Linen weave: no colour map, the finish colour shows through the weave.
+  linen: { set: 'fabric-linen', size: 0.27, avg: '#ffffff', noColor: true },
+  // 3 cm oak flutes.
+  fluted: { set: 'wood-oak', size: 1.2, avg: '#a07d56', pattern: { kind: 'flutes', count: 40, depth: 3 } },
+  // Panelled lower wall to 95 cm, painted.
+  wainscot: { set: null, size: 3.2, avg: '#ffffff', pattern: { kind: 'wainscot', count: 6, top: 0.3, depth: 4 } },
+  // 10 cm boards with a shadow gap.
+  slats: { set: 'wood-oak', size: 1.2, avg: '#a07d56', pattern: { kind: 'slats', count: 12, depth: 3 } },
 } satisfies Record<string, TextureSpec>;
 
 /** Finish id -> texture set. Finishes that are not listed (paints, ceilings) render as flat colour. */
@@ -58,10 +89,43 @@ export const SURFACE_TEXTURES: Record<string, TextureSpec> = {
   'wall.brick': SETS.brick,
   'wall.concrete': SETS.concrete,
   'wall.wood': SETS.walnut,
+  'floor.oak.smoked': SETS.oak,
+  'floor.oak.grey': SETS.oak,
+  'floor.chevron': SETS.chevron,
+  'floor.travertine': SETS.travertine,
+  'floor.slate': SETS.slate,
+  'floor.marble.black': SETS.marbleBlack,
+  'floor.microcement': SETS.microcement,
+  'wall.wallpaper.linen': SETS.linen,
+  'wall.panel.fluted': SETS.fluted,
+  'wall.panel.wainscot': SETS.wainscot,
+  'wall.stone.travertine': SETS.travertine,
+  'wall.marble': SETS.marble,
+  'wall.microcement': SETS.microcement,
+  // Hand-made 10 cm square tiles.
+  'wall.tile.zellige': { ...SETS.tileSmall, size: 1.2 },
+  'ceiling.wood': SETS.slats,
 };
 
-export function textureSpecFor(finishId: string | undefined): TextureSpec | undefined {
-  return finishId ? SURFACE_TEXTURES[finishId] : undefined;
+/**
+ * Finishes that are deliberately one flat colour: the paints and the white ceiling. Every
+ * other palette id has a texture set above.
+ */
+export function isFlatFinish(finishId: string): boolean {
+  return finishId.startsWith('wall.paint.') || finishId === 'ceiling.white';
+}
+
+/** A custom floor colour gets the trowelled finish; custom wall and ceiling colours are matte paint. */
+export const CUSTOM_FLOOR_TEXTURE: TextureSpec = SETS.microcement;
+
+/**
+ * The texture set of a finish: a palette id, or a custom colour (`#rrggbb`) on a surface.
+ * Undefined for flat finishes.
+ */
+export function textureSpecFor(finishId: string | undefined, surface?: 'floor' | 'wall' | 'ceiling'): TextureSpec | undefined {
+  if (!finishId) return undefined;
+  if (/^#[0-9a-fA-F]{6}$/.test(finishId)) return surface === 'floor' ? CUSTOM_FLOOR_TEXTURE : undefined;
+  return SURFACE_TEXTURES[finishId];
 }
 
 /** sRGB hex (#rrggbb) -> linear RGB in 0..1. */

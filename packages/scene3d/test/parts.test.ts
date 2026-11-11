@@ -179,7 +179,7 @@ describe('finish textures', () => {
     const ids = new Set(MATERIAL_LIST.map((m) => m.id));
     for (const [id, spec] of Object.entries(SURFACE_TEXTURES)) {
       expect(ids.has(id)).toBe(true);
-      expect(spec.size).toBeGreaterThan(0.5);
+      expect(spec.size).toBeGreaterThan(0.2);
       expect(uvTransform(spec).repeat).toBeCloseTo(1 / spec.size, 9);
     }
     // The brief's list: planks, tiles, marble, concrete, carpet, deck, brick, wall tile.

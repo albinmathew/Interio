@@ -3,6 +3,7 @@
  * down, place entries from the catalog, then move, turn, duplicate and remove them.
  */
 import { planStore, useLevel, usePlanStore, type Level } from '@interio/core';
+import { installFurnitureTextures } from '@interio/scene3d';
 import { Canvas } from '@react-three/fiber';
 import { PencilRuler } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
@@ -148,6 +149,8 @@ function Overlay({ level }: { level: Level }) {
 }
 
 export default function Viewer3D() {
+  // Real textures for furniture materials; registered once, before the first model is built.
+  installFurnitureTextures();
   const level = useLevel();
   const quality = useViewer((s) => s.quality);
   useKeyboard();

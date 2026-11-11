@@ -323,6 +323,7 @@ function DebugHook() {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
+  const get = useThree((s) => s.get);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const hook = {
@@ -337,17 +338,41 @@ function DebugHook() {
         const r = gl.domElement.getBoundingClientRect();
         return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
       },
-      /** World bounds (metres) and mesh names of a placed item as it is drawn right now. */
-      describeItem(id: string): { min: number[]; max: number[]; meshes: string[] } | null {
+      /** World bounds (metres), mesh names and, per mesh, the material it is drawn with (the finish id), of a placed item as drawn now. */
+      describeItem(id: string): { min: number[]; max: number[]; meshes: string[]; materials: Record<string, string> } | null {
         const object = scene.getObjectByName(`item:${id}`);
         if (!object) return null;
         object.updateWorldMatrix(true, true);
         const box = new THREE.Box3().setFromObject(object);
         const meshes: string[] = [];
+        const materials: Record<string, string> = {};
         object.traverse((o) => {
-          if ((o as THREE.Mesh).isMesh) meshes.push(o.name);
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          meshes.push(o.name);
+          const m = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+          if (m) materials[o.name] = m.name;
         });
-        return { min: box.min.toArray(), max: box.max.toArray(), meshes };
+        return { min: box.min.toArray(), max: box.max.toArray(), meshes, materials };
+      },
+      /** The finish (material name) and colour each wall, floor and ceiling mesh is drawn with, by mesh group key. */
+      describeSurfaces(): Record<string, { finish: string; color: string }> {
+        const out: Record<string, { finish: string; color: string }> = {};
+        scene.getObjectByName('level')?.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          const m = mesh.material as THREE.MeshStandardMaterial | undefined;
+          if (mesh.isMesh && mesh.userData.group && m && !Array.isArray(m)) out[o.name] = { finish: m.name, color: `#${m.color.getHexString()}` };
+        });
+        return out;
+      },
+      /** Points the camera from `position` at `target` (world metres): for close-up screenshots. */
+      look(position: [number, number, number], target: [number, number, number]): void {
+        const controls = get().controls as { target: THREE.Vector3; update(): void } | null;
+        camera.position.set(...position);
+        controls?.target.set(...target);
+        controls?.update();
+        camera.lookAt(...target);
+        get().invalidate();
       },
       /** Cost of the last frame: draw calls and triangles (shadow and contact-shadow passes included). */
       stats(): { calls: number; triangles: number } {
@@ -358,7 +383,7 @@ function DebugHook() {
     return () => {
       if (window.__interio === hook) delete window.__interio;
     };
-  }, [camera, gl, scene]);
+  }, [camera, gl, scene, get]);
   return null;
 }
 
@@ -398,7 +423,9 @@ declare global {
       ui: typeof useViewer;
       registerEntry: typeof registerEntry;
       project(x: number, y: number, z?: number): { x: number; y: number };
-      describeItem(id: string): { min: number[]; max: number[]; meshes: string[] } | null;
+      describeItem(id: string): { min: number[]; max: number[]; meshes: string[]; materials: Record<string, string> } | null;
+      describeSurfaces(): Record<string, { finish: string; color: string }>;
+      look(position: [number, number, number], target: [number, number, number]): void;
       stats(): { calls: number; triangles: number };
     };
   }

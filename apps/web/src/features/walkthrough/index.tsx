@@ -8,7 +8,7 @@
  */
 import { getEntry } from '@interio/catalog';
 import { selectLevelMesh, selectRooms, useLevel, usePlanStore, type Pt } from '@interio/core';
-import { PlanScene, SceneLighting, detectSoftwareRenderer, lightingFromSettings, lightingRig, type RenderQuality } from '@interio/scene3d';
+import { PlanScene, SceneLighting, detectSoftwareRenderer, installFurnitureTextures, lightingFromSettings, lightingRig, type RenderQuality } from '@interio/scene3d';
 import { PerformanceMonitor } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -47,6 +47,7 @@ function download(dataUrl: string, name: string): void {
 }
 
 export default function Walkthrough() {
+  installFurnitureTextures();
   const level = useLevel();
   const projectId = usePlanStore((s) => s.project?.id);
   // The lighting preset is picked in Design mode and saved with the project.
