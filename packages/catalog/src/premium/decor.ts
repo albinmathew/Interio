@@ -97,19 +97,19 @@ function roundedOutline(w: number, d: number, r: number): THREE.Shape {
 }
 
 /** A ring between two outlines, extruded up from y with a soft top. */
-function ring(outer: THREE.Shape, inner: THREE.Shape, h: number, bevel: number, y = 0): G {
-  const s = new THREE.Shape(outer.getPoints(24));
-  s.holes.push(new THREE.Path(inner.getPoints(24).reverse()));
-  return layDown(s, h, bevel, y);
+function ring(outer: THREE.Shape, inner: THREE.Shape, h: number, bevel: number, res: number): G {
+  const s = new THREE.Shape(outer.getPoints(res));
+  s.holes.push(new THREE.Path(inner.getPoints(res).reverse()));
+  return layDown(s, h, bevel, res);
 }
 
 /** Extrudes a shape drawn in XY by `h` and lays it on the floor (y up). The bevel stays inside the outline. */
-function layDown(shape: THREE.Shape, h: number, bevel: number, y = 0): G {
+function layDown(shape: THREE.Shape, h: number, bevel: number, res: number): G {
   const b = Math.min(bevel, h / 2 - 1e-4);
-  const g = new THREE.ExtrudeGeometry(shape, { depth: Math.max(1e-4, h - 2 * b), bevelEnabled: b > 0, bevelSize: b, bevelThickness: b, bevelSegments: 2, curveSegments: 24, bevelOffset: -b });
+  const g = new THREE.ExtrudeGeometry(shape, { depth: Math.max(1e-4, h - 2 * b), bevelEnabled: b > 0, bevelSize: b, bevelThickness: b, bevelSegments: 2, curveSegments: res, bevelOffset: -b });
   g.rotateX(-Math.PI / 2);
   g.computeBoundingBox();
-  return g.translate(0, y - g.boundingBox!.min.y, 0);
+  return g.translate(0, -g.boundingBox!.min.y, 0);
 }
 
 /**
@@ -130,16 +130,18 @@ export function buildRug(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3
   const RD = alongZ ? D - 2 * f : D;
   const b = THREE.MathUtils.clamp(Math.min(RW, RD) * 0.025, 0.018, 0.045);
   const bh = H * 0.72;
-  m.part('border', ring(outline(RW, RD, shape, 0), outline(RW, RD, shape, b), bh, Math.min(bh * 0.45, 0.005)));
+  // Curve resolution: rounded corners need few points, round rugs more.
+  const res = shape === 'rect' ? 3 : shape === 'pill' ? 10 : 36;
+  m.part('border', ring(outline(RW, RD, shape, 0), outline(RW, RD, shape, b), bh, Math.min(bh * 0.45, 0.005), res));
   const lip = 0.003; // the pile tucks under the binding
   if (band && Math.min(RW, RD) > 0.5) {
     const c = b + THREE.MathUtils.clamp(Math.min(RW, RD) * 0.07, 0.05, 0.16);
     const gw = 0.012;
-    m.part('pile', ring(outline(RW, RD, shape, b - lip), outline(RW, RD, shape, c - gw / 2), H, H * 0.35));
-    m.part('border', ring(outline(RW, RD, shape, c - gw / 2 - 0.001), outline(RW, RD, shape, c + gw / 2 + 0.001), H * 0.82, 0.002));
-    m.part('pile', layDown(outline(RW, RD, shape, c + gw / 2), H, H * 0.35));
+    m.part('pile', ring(outline(RW, RD, shape, b - lip), outline(RW, RD, shape, c - gw / 2), H, H * 0.35, res));
+    m.part('border', ring(outline(RW, RD, shape, c - gw / 2 - 0.001), outline(RW, RD, shape, c + gw / 2 + 0.001), H * 0.82, 0.002, res));
+    m.part('pile', layDown(outline(RW, RD, shape, c + gw / 2), H, H * 0.35, res));
   } else {
-    m.part('pile', layDown(outline(RW, RD, shape, b - lip), H, H * 0.35));
+    m.part('pile', layDown(outline(RW, RD, shape, b - lip), H, H * 0.35, res));
   }
   if (fringe) {
     const span = alongZ ? RW - 2 * b : RD - 2 * b;
@@ -337,12 +339,13 @@ export function buildMirror(entry: CatalogEntry, ctx?: BuildContext): THREE.Obje
   // Built standing at the origin, back face at z = 0.
   const outer = mirrorOutline(W, L, shape);
   const inner = mirrorOutline(W - 2 * f, L - 2 * f, shape);
-  const frame = new THREE.Shape(outer.getPoints(48));
-  frame.holes.push(new THREE.Path(inner.getPoints(48).reverse()));
+  const res = shape === 'rect' ? 4 : 32;
+  const frame = new THREE.Shape(outer.getPoints(res));
+  frame.holes.push(new THREE.Path(inner.getPoints(res).reverse()));
   const b = Math.min(0.004, t / 4);
-  fit.part('frame', new THREE.ExtrudeGeometry(frame, { depth: t - 2 * b, bevelEnabled: true, bevelSize: b, bevelThickness: b, bevelSegments: 2, curveSegments: 24, bevelOffset: -b }).translate(0, 0, b));
-  fit.part('frame', new THREE.ExtrudeGeometry(mirrorOutline(W - 2 * f + 0.004, L - 2 * f + 0.004, shape), { depth: 0.006, bevelEnabled: false, curveSegments: 24 }).translate(0, 0, 0.002));
-  fit.part('glass', new THREE.ExtrudeGeometry(mirrorOutline(W - 2 * f + 0.002, L - 2 * f + 0.002, shape), { depth: 0.004, bevelEnabled: false, curveSegments: 24 }).translate(0, 0, t * 0.55));
+  fit.part('frame', new THREE.ExtrudeGeometry(frame, { depth: t - 2 * b, bevelEnabled: true, bevelSize: b, bevelThickness: b, bevelSegments: 2, curveSegments: res, bevelOffset: -b }).translate(0, 0, b));
+  fit.part('frame', new THREE.ExtrudeGeometry(mirrorOutline(W - 2 * f + 0.004, L - 2 * f + 0.004, shape), { depth: 0.006, bevelEnabled: false, curveSegments: res }).translate(0, 0, 0.002));
+  fit.part('glass', new THREE.ExtrudeGeometry(mirrorOutline(W - 2 * f + 0.002, L - 2 * f + 0.002, shape), { depth: 0.004, bevelEnabled: false, curveSegments: res }).translate(0, 0, t * 0.55));
   if (lean) {
     // Two felt pads at the foot.
     for (const s of [-1, 1]) fit.fixed('fabric.weave.charcoal', rbox(0.03, 0.01, t * 0.8, 0.003, s * (W / 2 - 0.06), -L / 2 - 0.004, t / 2, 1));

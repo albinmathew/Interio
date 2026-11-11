@@ -10,7 +10,7 @@ import { surface, twoSided, type G } from './decor.parts';
 /** Finish slots shared by every bed. */
 export const BED_SLOTS: FinishSlot[] = [
   { id: 'frame', label: 'Frame', kind: 'wood', default: 'wood.oak' },
-  { id: 'headboard', label: 'Headboard and cushions', kind: 'fabric', default: 'fabric.linen.sand' },
+  { id: 'headboard', label: 'Headboard', kind: 'fabric', default: 'fabric.linen.sand' },
   { id: 'bedding', label: 'Bedding', kind: 'fabric', default: 'fabric.cotton.white' },
   { id: 'throw', label: 'Throw', kind: 'fabric', default: 'fabric.linen.taupe' },
 ];
@@ -27,7 +27,7 @@ export const BUNK_SLOTS: FinishSlot[] = [
  * sides and the foot and hanging down to `hem` (a height). `x` across is
  * ±w/2, the length runs from z0 (head end, folded back separately) to z1 (foot).
  */
-export function duvet(w: number, z0: number, z1: number, top: number, hem: number, puff = 0.035, roll = 0.06): G {
+export function duvet(w: number, z0: number, z1: number, top: number, hem: number, puff = 0.035, roll = 0.06, res: [number, number] = [28, 22]): G {
   const drop = top - hem;
   const path = (len: number) => {
     // Distance along the cross-section: drape, roll, flat, roll, drape.
@@ -67,7 +67,7 @@ export function duvet(w: number, z0: number, z1: number, top: number, hem: numbe
     s -= arcL;
     return [z1, roll + s, 0];
   };
-  const sheet = surface(34, 30, (u, v) => {
+  const sheet = surface(res[0], res[1], (u, v) => {
     const [x, dx, fx] = across(u);
     const [z, dz, fz] = along(v);
     const dome = puff * Math.sin((Math.PI / 2) * fx) * Math.min(1, fz * 1.5);
@@ -148,7 +148,7 @@ export function buildBed(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3
     const padH = H - frameTop + 0.06;
     for (let i = 0; i < channels; i++) {
       // Vertical channels, a touch lower than the backing board so its edge frames them.
-      m.part('headboard', rbox(cw - 0.012, padH - 0.02, headT - 0.03, 0.03, -(W - 0.02) / 2 + cw * (i + 0.5), frameTop - 0.08, back + 0.03 + (headT - 0.03) / 2, 5));
+      m.part('headboard', rbox(cw - 0.012, padH - 0.02, headT - 0.03, 0.03, -(W - 0.02) / 2 + cw * (i + 0.5), frameTop - 0.08, back + 0.03 + (headT - 0.03) / 2, 3));
     }
   } else if (headboard === 'slats') {
     // Timber slats with shadow gaps in front of a dark backing panel, capped by a rail.
@@ -195,7 +195,7 @@ export function buildBed(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3
   // Throw across the foot, draped over the duvet.
   if (hasThrow) {
     const tz0 = D / 2 - 0.62;
-    m.part('throw', duvet(W, tz0, D / 2 - 0.005, top + 0.085, top - mattH * 0.55, 0.012, 0.05));
+    m.part('throw', duvet(W, tz0, D / 2 - 0.005, top + 0.085, top - mattH * 0.55, 0.012, 0.05, [26, 10]));
   }
 
   return m.build();
