@@ -35,7 +35,9 @@ const SOFA = entry('sofa', 2200, 900, 800);
 const CHAIR = entry('chair', 500, 500, 900);
 const AC = entry('ac', 900, 220, 300, { anchor: 'wall', mountHeight: 2300 });
 const LAMP = entry('lamp', 400, 400, 500, { anchor: 'ceiling' });
-const ENTRIES: Record<string, CatalogEntry> = { sofa: SOFA, chair: CHAIR, ac: AC, lamp: LAMP };
+const RUG = entry('rug', 2400, 1700, 15, { category: 'decor' });
+const CURTAINS = entry('curtains', 2400, 180, 2700, { category: 'decor', anchor: 'wall', model: { kind: 'parametric', generator: 'box', params: { stack: 450 } } });
+const ENTRIES: Record<string, CatalogEntry> = { sofa: SOFA, chair: CHAIR, ac: AC, lamp: LAMP, rug: RUG, curtains: CURTAINS };
 const resolve = (id: string) => ENTRIES[id];
 
 const level: Level = createSampleLevel();
@@ -253,6 +255,16 @@ describe('overlap warnings', () => {
     expect(findOverlaps(side, resolve).size).toBe(0);
     const stacked = withItems(item('a', 'sofa', 6500, 2100), item('b', 'lamp', 6500, 2100, 0, 2500));
     expect(findOverlaps(stacked, resolve).size).toBe(0);
+  });
+
+  it('lets furniture stand on a rug, and under the rod between stacked curtain panels', () => {
+    const onRug = withItems(item('r', 'rug', 6500, 2100), item('a', 'sofa', 6500, 2100), item('b', 'chair', 7000, 2900));
+    expect(findOverlaps(onRug, resolve).size).toBe(0);
+    // A chair between the two 450 mm panels, under the rod: fine. The same chair inside a panel: flagged.
+    const between = withItems(item('c', 'curtains', 6500, 2100), item('b', 'chair', 6500, 2100));
+    expect(findOverlaps(between, resolve).size).toBe(0);
+    const inPanel = withItems(item('c', 'curtains', 6500, 2100), item('b', 'chair', 6500 - 1200 + 225, 2100));
+    expect(findOverlaps(inPanel, resolve).get('b')?.items).toEqual(['c']);
   });
 
   it('flags an item pushed into a wall but not one snapped flush against it', () => {
