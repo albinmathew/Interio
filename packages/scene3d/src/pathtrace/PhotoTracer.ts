@@ -33,6 +33,14 @@ export interface PhotoTracerOptions {
   bounces?: number;
   /** Pixels per tile (the unit of work per frame). Default `TILE_PIXELS`. */
   tilePixels?: number;
+  /**
+   * Multipliers on the live scene's lamps (point and spot lights), sun and sky. The live rig is
+   * balanced for a rasteriser with fill lights; traced, the sky through the windows does more of
+   * the work, as in a photograph. Defaults 0.6, 1 and 2.5; exposure is matched to the live view.
+   */
+  lampScale?: number;
+  sunScale?: number;
+  skyScale?: number;
 }
 
 /** What `sync` found. `stale`: the traced picture no longer matches the scene and must not be shown. */
@@ -64,7 +72,17 @@ export class PhotoTracer {
   private readonly denoiser: Denoiser;
   private readonly fallbackEnvironment = new GradientEquirectTexture(64);
   private options: Required<PhotoTracerOptions>;
+  /** Exposure on screen, the one it eases towards, and a fixed one set by `configure` (null: automatic). */
   private exposure = 1;
+  private exposureTarget = 1;
+  private fixedExposure: number | null = null;
+  private exposureTime = 0;
+  /** Brightness of the live frame (mean log luminance) and the samples at which the picture was last metered. */
+  private liveLog = 0;
+  private meteredAt = -1;
+  /** White balance gains on screen and the ones they ease towards. */
+  private readonly balance = new THREE.Vector3(1, 1, 1);
+  private readonly balanceTarget = new THREE.Vector3(1, 1, 1);
 
   private scene: THREE.Scene | null = null;
   private built: SceneSignature | null = null;
@@ -87,7 +105,7 @@ export class PhotoTracer {
 
   constructor(gl: THREE.WebGLRenderer, options: PhotoTracerOptions = {}) {
     this.gl = gl;
-    this.options = { maxPixels: 1920 * 1080, previewScale: 0.5, previewSamples: 48, takeoverSamples: 24, bounces: 5, tilePixels: TILE_PIXELS, ...options };
+    this.options = { maxPixels: 1920 * 1080, previewScale: 0.5, previewSamples: 48, takeoverSamples: 24, bounces: 5, tilePixels: TILE_PIXELS, lampScale: 0.6, sunScale: 1, skyScale: 2.5, ...options };
     // The WebGL tracer logs a deprecation notice in favour of its WebGPU sibling; R3F renders with WebGL.
     const warn = console.warn;
     console.warn = () => {};
@@ -132,7 +150,9 @@ export class PhotoTracer {
     const { exposure, ...rest } = patch;
     this.options = { ...this.options, ...rest };
     this.tracer.bounces = this.options.bounces;
-    if (exposure !== undefined) this.exposure = exposure;
+    if (rest.lampScale !== undefined || rest.sunScale !== undefined) this.tracer.updateLights();
+    if (rest.skyScale !== undefined) this.tracer.updateEnvironment();
+    if (exposure !== undefined) this.fixedExposure = exposure;
   }
 
   /* ---------------------------------------------------------------- state */
@@ -268,7 +288,11 @@ export class PhotoTracer {
     this.frozenSamples = 0;
     this.filteredAt = -1;
     this.pass = this.options.previewSamples > 0 && this.options.previewScale < 1 ? 'preview' : 'final';
-    if (this.scene) this.denoiser.prepare(this.scene, camera, w, h, this.materials.guideHidden(this.scene));
+    if (this.scene) {
+      this.denoiser.prepare(this.scene, camera, w, h, this.materials.guideHidden(this.scene));
+      this.liveLog = this.denoiser.meterLive(this.scene, camera);
+    }
+    this.meteredAt = -1;
     this.applyScale();
     t.reset();
   }
@@ -311,6 +335,32 @@ export class PhotoTracer {
     this.denoiser.filter(t.target.texture, t.samples);
     this.filteredAt = t.samples;
     this.filteredTime = now;
+    this.autoExpose(t.samples);
+  }
+
+  /**
+   * Matches the picture's overall brightness to the live frame's, so the fade from one to the
+   * other is seamless and the exposure suits whatever lights the room: metered on the first
+   * filtered image and again, more reliably, after a few samples (eased in, see `draw`).
+   */
+  private autoExpose(samples: number): void {
+    if (this.fixedExposure !== null) {
+      this.exposure = this.exposureTarget = this.fixedExposure;
+      this.balance.set(1, 1, 1);
+      this.balanceTarget.set(1, 1, 1);
+      return;
+    }
+    const first = this.meteredAt < 0;
+    if (!first && (this.meteredAt >= 8 || samples < 8)) return;
+    const traced = this.denoiser.meterResult();
+    if (traced === null) return;
+    this.meteredAt = samples;
+    this.exposureTarget = Math.min(4, Math.max(0.35, Math.exp(this.liveLog - traced.logLuminance)));
+    this.balanceTarget.copy(whiteBalance(traced.illuminant, WHITE_BALANCE));
+    if (first) {
+      this.exposure = this.exposureTarget;
+      this.balance.copy(this.balanceTarget);
+    }
   }
 
   /**
@@ -320,7 +370,13 @@ export class PhotoTracer {
   draw(opacity: number, live: { scene: THREE.Scene; camera: THREE.Camera } | null): void {
     if (live && opacity < 1) this.gl.render(live.scene, live.camera);
     if (opacity <= 0) return;
-    this.denoiser.draw(opacity, this.exposure, this.frozen);
+    const now = performance.now();
+    const dt = Math.min(0.1, (now - this.exposureTime) / 1000);
+    this.exposureTime = now;
+    const k = 1 - Math.exp(-dt / 0.35);
+    this.exposure += (this.exposureTarget - this.exposure) * k;
+    this.balance.lerp(this.balanceTarget, k);
+    this.denoiser.draw(opacity, this.exposure, this.frozen, this.balance);
   }
 
   /** PNG of the picture at its current sample count, or null when there is none yet. */
@@ -349,10 +405,21 @@ export class PhotoTracer {
     const camera = this.internals.camera;
     const hidden = scene && camera ? hiddenLights(scene, camera) : [];
     for (const l of hidden) l.visible = false;
+    const scaled: [THREE.Light, number][] = [];
+    const { lampScale, sunScale } = this.options;
+    scene?.traverseVisible((o) => {
+      const l = o as THREE.Light & { isPointLight?: boolean; isSpotLight?: boolean; isDirectionalLight?: boolean };
+      if (!l.isLight) return;
+      const k = l.isPointLight || l.isSpotLight ? lampScale : l.isDirectionalLight ? sunScale : 1;
+      if (k === 1) return;
+      scaled.push([l, l.intensity]);
+      l.intensity *= k;
+    });
     try {
       fn();
     } finally {
       for (const l of hidden) l.visible = true;
+      for (const [l, intensity] of scaled) l.intensity = intensity;
     }
   }
 
@@ -361,13 +428,15 @@ export class PhotoTracer {
     const scene = this.internals.scene;
     if (!scene) return fn();
     const env = scene.environment;
+    const intensity = scene.environmentIntensity;
     const usable = !env || (env as THREE.CubeTexture).isCubeTexture === true || hasPixels(env);
-    if (usable) return fn();
-    scene.environment = this.fallbackEnvironment;
+    if (!usable) scene.environment = this.fallbackEnvironment;
+    scene.environmentIntensity = intensity * this.options.skyScale;
     try {
       fn();
     } finally {
       scene.environment = env;
+      scene.environmentIntensity = intensity;
     }
   }
 
@@ -403,6 +472,18 @@ export class PhotoTracer {
     this.scene = null;
     this.built = null;
   }
+}
+
+/** How far the colour of the light is pulled towards neutral: some warmth (an evening, lamplight) stays. */
+const WHITE_BALANCE = 0.6;
+
+/** Gains that move the light's colour `strength` of the way to neutral grey, keeping its brightness. */
+export function whiteBalance(illuminant: [number, number, number] | null, strength: number): THREE.Vector3 {
+  if (!illuminant) return new THREE.Vector3(1, 1, 1);
+  const [r, g, b] = illuminant.map((c) => Math.max(c, 1e-4)) as [number, number, number];
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const gain = (c: number) => Math.min(2, Math.max(0.5, 1 + (y / c - 1) * strength));
+  return new THREE.Vector3(gain(r), gain(g), gain(b));
 }
 
 function hasPixels(texture: THREE.Texture): boolean {

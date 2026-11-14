@@ -45,7 +45,7 @@ export const needsUpdate = (u: SceneUpdate): boolean => u.rebuild || u.materials
 /* -------------------------------------------------------------------- tiles */
 
 /** About this many pixels per tile: big enough to keep the GPU busy, small enough to fit in a frame. */
-export const TILE_PIXELS = 64_000;
+export const TILE_PIXELS = 32_000;
 
 /** Tiles per side for an image of `pixels` pixels (the image is traced in `grid` x `grid` tiles per sample). */
 export function tileGrid(pixels: number, tilePixels = TILE_PIXELS): number {

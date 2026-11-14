@@ -62,14 +62,14 @@ class DemodulateMaterial extends THREE.ShaderMaterial {
           ivec2 size = textureSize(noisy, 0);
           ivec2 px = clamp(ivec2(vUv * vec2(size)), ivec2(0), size - 1);
           vec3 c = max(texelFetch(noisy, px, 0).rgb, 0.0);
-          // A pixel far brighter than all its neighbours is a firefly: bring it down to their level.
-          float most = 0.0;
+          // A pixel far brighter than its neighbourhood is a firefly: bring it down towards it.
+          float sum = 0.0;
           for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
             if (x == 0 && y == 0) continue;
-            most = max(most, lum(max(texelFetch(noisy, clamp(px + ivec2(x, y), ivec2(0), size - 1), 0).rgb, 0.0)));
+            sum += lum(max(texelFetch(noisy, clamp(px + ivec2(x, y), ivec2(0), size - 1), 0).rgb, 0.0));
           }
           float l = lum(c);
-          float cap = 3.0 * most + 0.4;
+          float cap = 4.0 * sum / 8.0 + 0.05;
           if (l > cap) c *= cap / l;
           vec3 a = texture2D(albedo, vUv).rgb;
           gl_FragColor = vec4(c / max(a, vec3(0.04)), 1.0);
@@ -86,11 +86,12 @@ class DemodulateMaterial extends THREE.ShaderMaterial {
 class AtrousMaterial extends THREE.ShaderMaterial {
   constructor() {
     super({
-      uniforms: { light: { value: null }, normalDepth: { value: null }, step: { value: 1 }, sigmaL: { value: 1 } },
+      uniforms: { light: { value: null }, normalDepth: { value: null }, albedo: { value: null }, step: { value: 1 }, sigmaL: { value: 1 } },
       vertexShader: VERTEX,
       fragmentShader: /* glsl */ `
         uniform sampler2D light;
         uniform sampler2D normalDepth;
+        uniform sampler2D albedo;
         uniform float step;
         uniform float sigmaL;
         varying vec2 vUv;
@@ -101,7 +102,14 @@ class AtrousMaterial extends THREE.ShaderMaterial {
           vec4 g = texture2D(normalDepth, vUv);
           // Nothing hit (the view outside, seen through glass): smooth it with its own kind only.
           bool sky = g.w >= ${FAR.toFixed(1)} * 0.5;
-          float lc = squash(centre.rgb);
+          // Mirrors (albedo alpha 0) show a reflected picture, not light: blur them only a touch, and only with each other.
+          bool mirror = texture2D(albedo, vUv).a < 0.5;
+          if (mirror && step > 1.5) { gl_FragColor = centre; return; }
+          // Brightness of the neighbourhood rather than of the pixel alone, so a stray bright or dark
+          // sample cannot shield itself from its neighbours.
+          float lc = 0.0;
+          for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) lc += squash(texture2D(light, vUv + vec2(float(x), float(y)) * texel).rgb);
+          lc /= 9.0;
           float k[3] = float[3](0.375, 0.25, 0.0625);
           vec3 sum = vec3(0.0);
           float weights = 0.0;
@@ -112,6 +120,7 @@ class AtrousMaterial extends THREE.ShaderMaterial {
               vec4 gs = texture2D(normalDepth, uv);
               bool skyS = gs.w >= ${FAR.toFixed(1)} * 0.5;
               float wn = sky || skyS ? (sky == skyS ? 1.0 : 0.0) : pow(max(0.0, dot(g.xyz, gs.xyz)), 32.0);
+              if ((texture2D(albedo, uv).a < 0.5) != mirror) wn = 0.0;
               float wz = sky ? 1.0 : exp(-abs(g.w - gs.w) / (0.015 * g.w * step + 0.002));
               float wl = exp(-abs(lc - squash(s)) / sigmaL);
               float w = k[abs(x)] * k[abs(y)] * wn * wz * wl;
@@ -133,7 +142,7 @@ class AtrousMaterial extends THREE.ShaderMaterial {
 class OutputMaterial extends THREE.ShaderMaterial {
   constructor() {
     super({
-      uniforms: { light: { value: null }, albedo: { value: null }, normalDepth: { value: null }, opacity: { value: 1 }, exposure: { value: 1 } },
+      uniforms: { light: { value: null }, albedo: { value: null }, normalDepth: { value: null }, opacity: { value: 1 }, exposure: { value: 1 }, balance: { value: new THREE.Vector3(1, 1, 1) } },
       vertexShader: VERTEX,
       fragmentShader: /* glsl */ `
         uniform sampler2D light;
@@ -141,13 +150,12 @@ class OutputMaterial extends THREE.ShaderMaterial {
         uniform sampler2D normalDepth;
         uniform float opacity;
         uniform float exposure;
+        uniform vec3 balance;
         varying vec2 vUv;
         // Joint bilateral upsampling: the four nearest light texels, weighted by how well their
         // surface matches this pixel's, so a half-size light never bleeds across an edge.
-        vec3 upsample() {
+        vec3 upsample(vec4 g, bool sky) {
           vec2 size = vec2(textureSize(light, 0));
-          vec4 g = texture2D(normalDepth, vUv);
-          bool sky = g.w >= ${FAR.toFixed(1)} * 0.5;
           vec2 p = vUv * size - 0.5;
           vec2 f = fract(p);
           vec2 base = floor(p);
@@ -170,7 +178,11 @@ class OutputMaterial extends THREE.ShaderMaterial {
         }
         void main() {
           vec3 a = texture2D(albedo, vUv).rgb;
-          vec3 c = upsample() * max(a, vec3(0.04)) * exposure;
+          vec4 g = texture2D(normalDepth, vUv);
+          bool sky = g.w >= ${FAR.toFixed(1)} * 0.5;
+          // The view outside keeps the live view's exposure (as a photographer "pulls" a window), so a
+          // dim room brightened for the photo does not turn its windows into white rectangles.
+          vec3 c = upsample(g, sky) * max(a, vec3(0.04)) * (sky ? vec3(min(exposure, 1.0)) : exposure * balance);
           gl_FragColor = vec4(c, opacity);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
@@ -182,6 +194,42 @@ class OutputMaterial extends THREE.ShaderMaterial {
   }
 }
 
+/**
+ * For metering: log luminance of light x albedo (or of `light` alone) in red, and the log of
+ * the light's own colour (the illuminant, albedo divided out) in green, blue and alpha, or a
+ * sentinel where the view looks outside.
+ */
+class MeterMaterial extends THREE.ShaderMaterial {
+  constructor() {
+    super({
+      uniforms: { light: { value: null }, albedo: { value: null }, normalDepth: { value: null }, useAlbedo: { value: 1 } },
+      vertexShader: VERTEX,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D light;
+        uniform sampler2D albedo;
+        uniform sampler2D normalDepth;
+        uniform float useAlbedo;
+        varying vec2 vUv;
+        void main() {
+          vec3 l = max(texture2D(light, vUv).rgb, vec3(1e-3));
+          vec3 c = useAlbedo > 0.5 ? l * max(texture2D(albedo, vUv).rgb, vec3(0.04)) : l;
+          bool sky = useAlbedo > 0.5 && texture2D(normalDepth, vUv).w >= ${FAR.toFixed(1)} * 0.5;
+          gl_FragColor = vec4(log(max(dot(c, ${LUMA}), 1e-3)), sky ? vec3(-1000.0) : log(l));
+        }`,
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.NoBlending,
+      toneMapped: false,
+    });
+  }
+}
+
+/** A picture's overall brightness (mean log luminance) and the colour of the light in it (geometric mean, linear). */
+export interface Metering {
+  logLuminance: number;
+  illuminant: [number, number, number] | null;
+}
+
 /** Iterations and brightness tolerance of the filter for a sample count: strong at first, light once converged. */
 export function filterStrength(samples: number): { iterations: number; sigmaL: number } {
   const spp = Math.max(1, samples);
@@ -189,6 +237,9 @@ export function filterStrength(samples: number): { iterations: number; sigmaL: n
   const sigmaL = Math.min(1.5, Math.max(0.04, 1.4 / Math.sqrt(spp)));
   return { iterations, sigmaL };
 }
+
+const METER_W = 64;
+const METER_H = 36;
 
 const halfFloat = (w: number, h: number, samples = 0) =>
   new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, samples });
@@ -207,6 +258,10 @@ export class Denoiser {
   private readonly demodulate = new FullScreenQuad(new DemodulateMaterial());
   private readonly atrous = new FullScreenQuad(new AtrousMaterial());
   private readonly output = new FullScreenQuad(new OutputMaterial());
+  private readonly meterQuad = new FullScreenQuad(new MeterMaterial());
+  private readonly meterTarget = new THREE.WebGLRenderTarget(METER_W, METER_H, { type: THREE.FloatType, depthBuffer: false });
+  private readonly liveTarget = halfFloat(METER_W * 2, METER_H * 2);
+  private readonly meterPixels = new Float32Array(METER_W * METER_H * 4);
   private result: THREE.WebGLRenderTarget | null = null;
 
   constructor(private readonly gl: THREE.WebGLRenderer) {}
@@ -276,8 +331,12 @@ export class Denoiser {
     a.vertexColors = src.vertexColors === true;
     a.alphaTest = src.alphaTest ?? 0;
     a.alphaMap = src.alphaMap ?? null;
-    // Metals reflect their colour; a mirror's "albedo" is what it shows, so leave it white.
-    if ((src.metalness ?? 0) > 0.9 && (src.roughness ?? 1) < 0.1) a.color.copy(WHITE);
+    // A mirror's "albedo" is the picture it reflects: white, flagged with alpha 0 for the filter.
+    const mirror = src.name === 'glass.mirror' || ((src.metalness ?? 0) > 0.9 && (src.roughness ?? 1) < 0.08);
+    if (mirror) a.color.copy(WHITE);
+    a.opacity = mirror ? 0 : 1;
+    a.transparent = mirror;
+    a.blending = THREE.NoBlending;
     return a;
   }
 
@@ -296,6 +355,7 @@ export class Denoiser {
     const { iterations, sigmaL } = filterStrength(samples);
     const pass = this.atrous.material as AtrousMaterial;
     pass.uniforms.normalDepth!.value = this.normalDepth.texture;
+    pass.uniforms.albedo!.value = this.albedo.texture;
     pass.uniforms.sigmaL!.value = sigmaL;
     let read = this.ping;
     let write = this.pong;
@@ -323,8 +383,8 @@ export class Denoiser {
     return copy;
   }
 
-  /** Draws the filtered image (or `image`, a frozen one) to the canvas. */
-  draw(opacity: number, exposure: number, image?: THREE.WebGLRenderTarget | null): void {
+  /** Draws the filtered image (or `image`, a frozen one) to the canvas. `balance`: white balance gains for the room. */
+  draw(opacity: number, exposure: number, image?: THREE.WebGLRenderTarget | null, balance?: THREE.Vector3): void {
     const light = image ?? this.result;
     if (!light) return;
     const gl = this.gl;
@@ -334,6 +394,7 @@ export class Denoiser {
     out.uniforms.normalDepth!.value = this.normalDepth.texture;
     out.uniforms.opacity!.value = opacity;
     out.uniforms.exposure!.value = exposure;
+    (out.uniforms.balance!.value as THREE.Vector3).copy(balance ?? ONE3);
     out.blending = opacity < 1 ? THREE.NormalBlending : THREE.NoBlending;
     const autoClear = gl.autoClear;
     gl.autoClear = false;
@@ -343,6 +404,56 @@ export class Denoiser {
   }
 
   /** The filtered light, for metering. */
+  /** Brightness and light colour of the filtered picture, or null before there is one. */
+  meterResult(): Metering | null {
+    return this.result ? this.meter(this.result.texture, true) : null;
+  }
+
+  /** Brightness of the live frame (the raster view, before tone mapping). */
+  meterLive(scene: THREE.Scene, camera: THREE.Camera): number {
+    const gl = this.gl;
+    const previous = gl.getRenderTarget();
+    gl.setRenderTarget(this.liveTarget);
+    gl.render(scene, camera);
+    gl.setRenderTarget(previous);
+    return this.meter(this.liveTarget.texture, false).logLuminance;
+  }
+
+  private meter(texture: THREE.Texture, useAlbedo: boolean): Metering {
+    const gl = this.gl;
+    const m = this.meterQuad.material as MeterMaterial;
+    m.uniforms.light!.value = texture;
+    m.uniforms.albedo!.value = this.albedo.texture;
+    m.uniforms.normalDepth!.value = this.normalDepth.texture;
+    m.uniforms.useAlbedo!.value = useAlbedo ? 1 : 0;
+    const previous = gl.getRenderTarget();
+    gl.setRenderTarget(this.meterTarget);
+    this.meterQuad.render(gl);
+    gl.readRenderTargetPixels(this.meterTarget, 0, 0, METER_W, METER_H, this.meterPixels);
+    gl.setRenderTarget(previous);
+    let lum = 0;
+    let n = 0;
+    const rgb = [0, 0, 0];
+    let lit = 0;
+    const px = this.meterPixels;
+    for (let i = 0; i < px.length; i += 4) {
+      if (Number.isFinite(px[i]!)) {
+        lum += px[i]!;
+        n++;
+      }
+      if (px[i + 1]! > -999 && Number.isFinite(px[i + 1]!) && Number.isFinite(px[i + 2]!) && Number.isFinite(px[i + 3]!)) {
+        rgb[0]! += px[i + 1]!;
+        rgb[1]! += px[i + 2]!;
+        rgb[2]! += px[i + 3]!;
+        lit++;
+      }
+    }
+    return {
+      logLuminance: n ? lum / n : 0,
+      illuminant: lit > 16 ? [Math.exp(rgb[0]! / lit), Math.exp(rgb[1]! / lit), Math.exp(rgb[2]! / lit)] : null,
+    };
+  }
+
   get light(): THREE.Texture | null {
     return this.result?.texture ?? null;
   }
@@ -352,11 +463,11 @@ export class Denoiser {
   }
 
   dispose(): void {
-    for (const t of [this.albedo, this.normalDepth, this.ping, this.pong]) t.dispose();
+    for (const t of [this.albedo, this.normalDepth, this.ping, this.pong, this.meterTarget, this.liveTarget]) t.dispose();
     this.normalDepthMaterial.dispose();
     for (const m of this.albedoMaterials.values()) m.dispose();
     this.albedoMaterials.clear();
-    for (const quad of [this.demodulate, this.atrous, this.output]) {
+    for (const quad of [this.demodulate, this.atrous, this.output, this.meterQuad]) {
       quad.dispose();
       (quad as unknown as { material: THREE.Material }).material.dispose();
     }
@@ -366,6 +477,7 @@ export class Denoiser {
 }
 
 const WHITE = new THREE.Color(1, 1, 1);
+const ONE3 = new THREE.Vector3(1, 1, 1);
 
 let copier: FullScreenQuad | null = null;
 
