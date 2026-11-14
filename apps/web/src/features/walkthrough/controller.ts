@@ -6,23 +6,28 @@
 import { vec, type Id, type Pt } from '@interio/core';
 import { isFree, moveCapsule, overlaps, resolvePosition, sweep } from './collision';
 import { findPath, isWalkable, nearestWalkable, pathLength, pointAlong } from './nav';
-import { inRoomOrDoorway, landingNear, planTour, roomAtPoint, roomPose, startPose, type Pose, type TourPlan, type WalkWorld } from './route';
+import { glideAlong, inRoomOrDoorway, landingNear, planTour, roomAtPoint, roomPose, startPose, type Pose, type TourPlan, type WalkWorld } from './route';
 
 export const WALK_SPEED = 1500; // mm/s
 export const RUN_SPEED = 3200;
 const TURN_RATE = 1.9; // rad/s, keyboard turning
-const ACCELERATION = 0.14; // s to close most of the gap to the wanted speed
+const ACCELERATION = 0.12; // s to close most of the gap to the wanted speed
 const BRAKING = 0.09;
+/** The wanted velocity itself is eased in and out over this time, so a step starts and stops softly (an S-curve, not a jolt). */
+const INTENT = 0.07;
 const MAX_PITCH = 1.3;
 const FADE_OUT = 0.16; // s
 const FADE_IN = 0.24;
 
-const TOUR_SPEED = 1200; // mm/s at 1x
-const TOUR_PAN_RATE = 55; // degrees per second at 1x
-const TOUR_TURN_RATE = 150;
-const TOUR_SETTLE = 0.5; // s standing still before and after the pan
-const TOUR_LOOK_AHEAD = 800; // mm
-const TOUR_PITCH = -0.04;
+/** The cinematic tour: a slow dolly glide along each leg, then a linger that frames the room. */
+const TOUR_SPEED = 950; // mm/s at 1x
+const TOUR_PAN_RATE = 24; // degrees per second at 1x, the linger's slow pan
+const TOUR_TURN_RATE = 110;
+const TOUR_SETTLE = 0.7; // s holding the frame on the main piece before the pan
+const TOUR_HOLD = 0.9; // s holding the last frame
+const TOUR_LOOK_AHEAD = 1100; // mm
+const TOUR_APPROACH = 1700; // mm before a stop where the view turns from the way ahead to the room's main piece
+const TOUR_PITCH = -0.06;
 
 export interface WalkState {
   x: number;
@@ -63,6 +68,8 @@ const wrap = (rad: number): number => {
 const rad = (deg: number) => (deg * Math.PI) / 180;
 const deg = (r: number) => (r * 180) / Math.PI;
 const smooth = (u: number) => u * u * (3 - 2 * u);
+/** Angle from a to b, the short way round, at u (0..1). */
+const mixAngle = (a: number, b: number, u: number) => a + wrap(b - a) * u;
 
 interface Tour {
   plan: TourPlan;
@@ -79,6 +86,8 @@ interface Tour {
   /** Seconds into the look phase, and the heading the pan started from. */
   t: number;
   panFrom: number;
+  /** How far the linger pans, radians (signed). */
+  sweep: number;
   /** Where the walker stood when the tour was paused. */
   pausedAt: Pt | null;
 }
@@ -100,6 +109,9 @@ export class WalkController {
 
   private vx = 0;
   private vy = 0;
+  /** The eased wanted velocity (see INTENT). */
+  private ix = 0;
+  private iy = 0;
   private stuck = 0;
   private pendingJump: Pose | null = null;
   private tour: Tour | null = null;
@@ -158,7 +170,7 @@ export class WalkController {
     this.x = p.x;
     this.y = p.y;
     if (yawDeg !== undefined) this.yaw = rad(yawDeg);
-    this.vx = this.vy = 0;
+    this.vx = this.vy = this.ix = this.iy = 0;
     this.trackRoom();
   }
 
@@ -240,6 +252,11 @@ export class WalkController {
     this.changed();
   }
 
+  /** Walking speed in mm/s (0 while the tour drives the camera). */
+  get speed(): number {
+    return Math.hypot(this.vx, this.vy);
+  }
+
   get manual(): boolean {
     return this.tour?.status !== 'playing' && !this.pendingJump;
   }
@@ -297,6 +314,7 @@ export class WalkController {
       const d = Math.hypot(dx, dy);
       if (d < 25) {
         this.target = null;
+        this.ix = this.iy = 0;
         this.changed();
       } else {
         const v = Math.min(top, Math.max(250, d * 5)); // ease into the destination
@@ -304,13 +322,17 @@ export class WalkController {
         wy = (dy / d) * v;
       }
     }
-    const wanted = Math.hypot(wx, wy);
+    // Keys and the stick are eased in and out; click-to-move already eases into its destination.
+    const ki = this.target ? 1 : 1 - Math.exp(-dt / INTENT);
+    this.ix += (wx - this.ix) * ki;
+    this.iy += (wy - this.iy) * ki;
+    const wanted = Math.hypot(this.ix, this.iy);
     const k = 1 - Math.exp(-dt / (wanted > Math.hypot(this.vx, this.vy) ? ACCELERATION : BRAKING));
-    this.vx += (wx - this.vx) * k;
-    this.vy += (wy - this.vy) * k;
+    this.vx += (this.ix - this.vx) * k;
+    this.vy += (this.iy - this.vy) * k;
     const speed = Math.hypot(this.vx, this.vy);
-    if (speed < 8 && wanted === 0) {
-      this.vx = this.vy = 0;
+    if (speed < 8 && wx === 0 && wy === 0) {
+      this.vx = this.vy = this.ix = this.iy = 0;
       return;
     }
     const from = { x: this.x, y: this.y };
@@ -319,8 +341,8 @@ export class WalkController {
     this.y = pos.y;
     if (blocked && dt > 0) {
       // Keep only the part of the velocity that actually moved us (the slide along the wall).
-      this.vx = (pos.x - from.x) / dt;
-      this.vy = (pos.y - from.y) / dt;
+      this.vx = this.ix = (pos.x - from.x) / dt;
+      this.vy = this.iy = (pos.y - from.y) / dt;
       if (this.target) {
         this.stuck += dt;
         if (this.stuck > 0.3) {
@@ -367,7 +389,7 @@ export class WalkController {
     this.target = null;
     this.vx = this.vy = 0;
     // Index -1 is "getting to the start": the first leg begins once any fade has finished.
-    this.tour = { plan, status: 'playing', index: -1, phase: 'jump', visited: [], path: [], length: 0, s: 0, turning: false, t: 0, panFrom: 0, pausedAt: null };
+    this.tour = { plan, status: 'playing', index: -1, phase: 'jump', visited: [], path: [], length: 0, s: 0, turning: false, t: 0, panFrom: 0, sweep: 0, pausedAt: null };
     if (vec.dist(this, plan.start) > 400) this.jumpTo(plan.start);
     else this.pendingJump = null;
     this.changed();
@@ -391,7 +413,7 @@ export class WalkController {
     if (t.index >= 0 && (t.phase === 'walk' || moved)) this.enterLeg(t, t.index);
     else if (t.phase === 'look') {
       // Carry on panning from wherever the walker is looking now.
-      t.panFrom = this.yaw - this.panAngle(t.t);
+      t.panFrom = this.yaw - this.lingerAngle(t, t.t);
     }
     this.changed();
   }
@@ -420,7 +442,7 @@ export class WalkController {
     t.index = index;
     t.phase = 'jump';
     t.pausedAt = null;
-    this.jumpTo({ ...stop.eye, yawDeg: stop.viewDeg });
+    this.jumpTo({ ...stop.eye, yawDeg: stop.focusDeg });
     this.changed();
   }
 
@@ -435,11 +457,12 @@ export class WalkController {
     const stop = t.plan.stops[index]!;
     t.index = index;
     const here = { x: this.x, y: this.y };
-    const planned = stop.leg.points;
-    const path = !stop.leg.jump && planned.length > 0 && vec.dist(planned[0]!, here) < 30 ? planned : findPath(this.world.nav, here, stop.eye);
-    if (!path) {
+    const planned = stop.leg.glide;
+    const route = !stop.leg.jump && planned.length > 0 && vec.dist(planned[0]!, here) < 30 ? null : findPath(this.world.nav, here, stop.eye);
+    const path = route ? glideAlong(this.world, route) : stop.leg.jump ? null : planned;
+    if (!path || path.length === 0) {
       t.phase = 'jump';
-      this.jumpTo({ ...stop.eye, yawDeg: stop.viewDeg });
+      this.jumpTo({ ...stop.eye, yawDeg: stop.focusDeg });
     } else {
       t.phase = 'walk';
       t.path = path;
@@ -456,13 +479,30 @@ export class WalkController {
     t.phase = 'look';
     t.t = 0;
     t.panFrom = this.yaw;
+    // From the main piece across to the windows; a gentle sweep past the piece when the room has none.
+    const target = stop.windowDeg !== null ? rad(stop.windowDeg) : this.yaw + rad(45);
+    let sweep = wrap(target - this.yaw);
+    if (Math.abs(sweep) < rad(30)) sweep = (Math.sign(sweep) || 1) * rad(40);
+    t.sweep = Math.max(-rad(120), Math.min(rad(120), sweep));
     this.changed();
   }
 
-  /** How far the look-around has panned after `t` seconds: settle, one full turn, settle. */
-  private panAngle(t: number): number {
-    const duration = 360 / TOUR_PAN_RATE;
-    return 2 * Math.PI * smooth(Math.max(0, Math.min(1, (t - TOUR_SETTLE) / duration)));
+  /** Seconds of the linger: hold on the main piece, pan, hold on the last frame. */
+  private lingerDuration(t: Tour): number {
+    return TOUR_SETTLE + (Math.abs(t.sweep) * 180) / Math.PI / TOUR_PAN_RATE + TOUR_HOLD;
+  }
+
+  /** How far the linger has panned after `seconds`: eased in and out. */
+  private lingerAngle(t: Tour, seconds: number): number {
+    const duration = (Math.abs(t.sweep) * 180) / Math.PI / TOUR_PAN_RATE;
+    return t.sweep * smooth(Math.max(0, Math.min(1, (seconds - TOUR_SETTLE) / duration)));
+  }
+
+  /** The main piece of the room the tour lingers in (for depth of field), or null. */
+  tourFocus(): Pt | null {
+    const t = this.tour;
+    if (!t || t.phase !== 'look' || t.index < 0) return null;
+    return t.plan.stops[t.index]?.focus ?? null;
   }
 
   private updateTour(dt: number): void {
@@ -475,22 +515,26 @@ export class WalkController {
       return;
     }
     if (t.phase === 'walk') {
+      const stop = t.plan.stops[t.index]!;
       const ahead = pointAlong(t.path, Math.min(t.length, t.s + TOUR_LOOK_AHEAD));
       const here = pointAlong(t.path, t.s);
-      const facing = vec.dist(ahead, here) > 1 ? Math.atan2(ahead.y - here.y, ahead.x - here.x) : this.yaw;
+      const way = vec.dist(ahead, here) > 1 ? Math.atan2(ahead.y - here.y, ahead.x - here.x) : this.yaw;
+      // Coming into the room, the view turns from the way ahead to frame the room's main piece.
+      const arriving = smooth(Math.max(0, Math.min(1, 1 - (t.length - t.s) / TOUR_APPROACH)));
+      const facing = t.turning ? way : mixAngle(way, rad(stop.focusDeg), arriving);
       const off = wrap(facing - this.yaw);
       if (t.turning) {
-        // Turn on the spot to face the way out before setting off.
-        const turn = rad(TOUR_TURN_RATE) * dt;
-        if (Math.abs(off) <= Math.max(turn, rad(12))) t.turning = false;
+        // Turn to face the way out before setting off, easing into and out of the turn.
+        const turn = Math.min(rad(TOUR_TURN_RATE), Math.abs(off) * 2.5 + rad(15)) * dt;
+        if (Math.abs(off) <= Math.max(turn, rad(10))) t.turning = false;
         else {
           this.yaw = wrap(this.yaw + Math.sign(off) * turn);
           return;
         }
       }
-      this.yaw = wrap(this.yaw + off * (1 - Math.exp(-dt / 0.28)));
-      // Ease away from a stop and into the next one.
-      const ease = Math.max(0.3, Math.min(1, t.s / 500 + 0.3, (t.length - t.s) / 500 + 0.3));
+      this.yaw = wrap(this.yaw + off * (1 - Math.exp(-dt / 0.4)));
+      // A dolly: ease away from a stop and glide slowly into the next one.
+      const ease = Math.max(0.22, Math.min(1, smooth(Math.min(1, t.s / 900)) + 0.22, smooth(Math.min(1, (t.length - t.s) / 1300)) + 0.22));
       t.s = Math.min(t.length, t.s + TOUR_SPEED * ease * dt);
       const p = pointAlong(t.path, t.s);
       this.x = p.x;
@@ -500,10 +544,10 @@ export class WalkController {
       else if (roomChanged) this.changed();
       return;
     }
-    // look
+    // look: the linger
     t.t += dt;
-    this.yaw = wrap(t.panFrom + this.panAngle(t.t));
-    if (t.t < 2 * TOUR_SETTLE + 360 / TOUR_PAN_RATE) return;
+    this.yaw = wrap(t.panFrom + this.lingerAngle(t, t.t));
+    if (t.t < this.lingerDuration(t)) return;
     if (t.index + 1 >= t.plan.stops.length) this.finishTour(t);
     else this.enterLeg(t, t.index + 1);
   }

@@ -88,32 +88,106 @@ function useAppearance(root: THREE.Object3D, a: ItemAppearance | undefined): voi
 /** Material of a lamp's bulb in the premium set (a fixed part of every lighting model). */
 export const BULB_MATERIAL = 'lacquer.white.gloss';
 
+/**
+ * A switched-on bulb. Bright enough (well above the bloom threshold of the walk view's
+ * cinematic image) to glow; without bloom it still reads as a light source.
+ */
 const glowing = new THREE.MeshStandardMaterial({
   name: `${BULB_MATERIAL}:lit`,
   color: '#fff4e2',
   emissive: '#ffd59a',
-  emissiveIntensity: 2.4,
+  emissiveIntensity: 9,
   roughness: 0.4,
 });
 
-/** While `lit`, the bulbs of a lighting model glow. Only lighting entries are touched: gloss white elsewhere stays gloss white. */
+/** How brightly each part of a lit lamp glows (emissive intensity on a warm white). */
+const GLOW = {
+  /** Fabric and paper shades: lit from within, like the reference's paper lanterns. */
+  shade: 2.4,
+  /** Opal diffusers and lenses (flush lights, battens, downlights). */
+  diffuser: 6,
+  /** The white enamel inside a metal dome, catching the bulb. */
+  reflector: 1.2,
+} as const;
+
+const LAMP_GLOW = new THREE.Color('#ffc98a');
+
+/** Which part of a lit lamp a mesh is, or null when it does not glow. */
+function glowPart(mesh: THREE.Mesh, m: THREE.Material): keyof typeof GLOW | 'bulb' | null {
+  if (m.name === BULB_MATERIAL) return 'bulb';
+  const slot = mesh.userData.slot as string | undefined;
+  if (slot === 'diffuser' || m.name === 'glass.frosted') return 'diffuser';
+  // A fabric or paper shade glows; a metal dome shade does not (its white inside does).
+  if (slot === 'shade') return m.name.startsWith('metal.') ? null : 'shade';
+  if (!slot && m.name === 'metal.white') return 'reflector';
+  return null;
+}
+
+/** A candle's flame: the wick of a lit candle, small and very bright (it blooms into a soft glow). */
+const flame = new THREE.MeshBasicMaterial({ name: 'candle.flame', color: new THREE.Color('#ffb35c').multiplyScalar(14) });
+/** Candle wax lit from within by its flame. */
+const litWax = new THREE.MeshStandardMaterial({ name: 'lacquer.cream:lit', color: '#f3e6cf', emissive: '#ffb066', emissiveIntensity: 0.55, roughness: 0.6 });
+
+/** Entries that hold candles (lit with the lamps in the evening and at night). */
+const isCandle = (entry: CatalogEntry) => /candle/.test(entry.id) || (entry.tags ?? []).some((t) => /candle/.test(t));
+
+const glows = new WeakMap<THREE.Material, Map<string, THREE.Material>>();
+
+/** A glowing copy of a lamp part's material, shared per source material (fabrics are shared with sofas: never touch the source). */
+function glowMaterial(source: THREE.Material, part: keyof typeof GLOW): THREE.Material {
+  let byPart = glows.get(source);
+  if (!byPart) glows.set(source, (byPart = new Map()));
+  let m = byPart.get(part);
+  if (!m) {
+    const copy = source.clone() as THREE.MeshStandardMaterial;
+    copy.name = `${source.name}:lit`;
+    if (copy.emissive) {
+      // Tinted by the shade's own colour, so a sand linen glows sand and an ivory one cream.
+      const tint = copy.color ? copy.color.clone().lerp(new THREE.Color('#ffffff'), 0.35) : new THREE.Color('#ffffff');
+      copy.emissive.copy(LAMP_GLOW).multiply(tint);
+      copy.emissiveIntensity = GLOW[part];
+      if (copy.map && part === 'shade') copy.emissiveMap = copy.map;
+    }
+    byPart.set(part, (m = copy));
+  }
+  return m;
+}
+
+/**
+ * While `lit`, the lamp glows: bulbs, fabric shades, opal diffusers and the white inside of
+ * metal domes. Keyed on slot ids and material names, not catalog ids, so new lamps glow too.
+ * Only lighting entries are touched: gloss white or linen elsewhere stays as it is.
+ */
 function useBulbs(root: THREE.Object3D, entry: CatalogEntry, lit: boolean): void {
   useLayoutEffect(() => {
-    if (!lit || entry.category !== 'lighting') return;
-    const swapped: [THREE.Mesh, THREE.Material | THREE.Material[]][] = [];
+    const candles = isCandle(entry);
+    if (!lit || (entry.category !== 'lighting' && !candles)) return;
+    const swapped: [THREE.Mesh, THREE.Material | THREE.Material[], boolean][] = [];
     root.traverse((o) => {
       const mesh = o as THREE.Mesh;
       const m = mesh.material as THREE.Material | undefined;
-      if (mesh.isMesh && m && !Array.isArray(m) && m.name === BULB_MATERIAL) {
-        swapped.push([mesh, m]);
-        mesh.material = glowing;
-        mesh.castShadow = false;
+      if (!mesh.isMesh || !m || Array.isArray(m)) return;
+      if (candles) {
+        const wick = !mesh.userData.slot && m.name === 'lacquer.black.gloss';
+        const wax = !mesh.userData.slot && m.name === 'lacquer.cream';
+        if (wick || wax) {
+          swapped.push([mesh, m, mesh.castShadow]);
+          mesh.material = wick ? flame : litWax;
+          mesh.castShadow = false;
+        }
+        return;
       }
+      const part = glowPart(mesh, m);
+      if (!part) return;
+      swapped.push([mesh, m, mesh.castShadow]);
+      mesh.material = part === 'bulb' ? glowing : glowMaterial(m, part);
+      // The bulb and its shade must not shadow the light that stands for them.
+      if (part === 'bulb' || part === 'shade' || part === 'diffuser') mesh.castShadow = false;
     });
     return () => {
-      for (const [mesh, m] of swapped) {
+      for (const [mesh, m, cast] of swapped) {
         mesh.material = m;
-        mesh.castShadow = true;
+        mesh.castShadow = cast;
       }
     };
   }, [root, entry, lit]);

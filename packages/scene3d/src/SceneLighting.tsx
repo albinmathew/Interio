@@ -5,7 +5,9 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
-import { DEFAULT_LIGHTING_PRESET, MAX_INTERIOR_LIGHTS, interiorLights, lightSlots, lightingRig, type LightingPreset } from './lighting';
+import { loadPanorama } from './Backdrop';
+import { OUTSIDE_ASSETS } from './outside';
+import { DEFAULT_LIGHTING_PRESET, MAX_INTERIOR_LIGHTS, interiorLights, lightSlots, lightingRig, type LightingMode, type LightingPreset, type PointLightSpec } from './lighting';
 
 /** Default image-based light: a soft overcast sky (CC0, Poly Haven). See docs/assets/scene3d.md. */
 export const DEFAULT_ENVIRONMENT_URL = '/env/kloofendal_overcast_puresky_1k.hdr';
@@ -23,7 +25,11 @@ export interface SceneLightingProps {
    * `dollhouse`: sun from above with shadows, for the open-top 3D view.
    * `interior`: lit from inside each room, for walking under ceilings.
    */
-  mode: 'dollhouse' | 'interior';
+  mode: LightingMode;
+  /** Points from the scene towards the sun; overrides the preset's fixed direction (see `planSun`). */
+  sunDirection?: [number, number, number];
+  /** Turn of the image-based light about the vertical, radians (matches the outside backdrop). */
+  environmentRotation?: number;
   /** Equirectangular .hdr used for image-based lighting. `null` turns it off. */
   envUrl?: string | null;
   /** The sun casts shadows. Default true. */
@@ -65,6 +71,11 @@ function roomEnvironment(gl: THREE.WebGLRenderer): THREE.Texture {
 
 function loadEnvironment(url: string): Promise<THREE.Texture> {
   let p = environments.get(url);
+  // The outside panoramas are read for their sun as they load: share that copy.
+  if (!p && Object.values(OUTSIDE_ASSETS).some((a) => a.hdr === url)) {
+    p = loadPanorama(url).then((info) => info.texture);
+    environments.set(url, p);
+  }
   if (!p) {
     p = new Promise<THREE.Texture>((resolve, reject) => {
       new HDRLoader().load(
@@ -83,7 +94,7 @@ function loadEnvironment(url: string): Promise<THREE.Texture> {
 }
 
 /** Sets `scene.environment` while mounted. Returns true once the map is in place. */
-function useEnvironment(url: string | null, intensity: number): boolean {
+function useEnvironment(url: string | null, intensity: number, rotation: number): boolean {
   const scene = useThree((s) => s.scene);
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
@@ -116,6 +127,14 @@ function useEnvironment(url: string | null, intensity: number): boolean {
       scene.environmentIntensity = previous;
     };
   }, [scene, intensity, invalidate, loaded]);
+  useEffect(() => {
+    const previous = scene.environmentRotation.y;
+    scene.environmentRotation.y = rotation;
+    invalidate();
+    return () => {
+      scene.environmentRotation.y = previous;
+    };
+  }, [scene, rotation, invalidate]);
   return loaded;
 }
 
@@ -128,9 +147,11 @@ interface SunProps {
   shadows: boolean;
   mapSize: number;
   softness: number;
+  /** Darkness of the shadow, 0..1. */
+  darkness: number;
 }
 
-function Sun({ level, intensity, color, direction, shadows, mapSize, softness }: SunProps) {
+function Sun({ level, intensity, color, direction, shadows, mapSize, softness, darkness }: SunProps) {
   const light = useMemo(() => new THREE.DirectionalLight(), []);
   const invalidate = useThree((s) => s.invalidate);
   const { min, max } = selectLevelMesh(level).bounds;
@@ -167,9 +188,9 @@ function Sun({ level, intensity, color, direction, shadows, mapSize, softness }:
     shadow.normalBias = 0.03;
     shadow.radius = softness;
     shadow.blurSamples = 12;
-    shadow.intensity = 0.8;
+    shadow.intensity = darkness;
     invalidate();
-  }, [light, invalidate, intensity, color, dx, dy, dz, shadows, mapSize, softness, x0, x1, z0, z1, y1]);
+  }, [light, invalidate, intensity, color, dx, dy, dz, shadows, mapSize, softness, darkness, x0, x1, z0, z1, y1]);
   useEffect(() => () => light.dispose(), [light]);
   return <primitive object={light} />;
 }
@@ -178,15 +199,60 @@ interface LampsProps {
   level: Level;
   color: string;
   scale: number;
+  roomScale?: number;
+  /** Physical falloff (inverse square) with a brighter source: pools of light instead of an even wash. */
+  pools?: boolean;
   resolveEntry?: (catalogId: string) => CatalogEntry | undefined;
   max?: number;
 }
 
+/**
+ * Ceiling lights as soft downward spots: a pool on the table and the floor, walls lit from
+ * above, a ceiling that stays calm instead of burning a hot spot above every fitting.
+ */
+function DownLights({ lights, slots, color }: { lights: PointLightSpec[]; slots: number; color: string }) {
+  const spots = useMemo(
+    () =>
+      Array.from({ length: slots }, () => {
+        const spot = new THREE.SpotLight(color, 0, 0, 1.15, 0.85, 2);
+        spot.target.matrixAutoUpdate = false;
+        return spot;
+      }),
+    [slots], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  useLayoutEffect(() => {
+    spots.forEach((spot, i) => {
+      const l = lights[i];
+      spot.color.set(color);
+      spot.intensity = l ? l.intensity * 4.2 : 0;
+      spot.distance = l ? l.distance : 1;
+      const [x, y, z] = l?.position ?? [0, 0, 0];
+      spot.position.set(x, y, z);
+      spot.target.position.set(x, 0, z);
+      spot.target.updateMatrixWorld();
+    });
+  }, [spots, lights, color]);
+  useEffect(() => () => spots.forEach((s) => s.dispose()), [spots]);
+  return (
+    <>
+      {spots.map((spot, i) => (
+        <primitive key={i} object={spot} />
+      ))}
+    </>
+  );
+}
+
 /** The lights inside the rooms: one per room, or the lamps placed from the catalog. */
-function Lamps({ level, color, scale, resolveEntry, max }: LampsProps) {
+function Lamps({ level, color, scale, roomScale, pools, resolveEntry, max }: LampsProps) {
   const { items, ceilingHeight } = level;
   const rooms = selectRooms(level);
-  const lights = useMemo(() => interiorLights({ items, ceilingHeight }, rooms, { scale, resolveEntry, max }), [items, ceilingHeight, rooms, scale, resolveEntry, max]);
+  const all = useMemo(
+    () => interiorLights({ items, ceilingHeight }, rooms, { scale, resolveEntry, max, roomScale }),
+    [items, ceilingHeight, rooms, scale, resolveEntry, max, roomScale],
+  );
+  // With pools, overhead lights become downward spots and only shaded lamps stay point lights.
+  const down = useMemo(() => (pools ? all.filter((l) => l.overhead) : []), [all, pools]);
+  const lights = useMemo(() => (pools ? all.filter((l) => !l.overhead) : all), [all, pools]);
   // A steady number of slots (the spare ones are dark) keeps materials from recompiling whenever a lamp comes or goes.
   const slots = max === undefined ? lights.length : lightSlots(lights.length, max);
   return (
@@ -197,13 +263,14 @@ function Lamps({ level, color, scale, resolveEntry, max }: LampsProps) {
           <pointLight
             key={i}
             position={light?.position ?? [0, 0, 0]}
-            intensity={light?.intensity ?? 0}
+            intensity={(light?.intensity ?? 0) * (pools ? 1.6 : 1)}
             distance={light?.distance ?? 1}
-            decay={light?.decay ?? 2}
+            decay={pools ? 2 : (light?.decay ?? 2)}
             color={color}
           />
         );
       })}
+      {pools && <DownLights lights={down} slots={max === undefined ? down.length : lightSlots(down.length, max)} color={color} />}
     </>
   );
 }
@@ -224,10 +291,13 @@ export function SceneLighting({
   resolveEntry,
   maxLamps = MAX_INTERIOR_LIGHTS,
   quality = 'high',
+  sunDirection,
+  environmentRotation = 0,
 }: SceneLightingProps) {
   const low = quality === 'low';
-  const hasEnv = useEnvironment(envUrl, lightingRig(preset, mode).environment);
+  const hasEnv = useEnvironment(envUrl, lightingRig(preset, mode).environment, environmentRotation);
   const rig = lightingRig(preset, mode, hasEnv);
+  const cinematic = mode === 'cinematic';
   const { hemisphere, bounce, sun, lamps } = rig;
   return (
     <>
@@ -238,12 +308,25 @@ export function SceneLighting({
       {/* Light bounced off the floor: keeps ceilings, door heads and the undersides of furniture from going grey. */}
       {bounce.intensity > 0 && <directionalLight position={[0, -1, 0]} intensity={bounce.intensity} color={bounce.color} />}
       {/* Under ceilings the sun only gets in through windows (ceilings cast shadows), so the rooms have lamps of their own. */}
-      {sun && <Sun level={level} intensity={sun.intensity} color={sun.color} direction={sun.direction} shadows={shadows && !low} mapSize={shadowMapSize} softness={shadowSoftness} />}
+      {sun && (
+        <Sun
+          level={level}
+          intensity={sun.intensity}
+          color={sun.color}
+          direction={sunDirection ?? sun.direction}
+          shadows={shadows && !low}
+          mapSize={shadowMapSize}
+          softness={shadowSoftness}
+          darkness={cinematic ? 1 : 0.8}
+        />
+      )}
       {lamps && !low && (
         <Lamps
           level={level}
           color={lamps.color}
           scale={lamps.scale}
+          roomScale={lamps.room}
+          pools={cinematic}
           resolveEntry={lamps.fromItems ? resolveEntry : undefined}
           max={lamps.fromItems ? maxLamps : undefined}
         />

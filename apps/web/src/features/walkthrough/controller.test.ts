@@ -2,7 +2,7 @@ import { createSampleLevel, vec } from '@interio/core';
 import { describe, expect, it } from 'vitest';
 import { PLAYER_RADIUS, isFree } from './collision';
 import { RUN_SPEED, WALK_SPEED, WalkController } from './controller';
-import { buildWorld, inRoomOrDoorway, standPoint } from './route';
+import { buildWorld, inRoomOrDoorway, planTour, standPoint } from './route';
 
 const level = createSampleLevel();
 const world = buildWorld(level);
@@ -181,17 +181,21 @@ describe('guided tour playback', () => {
     expect(new Set(c.tourState().visited).size).toBe(10);
   });
 
-  it('pans a full turn at each stop and reports phase and room', () => {
+  it('lingers at each stop: frames the main piece, then pans slowly across to the windows', () => {
     const c = new WalkController(world);
     c.startTour();
     const phases = new Set<string>();
     let turned = 0;
     let yaw = c.yaw;
+    let lookStart: number | null = null;
+    let frames = 0;
     while (c.tourState().index === 0 && c.tourState().status === 'playing') {
       c.update(1 / 30);
+      frames++;
       const s = c.tourState();
       if (s.phase) phases.add(s.phase);
       if (s.phase === 'look') {
+        lookStart ??= frames;
         let d = c.yaw - yaw;
         if (d < -Math.PI) d += 2 * Math.PI;
         if (d > Math.PI) d -= 2 * Math.PI;
@@ -200,9 +204,40 @@ describe('guided tour playback', () => {
       yaw = c.yaw;
     }
     expect([...phases].sort()).toEqual(['look', 'walk']);
-    expect((turned * 180) / Math.PI).toBeCloseTo(360, 0);
+    // A slow sweep, not a full turn: between 30 and 120 degrees.
+    expect(Math.abs((turned * 180) / Math.PI)).toBeGreaterThan(29);
+    expect(Math.abs((turned * 180) / Math.PI)).toBeLessThan(121);
+    // Lingers a few seconds.
+    const lingered = (frames - lookStart!) / 30;
+    expect(lingered).toBeGreaterThan(2.5);
+    expect(lingered).toBeLessThan(8);
     expect(name(c.tourState().roomId)).toBe('Living / Dining');
     expect(c.tourState().visited.map(name)).toEqual(['Foyer']);
+  });
+
+  it('frames the main piece of a furnished room as it arrives, and focuses on it while lingering', () => {
+    const furnished = createSampleLevel();
+    const bedroom = Object.values(furnished.rooms).find((r) => r.name === 'Bedroom 2')!;
+    furnished.items['bed'] = { id: 'bed', catalogId: 'bed.queen', x: 7300, y: 8000, z: 0, rotationDeg: 180, roomId: bedroom.id };
+    const w = buildWorld(furnished);
+    const plan = planTour(w)!;
+    const stop = plan.stops.find((s) => s.roomId === bedroom.id)!;
+    expect(stop.focus).toEqual({ x: 7300, y: 8000 });
+    const c = new WalkController(w);
+    c.startTour({ speed: 4 });
+    let framed: number | null = null;
+    for (let i = 0; i < 60 * 300 && c.tourState().status === 'playing'; i++) {
+      c.update(1 / 60);
+      const s = c.tourState();
+      if (s.roomId === bedroom.id && s.phase === 'look' && framed === null) {
+        framed = Math.abs((((c.yaw * 180) / Math.PI - stop.focusDeg + 540) % 360) - 180);
+        expect(c.tourFocus()).toEqual({ x: 7300, y: 8000 });
+      }
+    }
+    // On arrival the view is on the bed, give or take the last of the glide.
+    expect(framed).not.toBeNull();
+    expect(framed!).toBeLessThan(25);
+    expect(c.tourFocus()).toBeNull();
   });
 
   it('ignores manual input while playing, and hands control back when paused', () => {
