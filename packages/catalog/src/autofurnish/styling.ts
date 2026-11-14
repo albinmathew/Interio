@@ -170,7 +170,7 @@ class Stylist {
     return done;
   }
 
-  /** Floor-length curtains centred on every window and glazed door that has wall beside it. */
+  /** Floor-length curtains centred on every window that has wall beside it. */
   curtains(): void {
     if (!this.mounted || !CURTAINED.has(this.type)) return;
     const existing = this.p.placed.filter((q) => stackWidth(q.entry) > 0);
@@ -334,28 +334,30 @@ class Stylist {
 
 interface CurtainPlan {
   centre: Pt;
-  /** A glazed door rather than a window. */
-  door: boolean;
   /** Curtains that frame the opening, narrowest first. */
   entries: CatalogEntry[];
   pose: (entry: CatalogEntry) => Pose;
 }
 
-/** Windows (not high ventilators) and glazed doors on full walls, with the curtain widths that frame them. */
+/**
+ * Windows on full walls (not high ventilators), with the curtain widths that frame them.
+ * Glazed doors get none: walk mode collides with an item's whole box, so a rod across a
+ * sliding door would close it to people walking through.
+ */
 function curtainPlans(p: Planner): CurtainPlan[] {
   const out: CurtainPlan[] = [];
   for (const run of p.runs) {
     if (run.kind !== 'wall') continue;
     for (const o of run.openings) {
-      if (!(o.kind === 'window' ? o.sill < 1700 : o.kind === 'sliding')) continue;
+      if (o.kind !== 'window' || o.sill >= 1700) continue;
       const mid = (o.s0 + o.s1) / 2;
       // The panels stack beside the opening, clear of its jambs.
-      const need = o.s1 - o.s0 + 2 * CURTAIN_STACK + (o.kind === 'window' ? 40 : 2 * 70);
+      const need = o.s1 - o.s0 + 2 * CURTAIN_STACK + 40;
       const entries = CURTAIN_WIDTHS.filter((v) => v >= need)
         .slice(0, 3)
         .map((w) => E(`curtain.pair.${w}`))
         .filter((e): e is CatalogEntry => !!e);
-      out.push({ centre: vec.add(run.a, vec.scale(run.dir, mid)), door: o.kind !== 'window', entries, pose: (entry) => p.against(run, mid, entry, entry.mountHeight ?? 20, 2) });
+      out.push({ centre: vec.add(run.a, vec.scale(run.dir, mid)), entries, pose: (entry) => p.against(run, mid, entry, entry.mountHeight ?? 20, 2) });
     }
   }
   return out;
@@ -363,16 +365,13 @@ function curtainPlans(p: Planner): CurtainPlan[] {
 
 /**
  * Keeps the wall beside each window free for its curtains while the main pieces are laid
- * out, the way a designer plans the window treatment first. Glazed doors are left out: the
- * media wall of a living room often shares their wall, and the seating plan matters more;
- * they get curtains when the wall beside them is free. Returns the reservations, to be
- * lifted with `releaseCurtains` before the styling pass hangs the curtains.
+ * out, the way a designer plans the window treatment first. Returns the reservations, to
+ * be lifted with `releaseCurtains` before the styling pass hangs the curtains.
  */
 export function reserveCurtains(p: Planner, mounted: boolean): Zone[] {
   if (!mounted || !CURTAINED.has(p.room.type)) return [];
   const zones: Zone[] = [];
   for (const plan of curtainPlans(p)) {
-    if (plan.door) continue;
     const entry = plan.entries.find((e) => p.can(e, plan.pose(e)));
     if (!entry) continue;
     for (const part of partsOf(entry, plan.pose(entry))) {
