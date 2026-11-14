@@ -1,4 +1,3 @@
-/// <reference path="./modules.d.ts" />
 /**
  * The BVH build worker. three-mesh-bvh ships this worker, but it creates it from a URL
  * relative to its own file, which does not survive Vite's dependency pre-bundling; this

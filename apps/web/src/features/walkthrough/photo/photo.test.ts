@@ -244,7 +244,7 @@ describe('tracer helpers', () => {
 
   it('white balance pulls warm light part of the way to neutral, keeping brightness', () => {
     expect(whiteBalance(null, 0.6)).toEqual([1, 1, 1]);
-    const [r, g, b] = whiteBalance([1.2, 1, 0.7], 0.6);
+    const [r, , b] = whiteBalance([1.2, 1, 0.7], 0.6);
     expect(r).toBeLessThan(1);
     expect(b).toBeGreaterThan(1);
     const neutral = whiteBalance([1, 1, 1], 0.6);

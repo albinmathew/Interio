@@ -131,6 +131,8 @@ export class PhotoTracer {
     t.textureSize.set(1024, 1024);
     this.worker = new BvhWorker();
     t.setBVHWorker(this.worker);
+    // The tracer still passes three-mesh-bvh's deprecated `maxLeafTris`; the current name avoids the warning.
+    (this.internals._generator as unknown as { bvhOptions: object }).bvhOptions = { maxLeafTris: 0, targetLeafSize: 1 };
     this.denoiser = new Denoiser(gl);
 
     this.fallbackEnvironment.topColor.set('#dfe9f1');
