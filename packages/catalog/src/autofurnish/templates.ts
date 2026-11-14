@@ -7,10 +7,17 @@ import { vec, type CatalogEntry, type Pt, type RoomType } from '@interio/core';
 import { getEntry } from '../catalog';
 import { rectCorners, rotationFacing } from './geometry';
 import { WALL_GAP, type Placed, type Planner, type Pose, type Run, type WallCandidate } from './planner';
+import type { RoomSeed } from './seed';
 
 export interface TemplateOptions {
   /** Include wall-mounted and ceiling pieces. */
   mounted: boolean;
+  /**
+   * A styling pass follows: leave the pieces it chooses (bedside lamps, pendants over the
+   * table) to it, and pick the rug and floor lamp for the room.
+   */
+  styled?: boolean;
+  seed?: RoomSeed;
 }
 
 const E = (id: string): CatalogEntry | undefined => getEntry(id);
@@ -92,7 +99,7 @@ function diningSet(p: Planner, opts: TemplateOptions, sizes: string[], target: (
       p.tryPlace(chair, p.offset(pose, -hx, 0, pose.rot + 90), { group: g });
       p.tryPlace(chair, p.offset(pose, hx, 0, pose.rot - 90), { group: g });
     }
-    ceilingItem(p, opts, 'light.pendant', { x: pose.x, y: pose.y });
+    if (!opts.styled) ceilingItem(p, opts, 'light.pendant', { x: pose.x, y: pose.y });
     return placedTable;
   }
   return null;
@@ -130,7 +137,7 @@ function bedroom(p: Planner, opts: TemplateOptions): void {
       for (const side of single ? [1, -1] : [-1, 1]) {
         if (!night) break;
         const ns = p.tryPlace(night, p.against(best.run, best.t + side * (bed.dims.w / 2 + 40 + night.dims.w / 2), night), { group: g });
-        if (ns && !lampDone) {
+        if (ns && !lampDone && !opts.styled) {
           const lamp = E('lamp.table.round');
           if (lamp) lampDone = p.tryPlace(lamp, { ...ns.pose, z: night.dims.h }) !== null;
         }
@@ -254,7 +261,8 @@ function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
         tablePose = p.offset(sofaPose, 0, -(best.sofa.dims.d / 2 + 420 + table.dims.d / 2));
         if (!p.tryPlace(table, tablePose, { group: g })) tablePose = null;
       }
-      if (tablePose) {
+      if (opts.styled && opts.seed) seatingRug(p, opts.seed, best.sofa, sofaPose, tablePose);
+      else if (tablePose) {
         for (const id of ['rug.rectangle', 'rug.square', 'rug.round']) if (p.tryPlace(E(id), tablePose, { flat: true })) break;
       }
 
@@ -269,7 +277,7 @@ function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
           if (p.tryPlace(arm, pose, { group: g, clear: 300 })) break;
         }
       }
-      const lamp = E('lamp.floor.round');
+      const lamp = E(opts.styled && opts.seed ? opts.seed.pick('floor-lamp', ['lamp.floor.round', 'lamp.floor.square']) : 'lamp.floor.round');
       if (lamp) {
         for (const side of [1, -1]) {
           if (p.tryPlace(lamp, p.offset(sofaPose, side * (best.sofa.dims.w / 2 + 60 + lamp.dims.w / 2), (best.sofa.dims.d - lamp.dims.d) / 2))) break;
@@ -286,6 +294,32 @@ function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
     diningSet(p, opts, sizes, (c) => (away ? Math.min(vec.dist(c, away), 6000) : -vec.dist(c, p.centroid)) + Math.min(p.wallDistance(c), 1500) * 0.3);
   }
   cornerPlant(p);
+}
+
+/**
+ * The rug of a seating group: under the front legs of the sofa, reaching past the coffee
+ * table towards the screen. The shape varies from home to home; the first that fits wins.
+ */
+function seatingRug(p: Planner, seed: RoomSeed, sofa: CatalogEntry, sofaPose: Pose, tablePose: Pose | null): void {
+  const shapes = seed.order('living-rug', ['rug.large', 'rug.rectangle', 'rug.rounded', 'rug.square']);
+  // Slide along the sofa towards the middle of the room when a doorway is in the way.
+  const towards = vec.dot(vec.sub(p.centroid, sofaPose), vec.rotate({ x: 1, y: 0 }, sofaPose.rot)) >= 0 ? 1 : -1;
+  for (const id of [...shapes, 'rug.round']) {
+    const rug = E(id);
+    if (!rug) continue;
+    const reach = rug.dims.d;
+    for (const under of [220, 120]) {
+      // Long side along the sofa, running `under` mm under its front legs.
+      const ly = -(sofa.dims.d / 2 - under + reach / 2);
+      for (const shift of [0, 150, 300, 450]) {
+        const pose = p.offset(sofaPose, towards * shift, ly, sofaPose.rot);
+        // The rug takes in the coffee table, when there is one.
+        if (tablePose && vec.dist({ x: pose.x, y: pose.y }, tablePose) + 350 > reach / 2) continue;
+        if (p.tryPlace(rug, pose, { flat: true })) return;
+      }
+    }
+  }
+  if (tablePose) for (const id of ['rug.rectangle', 'rug.square', 'rug.round']) if (p.tryPlace(E(id), tablePose, { flat: true })) return;
 }
 
 function dining(p: Planner, opts: TemplateOptions): void {
