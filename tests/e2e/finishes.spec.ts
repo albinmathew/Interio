@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { autoFurnish } from '../../packages/catalog/src';
 import { MATERIAL_LIST } from '../../packages/core/src/materials';
 import type { Level } from '../../packages/core/src/schema';
-import { expectCanvasRendered, expectSaved, expectWalkRendered, gotoMode, openSample } from './helpers';
+import { CANVAS_POLL, expectCanvasRendered, expectSaved, expectWalkRendered, gotoMode, openSample } from './helpers';
 
 /**
  * Styling the sample home in Design mode: room finishes, whole-home furnishing,
@@ -306,7 +306,7 @@ test.describe('finishes and styling', () => {
     expect((await project(page)).settings['viewer3d.lighting']).toBe('night');
     await expectCanvasRendered(page.locator('canvas'));
     // The view really is darker at night.
-    await expect.poll(() => brightness(page)).toBeLessThan(day * 0.7);
+    await expect.poll(() => brightness(page), CANVAS_POLL).toBeLessThan(day * 0.7);
 
     // Saved with the project.
     await expectSaved(page);
@@ -326,7 +326,7 @@ test.describe('finishes and styling', () => {
     await expect(preset).toHaveAttribute('data-preset', 'daylight');
     await gotoMode(page, 'walk');
     await expectWalkRendered(page.locator('canvas'));
-    await expect.poll(() => brightness(page)).toBeGreaterThan(walkNight * 1.1);
+    await expect.poll(() => brightness(page), CANVAS_POLL).toBeGreaterThan(walkNight * 1.1);
   });
 
   test('the camera button downloads a PNG of the view at twice the resolution', async ({ page }) => {

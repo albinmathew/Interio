@@ -40,12 +40,16 @@ export async function expectCanvasRendered(canvas: Locator, minColours = 12): Pr
           return seen.size;
         }, png.toString('base64'));
       },
-      // CI rasterises WebGL in software on two cores: one capture of a continuously
-      // drawing walk view can take most of the old 20 s budget there.
-      { timeout: process.env.CI ? 90_000 : 20_000 },
+      CANVAS_POLL,
     )
     .toBeGreaterThan(minColours);
 }
+
+/**
+ * Time allowed for a poll that captures the canvas. CI rasterises WebGL in software on two
+ * cores, where one capture of a continuously drawing view can take most of 20 s.
+ */
+export const CANVAS_POLL = { timeout: process.env.CI ? 90_000 : 20_000 };
 
 /**
  * Walk mode is drawn: a live, non-blank view. Interior views of an unfurnished home
