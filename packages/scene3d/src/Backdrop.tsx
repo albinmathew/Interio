@@ -4,8 +4,8 @@
  * position of its sun and a small linear copy for the colour of the sky seen through each
  * window (`WindowLights`).
  */
-import { useThree } from '@react-three/fiber';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import type { LightingPreset } from './lighting';
@@ -104,6 +104,77 @@ export interface OutsideProps {
   fallback: string;
   /** Extra multiplier on the backdrop's brightness (the low tier draws it without tone mapping). Default 1. */
   gain?: number;
+  /**
+   * `background`: `scene.background` (image-based tools and the path tracer see it).
+   * `dome`: a sphere drawn after everything solid, so only the pixels seen through the
+   * glass pay for it: the cheaper choice for software renderers. Default `background`.
+   */
+  mode?: 'background' | 'dome';
+}
+
+const DomeShader = {
+  vertexShader: /* glsl */ `
+    varying vec3 vDir;
+    void main() {
+      vDir = position;
+      vec4 p = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      // On the far plane: behind everything, and rejected by the depth test wherever something solid was drawn.
+      gl_Position = p.xyww;
+    }`,
+  fragmentShader: /* glsl */ `
+    #include <common>
+    uniform sampler2D map;
+    uniform float intensity;
+    uniform mat3 turn;
+    varying vec3 vDir;
+    void main() {
+      vec4 c = texture2D( map, equirectUv( normalize( turn * vDir ) ) );
+      gl_FragColor = vec4( c.rgb * intensity, 1.0 );
+      #include <colorspace_fragment>
+    }`,
+};
+
+/** The backdrop as a dome round the camera (see `OutsideProps.mode`). */
+function Dome({ texture, intensity, rotation }: { texture: THREE.Texture; intensity: number; rotation: number }) {
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: { map: { value: null }, intensity: { value: 1 }, turn: { value: new THREE.Matrix3() } },
+        vertexShader: DomeShader.vertexShader,
+        fragmentShader: DomeShader.fragmentShader,
+        side: THREE.BackSide,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    [],
+  );
+  const geometry = useMemo(() => new THREE.SphereGeometry(100, 48, 24), []);
+  useEffect(
+    () => () => {
+      material.dispose();
+      geometry.dispose();
+    },
+    [material, geometry],
+  );
+  useLayoutEffect(() => {
+    material.uniforms['map']!.value = texture;
+    material.uniforms['intensity']!.value = intensity;
+    // Same lookup as three's background: the inverse of the turn.
+    (material.uniforms['turn']!.value as THREE.Matrix3).setFromMatrix4(new THREE.Matrix4().makeRotationY(rotation)).transpose();
+  }, [material, texture, intensity, rotation]);
+  const mesh = useMemo(() => {
+    const m = new THREE.Mesh(geometry, material);
+    m.frustumCulled = false;
+    // Last of the solid objects, before glass and other see-through things.
+    m.renderOrder = 100;
+    m.name = 'outside-dome';
+    m.raycast = () => {};
+    return m;
+  }, [geometry, material]);
+  useFrame(({ camera }) => {
+    mesh.position.copy(camera.position);
+  });
+  return <primitive object={mesh} />;
 }
 
 /**
@@ -111,7 +182,7 @@ export interface OutsideProps {
  * bright and slightly overexposed by day, as in an interior photograph, dim and warm at
  * evening (the grade warms it) and nearly black at night.
  */
-export function Outside({ view, preset, rotation, fallback, gain = 1 }: OutsideProps) {
+export function Outside({ view, preset, rotation, fallback, gain = 1, mode = 'background' }: OutsideProps) {
   const scene = useThree((s) => s.scene);
   const invalidate = useThree((s) => s.invalidate);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
@@ -130,10 +201,12 @@ export function Outside({ view, preset, rotation, fallback, gain = 1 }: OutsideP
     };
   }, [asset.backdrop]);
 
+  const dome = mode === 'dome';
+  const intensity = asset.gain * DIMMING[preset] * gain;
   useLayoutEffect(() => {
     const before = { background: scene.background, intensity: scene.backgroundIntensity, rotation: scene.backgroundRotation.clone() };
-    scene.background = texture ?? new THREE.Color(fallback);
-    scene.backgroundIntensity = texture ? asset.gain * DIMMING[preset] * gain : 1;
+    scene.background = texture && !dome ? texture : new THREE.Color(fallback);
+    scene.backgroundIntensity = texture && !dome ? intensity : 1;
     scene.backgroundRotation.set(0, rotation, 0);
     invalidate();
     return () => {
@@ -141,6 +214,6 @@ export function Outside({ view, preset, rotation, fallback, gain = 1 }: OutsideP
       scene.backgroundIntensity = before.intensity;
       scene.backgroundRotation.copy(before.rotation);
     };
-  }, [scene, texture, fallback, asset.gain, preset, rotation, gain, invalidate]);
-  return null;
+  }, [scene, texture, fallback, intensity, rotation, dome, invalidate]);
+  return dome && texture ? <Dome texture={texture} intensity={intensity} rotation={rotation} /> : null;
 }

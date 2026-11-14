@@ -96,7 +96,7 @@ export default function Walkthrough() {
   const glazing = useMemo(() => (level ? exteriorGlazing(level, selectRooms(level)) : []), [level]);
   const sun = useMemo(() => planSun(glazing, lighting), [glazing, lighting]);
   const panorama = usePanorama(outside);
-  const rotation = panoramaRotation(panorama, cinematic ? sun.azimuth : null);
+  const rotation = panoramaRotation(panorama, sun.azimuth);
   // Shader compilation and texture uploads make the first seconds slow: judge the frame rate after that.
   const [warm, setWarm] = useState(false);
   useEffect(() => {
@@ -253,7 +253,7 @@ export default function Walkthrough() {
         camera={{ position: [start.x / 1000, walkUi.get().eyeHeight / 1000, -start.y / 1000], fov, near: 0.05, far: 200 }}
         onCreated={({ gl }) => setCanvas(gl.domElement)}
       >
-        <Outside view={outside} preset={lighting} rotation={rotation} fallback={rig.background} gain={cinematic ? 1 : 0.75} />
+        <Outside view={outside} preset={lighting} rotation={rotation} fallback={rig.background} mode={cinematic ? 'background' : 'dome'} />
         {tierState.tier !== 'low' && warm && !pinned && (
           <PerformanceMonitor flipflops={3} onDecline={() => setTierState(declineTier)} onFallback={() => setTierState({ tier: 'low', step: 0 })} />
         )}
