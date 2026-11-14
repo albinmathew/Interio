@@ -29,7 +29,13 @@ export function lightingFromSettings(settings: Record<string, unknown> | null | 
   return resolveLightingPreset(settings?.[LIGHTING_SETTING]);
 }
 
-export type LightingMode = 'dollhouse' | 'interior';
+/**
+ * `dollhouse`: the open-top Design view. `interior`: walking under ceilings, the cheap rig
+ * software renderers get. `cinematic`: walking on a GPU, where the sun falls through the
+ * windows with soft shadows, window light and the outside panorama carry the daylight and
+ * the fill steps back so rooms keep their contrast.
+ */
+export type LightingMode = 'dollhouse' | 'interior' | 'cinematic';
 
 export interface LightingRig {
   /** Backdrop of the dollhouse view, sky colour seen through windows when walking. */
@@ -43,8 +49,60 @@ export interface LightingRig {
   bounce: { color: string; intensity: number };
   /** Sun or moon. `direction` points from the scene towards the light. Null: no directional light. */
   sun: { color: string; intensity: number; direction: [number, number, number] } | null;
-  /** Lamps inside the rooms. Null: none (the daylight dollhouse). */
-  lamps: { color: string; scale: number; fromItems: boolean } | null;
+  /** Lamps inside the rooms. Null: none (the daylight dollhouse). `room` scales the default ceiling light of each room (default 1). */
+  lamps: { color: string; scale: number; fromItems: boolean; room?: number } | null;
+  /** Strength of the sky light pouring in through the windows (`cinematic` only; 0 for none). */
+  windows?: number;
+  /** Exposure for the tone mapping of the cinematic view. */
+  exposure?: number;
+}
+
+const GOLDEN_SUN = '#ffa45c';
+
+/** The walk view on a GPU (see `LightingMode`). */
+function cinematicRig(preset: LightingPreset, hasEnv: boolean): LightingRig {
+  switch (preset) {
+    case 'evening':
+      return {
+        background: '#f0c49c',
+        // Image-based light ignores walls: kept faint indoors, for reflections more than for light.
+        environment: 0.03,
+        hemisphere: { sky: '#ffe2c4', ground: '#b98f6a', intensity: hasEnv ? 0.08 : 0.2 },
+        ambient: 0,
+        bounce: { color: '#ffcf9c', intensity: 0.16 },
+        sun: { color: GOLDEN_SUN, intensity: 4.2, direction: EVENING_SUN },
+        lamps: { color: '#ffd2a1', scale: 0.32, fromItems: true, room: 0.35 },
+        windows: 0.5,
+        exposure: 1.2,
+      };
+    case 'night':
+      return {
+        background: '#0b0f17',
+        environment: 0.012,
+        hemisphere: { sky: '#46536b', ground: '#7d6146', intensity: hasEnv ? 0.08 : 0.14 },
+        ambient: 0,
+        bounce: { color: '#ffd09c', intensity: 0.16 },
+        sun: null,
+        lamps: { color: '#ffd2a1', scale: 0.5, fromItems: true, room: 0.5 },
+        windows: 0,
+        exposure: 0.95,
+      };
+    default:
+      return {
+        background: '#dfe9f1',
+        // Image-based light ignores walls: kept faint indoors, so the sun and the windows shape the rooms.
+        environment: 0.08,
+        hemisphere: { sky: '#f4f7ff', ground: '#eadfce', intensity: hasEnv ? 0.55 : 0.7 },
+        ambient: 0,
+        // Sunlit floors throw a lot of light back up: ceilings and the undersides of things stay airy.
+        bounce: { color: '#fff1dd', intensity: 0.38 },
+        sun: { color: '#fff1dc', intensity: 4.1, direction: DAY_SUN },
+        // The sun, the windows and the sky carry the day: no lamps, no hot spots on the ceilings.
+        lamps: null,
+        windows: 1,
+        exposure: 1.5,
+      };
+  }
 }
 
 /** From the south-west (plan -x, -y), fairly high, so it reaches into rooms through southern and western openings. */
@@ -61,6 +119,7 @@ const WARM_LAMP = '#ffe0ba';
  * fill lights are then a little stronger. Daylight is the look the product shipped with.
  */
 export function lightingRig(preset: LightingPreset, mode: LightingMode, hasEnv = true): LightingRig {
+  if (mode === 'cinematic') return cinematicRig(preset, hasEnv);
   if (mode === 'dollhouse') {
     switch (preset) {
       case 'evening':
@@ -140,6 +199,8 @@ export interface PointLightSpec {
   /** `room`: a ceiling light the room gets by default. `lamp`: a placed catalog item. */
   source: 'room' | 'lamp';
   roomKey: string;
+  /** At the ceiling and shining down (room lights, pendants, flush lights, downlights), as opposed to a lamp with a shade that glows all round. */
+  overhead: boolean;
 }
 
 /** Most point lights a scene gets from `interiorLights`: every one is paid for by every lit pixel. */
@@ -180,6 +241,8 @@ export interface InteriorLightOptions {
   resolveEntry?: (catalogId: string) => CatalogEntry | undefined;
   /** Upper bound on the number of lights. Default unlimited (a light per room, as daylight always had). */
   max?: number;
+  /** Multiplier on each room's own default ceiling light (not on lamps from the catalog). Default 1. */
+  roomScale?: number;
 }
 
 /**
@@ -225,7 +288,7 @@ export function interiorLights(
     for (const { item } of overhead) {
       // Below the fitting, and never so close to the ceiling that it burns a hot spot into it.
       const y = Math.min((item.z - 100) / 1000, ceilingY);
-      lights.push({ ...base, key: `lamp:${item.id}`, source: 'lamp', position: [item.x / 1000, y, -item.y / 1000], intensity: base.intensity * share });
+      lights.push({ ...base, key: `lamp:${item.id}`, source: 'lamp', overhead: true, position: [item.x / 1000, y, -item.y / 1000], intensity: base.intensity * share });
     }
     if (overhead.length === 0) {
       // Other lamps carry part of the room, so its own light steps back.
@@ -233,8 +296,9 @@ export function interiorLights(
         ...base,
         key: `room:${roomKey}`,
         source: 'room',
+        overhead: true,
         position: [room.centroid.x / 1000, ceilingY, -room.centroid.y / 1000],
-        intensity: base.intensity * (own.length ? 0.5 : 1),
+        intensity: base.intensity * (own.length ? 0.5 : 1) * (opts.roomScale ?? 1),
       });
     }
     for (const { item, entry, kind } of own) {
@@ -256,6 +320,7 @@ export function interiorLights(
       extra.push({
         key: `lamp:${item.id}`,
         source: 'lamp',
+        overhead: kind === 'spot',
         roomKey,
         position: [x / 1000, z / 1000, -y / 1000],
         intensity: spec.intensity * scale,

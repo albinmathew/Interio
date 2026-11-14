@@ -35,8 +35,8 @@ function loadGlb(url: string): Promise<THREE.Object3D> {
   return p.then((scene) => scene.clone(true));
 }
 
-async function entryObject(entry: CatalogEntry): Promise<THREE.Object3D> {
-  if (entry.model.kind === 'parametric') return buildParametric(entry);
+async function entryObject(entry: CatalogEntry, finishes?: Record<string, string>): Promise<THREE.Object3D> {
+  if (entry.model.kind === 'parametric') return buildParametric(entry, finishes);
   return fitToDims(await loadGlb(entry.model.url), entry);
 }
 
@@ -263,6 +263,11 @@ export interface LevelRenderOptions {
   roomId?: string;
   /** Wall height cap in mm, so interiors stay visible. */
   wallHeight?: number;
+  /**
+   * Eye-level view from a plan point (mm) at a height, looking at a target. Walls are
+   * drawn full height with their doors and windows cut out.
+   */
+  eye?: { x: number; y: number; z: number; tx: number; ty: number; tz: number; fov?: number };
 }
 
 const FLOOR_COLOURS: Record<string, string> = {
@@ -284,6 +289,49 @@ function extrude(outline: { x: number; y: number }[], height: number, material: 
   return mesh;
 }
 
+/** Full-height walls as boxes along their centrelines, cut at doors, passages and windows; glass in the windows. */
+function cutWalls(level: Level, wallMat: THREE.Material, railMat: THREE.Material): THREE.Object3D[] {
+  const out: THREE.Object3D[] = [];
+  const glass = new THREE.MeshStandardMaterial({ color: '#cfe3ee', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.25 });
+  const piece = (a: { x: number; y: number }, dir: { x: number; y: number }, s0: number, s1: number, t: number, z0: number, z1: number, mat: THREE.Material) => {
+    if (s1 - s0 < 1 || z1 - z0 < 1) return;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry((s1 - s0) / 1000, (z1 - z0) / 1000, t / 1000), mat);
+    const mid = (s0 + s1) / 2;
+    mesh.position.set((a.x + dir.x * mid) / 1000, (z0 + z1) / 2000, -(a.y + dir.y * mid) / 1000);
+    mesh.rotation.y = Math.atan2(dir.y, dir.x);
+    mesh.userData.wall = true;
+    mesh.receiveShadow = true;
+    out.push(mesh);
+  };
+  for (const wall of Object.values(level.walls)) {
+    const a = level.vertices[wall.a];
+    const b = level.vertices[wall.b];
+    if (!a || !b || wall.kind === 'divider') continue;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const dir = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+    const mat = wall.kind === 'railing' ? railMat : wallMat;
+    // Run the boxes past the ends by half the thickness so corners close.
+    const ext = wall.thickness / 2;
+    const openings = Object.values(level.openings)
+      .filter((o) => o.wallId === wall.id)
+      .sort((p, q) => p.offset - q.offset);
+    let cursor = -ext;
+    for (const o of openings) {
+      const s0 = o.offset - o.width / 2;
+      const s1 = o.offset + o.width / 2;
+      piece(a, dir, cursor, s0, wall.thickness, 0, wall.height, mat);
+      if (o.kind === 'window') {
+        piece(a, dir, s0, s1, wall.thickness, 0, o.sill, mat);
+        piece(a, dir, s0, s1, 20, o.sill, o.sill + o.height, glass);
+      }
+      piece(a, dir, s0, s1, wall.thickness, Math.min(wall.height, o.sill + o.height), wall.height, mat);
+      cursor = s1;
+    }
+    piece(a, dir, cursor, len + ext, wall.thickness, 0, wall.height, mat);
+  }
+  return out;
+}
+
 async function renderLevel(level: Level, items: Omit<Item, 'id'>[], opts: LevelRenderOptions): Promise<string> {
   const s = getStudio();
   s.clear();
@@ -291,11 +339,14 @@ async function renderLevel(level: Level, items: Omit<Item, 'id'>[], opts: LevelR
   const rooms = deriveRooms(level);
   const wallMat = new THREE.MeshStandardMaterial({ color: '#f1eee8', roughness: 0.9 });
   const railMat = new THREE.MeshStandardMaterial({ color: '#8f989c', roughness: 0.6 });
-  const cap = opts.wallHeight ?? 1100;
-  for (const fp of wallFootprints(level)) {
-    const wall = level.walls[fp.wallId];
-    if (!wall) continue;
-    root.add(extrude(fp.polygon, Math.min(wall.height, cap), wall.kind === 'railing' ? railMat : wallMat));
+  const cap = opts.eye ? level.ceilingHeight : (opts.wallHeight ?? 1100);
+  if (opts.eye) root.add(...cutWalls(level, wallMat, railMat));
+  else {
+    for (const fp of wallFootprints(level)) {
+      const wall = level.walls[fp.wallId];
+      if (!wall) continue;
+      root.add(extrude(fp.polygon, Math.min(wall.height, cap), wall.kind === 'railing' ? railMat : wallMat));
+    }
   }
   for (const room of rooms) {
     const type = room.roomId ? level.rooms[room.roomId]?.type : undefined;
@@ -305,7 +356,7 @@ async function renderLevel(level: Level, items: Omit<Item, 'id'>[], opts: LevelR
     root.add(floor);
   }
   // Openings: tint the floor strip so doors and windows read in the render.
-  for (const o of Object.values(level.openings)) {
+  for (const o of opts.eye ? [] : Object.values(level.openings)) {
     const wall = level.walls[o.wallId];
     const a = wall && level.vertices[wall.a];
     const b = wall && level.vertices[wall.b];
@@ -327,7 +378,8 @@ async function renderLevel(level: Level, items: Omit<Item, 'id'>[], opts: LevelR
   for (const item of items) {
     const entry = getEntry(item.catalogId);
     if (!entry) continue;
-    const obj = await entryObject(entry);
+    const obj = await entryObject(entry, item.finishes);
+    if (item.scale && item.scale !== 1) obj.scale.setScalar(item.scale);
     const holder = new THREE.Group();
     holder.position.set(item.x / 1000, (item.z ?? 0) / 1000, -item.y / 1000);
     holder.rotation.y = planDegToWorldYaw(item.rotationDeg ?? 0);
@@ -351,8 +403,18 @@ async function renderLevel(level: Level, items: Omit<Item, 'id'>[], opts: LevelR
   }
   s.ground.visible = false;
   s.aimLight(new THREE.Box3().setFromObject(root), new THREE.Vector3(-0.5, 1.4, 0.6));
-  const camera = new THREE.PerspectiveCamera(26, opts.width / opts.height, 0.05, 500);
-  s.frame(camera, box, opts.azimuth ?? 20, opts.elevation ?? 55, 1.04);
+  const camera = new THREE.PerspectiveCamera(opts.eye?.fov ?? 26, opts.width / opts.height, 0.05, 500);
+  if (opts.eye) {
+    const e = opts.eye;
+    // Walls would shade the whole room from the key light: light the interior from the fill and sky instead.
+    root.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh && o.userData.wall) o.castShadow = false;
+    });
+    camera.position.set(e.x / 1000, e.z / 1000, -e.y / 1000);
+    camera.near = 0.05;
+    camera.lookAt(e.tx / 1000, e.tz / 1000, -e.ty / 1000);
+    camera.updateProjectionMatrix();
+  } else s.frame(camera, box, opts.azimuth ?? 20, opts.elevation ?? 55, 1.04);
   const canvas = downscale(s.render(opts.width * 2, opts.height * 2, camera), opts.width, opts.height, '#f6f4ef');
   s.clear();
   s.ground.visible = true;

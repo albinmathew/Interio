@@ -88,6 +88,20 @@ polyhaven hessian_230 jute "color normal"
 
 want env && mkdir -p "$DEST/env" && curl -sS -f --retry 4 --retry-all-errors --connect-timeout 30 -A "$UA" "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_overcast_puresky_1k.hdr" -o "$DEST/env/kloofendal_overcast_puresky_1k.hdr"
 
+# The world outside the windows in walk mode (`scene.outside`): per panorama the 1k HDR
+# (image-based light, the sun's position, the sky through each window) and a 2k backdrop
+# cut from Poly Haven's tone-mapped JPG of the same panorama (quality 82).
+outside() { # asset
+  want outside || return 0
+  mkdir -p "$DEST/env" "$TMP/outside"
+  curl -sS -f --retry 4 --retry-all-errors --connect-timeout 30 -A "$UA" "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/${1}_1k.hdr" -o "$DEST/env/${1}_1k.hdr"
+  curl -sS -f --retry 4 --retry-all-errors --connect-timeout 60 -A "$UA" "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/${1}.jpg" -o "$TMP/outside/$1.jpg"
+  sips -s format jpeg -s formatOptions 82 -z 1024 2048 "$TMP/outside/$1.jpg" --out "$DEST/env/${1}_2k.jpg" >/dev/null
+}
+outside roof_garden
+outside hotel_rooftop_balcony
+outside kloofendal_48d_partly_cloudy_puresky
+
 # Palette swatches, cut from the colour maps.
 bash "$(dirname "$0")/make-swatches.sh"
 

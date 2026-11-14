@@ -49,6 +49,20 @@ const glass = () =>
     depthWrite: false,
     envMapIntensity: 1.1,
   });
+/**
+ * Glass seen from inside: it takes a little light away and reflects, but does not glow
+ * milky in the sun, so the world outside stays crisp.
+ */
+const clearGlass = () =>
+  new THREE.MeshStandardMaterial({
+    color: '#0e1416',
+    roughness: 0.02,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.1,
+    depthWrite: false,
+    envMapIntensity: 0.6,
+  });
 
 interface Part {
   key: string;
@@ -83,7 +97,7 @@ function Parts({ parts }: { parts: Part[] }) {
   );
 }
 
-function OpeningObject({ level, opening, doorsOpen, fade }: { level: Level; opening: Opening; doorsOpen: boolean; fade?: WallFadeController }) {
+function OpeningObject({ level, opening, doorsOpen, fade, clear }: { level: Level; opening: Opening; doorsOpen: boolean; fade?: WallFadeController; clear?: boolean }) {
   const wall = level.walls[opening.wallId];
   const thickness = wall?.thickness;
   const height = wall?.height;
@@ -98,9 +112,9 @@ function OpeningObject({ level, opening, doorsOpen, fade }: { level: Level; open
       ...part('frame', spec.frame, () => solid(look.frame)),
       ...part('leaf', spec.leaf, () => solid(look.leaf)),
       ...part('metal', spec.metal, () => solid(look.metal)),
-      ...part('glass', spec.glass, glass, false),
+      ...part('glass', spec.glass, clear ? clearGlass : glass, false),
     ];
-  }, [opening, thickness, height, doorsOpen, bodiless]);
+  }, [opening, thickness, height, doorsOpen, bodiless, clear]);
   useDisposable(parts);
   useEffect(() => {
     if (!parts || !fade) return;
@@ -129,14 +143,16 @@ export interface OpeningsLayerProps {
   /** Openings that stay shut while the others stand open (the front door when walking). */
   closedDoors?: readonly Id[];
   fade?: WallFadeController;
+  /** Clear glass for views from inside (walk mode); a light tint otherwise, so panes read from above. */
+  clearGlass?: boolean;
 }
 
 /** Door frames and leaves, sliding doors and windows for every opening of the level. */
-export function OpeningsLayer({ level, doorsOpen = true, closedDoors, fade }: OpeningsLayerProps) {
+export function OpeningsLayer({ level, doorsOpen = true, closedDoors, fade, clearGlass: clear }: OpeningsLayerProps) {
   return (
     <group name="openings">
       {Object.values(level.openings).map((o) => (
-        <OpeningObject key={o.id} level={level} opening={o} doorsOpen={doorsOpen && !closedDoors?.includes(o.id)} fade={fade} />
+        <OpeningObject key={o.id} level={level} opening={o} doorsOpen={doorsOpen && !closedDoors?.includes(o.id)} fade={fade} clear={clear} />
       ))}
     </group>
   );

@@ -5,7 +5,8 @@ Lighting and surface assets used by `packages/scene3d`. Everything here is **CC0
 shipped file can be traced to its source.
 
 - Files live under `apps/web/public/textures/<set>/` and `apps/web/public/env/`.
-- 97 files, 22 MB in total: 32 texture sets (70 maps and 26 palette swatches, 20.6 MB) and one HDRI (1.1 MB).
+- 103 files, 28.8 MB in total: 32 texture sets (70 maps and 26 palette swatches, 20.6 MB), one HDRI for image-based light (1.1 MB)
+  and three outside panoramas for walk mode (6 files, 6.8 MB).
   The furniture and new-finish sets added with the premium furniture (20 sets, 48 files) weigh 12.9 MB.
 - `packages/scene3d/scripts/fetch-textures.sh` downloads and recompresses the whole set again,
   then runs `make-swatches.sh`.
@@ -39,6 +40,24 @@ three's `RoomEnvironment`, generated on the GPU.
 | Asset | File | Source | Licence |
 |---|---|---|---|
 | Kloofendal Overcast (Pure Sky), 1k | `env/kloofendal_overcast_puresky_1k.hdr` | Poly Haven, https://polyhaven.com/a/kloofendal_overcast_puresky | CC0-1.0 |
+
+## Outside panoramas (walk mode)
+
+What the windows look out on in walk mode, picked per project in `project.settings['scene.outside']`
+(`greenery` by default, `city`, `sky`; `packages/scene3d/src/outside.ts`). Each panorama ships twice:
+the unmodified 1k `.hdr` (image-based light, the position of its sun, the colour of the sky seen
+through each window) and a 2048 x 1024 backdrop seen through the glass, cut with `sips` (JPEG quality
+82) from Poly Haven's tone-mapped JPG of the same panorama. `fetch-textures.sh` fetches them
+(`ONLY=outside`).
+
+| View | Files | Asset | Source | Licence |
+|---|---|---|---|---|
+| `greenery` | `env/roof_garden_1k.hdr` (1.7 MB), `env/roof_garden_2k.jpg` (0.75 MB) | Roof Garden | Poly Haven, https://polyhaven.com/a/roof_garden | CC0-1.0 |
+| `city` | `env/hotel_rooftop_balcony_1k.hdr` (1.6 MB), `env/hotel_rooftop_balcony_2k.jpg` (0.38 MB) | Hotel Rooftop Balcony | Poly Haven, https://polyhaven.com/a/hotel_rooftop_balcony | CC0-1.0 |
+| `sky` | `env/kloofendal_48d_partly_cloudy_puresky_1k.hdr` (1.4 MB), `env/kloofendal_48d_partly_cloudy_puresky_2k.jpg` (0.22 MB) | Kloofendal 48d Partly Cloudy (Pure Sky) | Poly Haven, https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky | CC0-1.0 |
+
+The panorama is turned (`scene.backgroundRotation`, `environmentRotation`) so its brightest point,
+its sun, stands where the scene's sun is.
 
 ## Texture sets
 
@@ -124,3 +143,49 @@ The Design view picks a tier (`apps/web/src/features/viewer3d/Effects.tsx`):
   colour maps only (no normal or roughness maps). Walk mode applies the same savings.
 
 The Showcase view uses the composer on any GPU. Tone mapping is Khronos PBR Neutral.
+
+## Walk mode: the cinematic look (no assets beyond the panoramas)
+
+Walk mode (`apps/web/src/features/walkthrough`, tiers in `tier.ts`) lights the home with the
+`cinematic` rig of `lighting.ts` on a GPU:
+
+- **Sun.** `planSun` (`sun.ts`) aims it at the home's outside glazing: by day at 36 degrees through
+  the living rooms' windows, at golden hour at 19 degrees, warm, raking into the bedrooms. PCF soft
+  shadows from a frustum fitted to the home; ceilings cast them, so sunlight only enters through
+  openings.
+- **Window light.** `WindowLights`: rectangular area lights in the 6 (medium: 4) openings nearest the
+  walker, coloured and scaled by the panorama's half in front of each opening. Image-based light from
+  the panorama itself is kept faint indoors (it ignores walls).
+- **Lamps.** At most 12 real lights (`MAX_INTERIOR_LIGHTS`); ceiling fittings become soft downward
+  spots, shaded lamps inverse-square point lights. Bulbs, fabric shades, opal diffusers, the white
+  inside of metal domes and candles glow by their material (`ItemsLayer`).
+- **Coves** (`cove.ts`, `Coves.tsx`): a soffit round living rooms and bedrooms with an unlit, additive
+  LED line and ceiling wash; `project.settings['scene.coveLights']`, on by default in the evening and
+  at night.
+- **Glossy floors** (`FloorMirror.tsx`, `reflectance.ts`): one mirrored view at half resolution for all
+  floors (they lie at height 0), blurred through its mip chain by the finish and its roughness map,
+  faded by Fresnel. Marble strongest, tile and stone less, lacquered wood faintly, carpet not at all.
+- **Image** (`walkthrough/Effects.tsx`, `post.ts`): multisampled HDR render, GTAO, a firefly clamp,
+  depth of field only while the tour lingers, bloom (threshold 2.6 in linear light: lamps, coves and
+  bright sky bloom, lit walls do not), a warm grade and vignette per preset, ACES filmic tone mapping.
+
+Tiers: `high` everything; `medium` (the frame rate dropped) without reflections and depth of field, then
+with a 2048 px instead of 4096 px shadow map; `low` (software renderers) the forward render walk mode
+always had, plus the outside panorama (drawn as a depth-tested dome, so only pixels seen through glass
+cost anything) and glowing lamps and coves without bloom. `?tier=high|medium|medium1|low` pins a tier.
+
+Frame cost, furnished and styled sample home (108 items), 1280 x 800, every pass included (floor
+reflection, shadow maps, post-processing; `__interioWalk.stats()`, best of six, three viewpoints), Apple
+M5 Pro (Metal). All GPU tiers draw at pixel ratio 1 with 4x multisampling: at a Retina ratio of 2 the
+high tier cost 47 to 50 ms a frame. Daylight / evening, mean of the viewpoints:
+
+| Tier | Screen ratio 1 | Screen ratio 2 (Retina) |
+|---|---|---|
+| high | 11.7 / 17.9 ms | 13.0 / 16.8 ms |
+| medium | 10.5 / 11.7 ms | 9.7 / 10.6 ms |
+| medium, 2048 px shadow map | 9.4 / 14.6 ms | 8.9 / 11.4 ms |
+| low | 2.6 / 3.5 ms | 3.2 / 2.8 ms |
+
+SwiftShader (the e2e suite and CI), low tier, frame interval by `requestAnimationFrame`: 28 to 57 ms
+by day and 33 to 82 ms in the evening across the viewpoints, against 49 to 59 ms and 31 to 120 ms for
+walk mode before this change on the same home and machine (a shared, noisy machine: no regression).

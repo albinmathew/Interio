@@ -63,12 +63,30 @@ export interface Zone {
   group?: number;
 }
 
+/** A solid piece of an item for collision tests: a plan rectangle between two heights. */
+export interface Part {
+  rect: Pt[];
+  zMin: number;
+  zMax: number;
+  /** May pass in front of a window (a curtain rod above the glass). */
+  overWindow?: boolean;
+}
+
 export interface Placed {
   entry: CatalogEntry;
   pose: Pose;
   rect: Pt[];
   zMin: number;
   zMax: number;
+  /**
+   * The item's solid pieces when its box is mostly empty: curtains stacked beside a window
+   * are two panels and a rod. Absent: the whole box is solid.
+   */
+  parts?: Part[];
+  /** Finish per slot, from the room's colour scheme. */
+  finishes?: Record<string, string>;
+  /** Added by the styling pass. */
+  styled?: boolean;
   /** Floor coverings: other items may stand on them. */
   flat: boolean;
   group?: number;
@@ -102,6 +120,33 @@ export interface WallCandidate {
 }
 
 const isPassage = (o: RunOpening) => o.kind !== 'window';
+
+/** Width of each gathered curtain panel (`params.stack`), or 0 for entries that are not stacked curtains. */
+export function stackWidth(entry: CatalogEntry): number {
+  const v = entry.model.kind === 'parametric' ? entry.model.params?.stack : undefined;
+  return typeof v === 'number' ? v : 0;
+}
+
+/** Height of the band at the top of a stacked curtain that holds the rod, mm. */
+export const ROD_BAND = 90;
+
+/**
+ * Solid pieces of an item at a pose: stacked curtains are two full-height panels at the
+ * ends of the rod plus the rod band across the top; everything else is its box.
+ */
+export function partsOf(entry: CatalogEntry, pose: Pose, pad = 0): Part[] {
+  const { w, d, h } = entry.dims;
+  const stack = stackWidth(entry);
+  if (stack <= 0) return [{ rect: rectCorners(pose.x, pose.y, w + 2 * pad, d, pose.rot), zMin: pose.z, zMax: pose.z + h }];
+  const panel = (side: number) => {
+    const c = localToPlan(pose.x, pose.y, pose.rot, side * (w / 2 - stack / 2), 0);
+    return { rect: rectCorners(c.x, c.y, stack + 2 * pad, d, pose.rot), zMin: pose.z, zMax: pose.z + h };
+  };
+  return [panel(-1), panel(1), { rect: rectCorners(pose.x, pose.y, w + 2 * pad, d, pose.rot), zMin: pose.z + h - ROD_BAND, zMax: pose.z + h, overWindow: true }];
+}
+
+const solids = (p: Placed): Part[] => p.parts ?? [{ rect: p.rect, zMin: p.zMin, zMax: p.zMax }];
+const hits = (a: Part, b: Part) => a.zMin < b.zMax - 1 && b.zMin < a.zMax - 1 && convexOverlap(a.rect, b.rect);
 
 export class Planner {
   readonly polygon: Pt[];
@@ -271,6 +316,7 @@ export class Planner {
         zMax: pose.z + entry.dims.h * scale,
         flat: entry.dims.h <= 30,
         existing: true,
+        ...(stackWidth(entry) > 0 && scale === 1 ? { parts: partsOf(entry, pose) } : {}),
       });
     }
   }
@@ -317,29 +363,34 @@ export class Planner {
       if (zone.group !== undefined && zone.group === group) continue;
       if (zMin < zone.zMax - 1 && zone.zMin < zMax - 1 && convexOverlap(rect, zone.rect)) return false;
     }
+    const part: Part = { rect, zMin, zMax };
     for (const p of this.placed) {
       if (p.flat) continue;
-      if (zMin < p.zMax - 1 && p.zMin < zMax - 1 && convexOverlap(rect, p.rect)) return false;
+      if (solids(p).some((q) => hits(part, q))) return false;
     }
     return true;
   }
 
   can(entry: CatalogEntry, pose: Pose, opts: PlaceOptions = {}): boolean {
     const rect = this.footprint(entry, pose, opts.pad ?? 0);
-    const zMin = pose.z;
     const zMax = pose.z + entry.dims.h;
     if (zMax > this.level.ceilingHeight + 1) return false;
     if (!insidePolygon(rect, this.polygon)) return false;
     if (entry.anchor === 'wall' && !this.wallBehind(entry, pose)) return false;
+    const parts = partsOf(entry, pose, opts.pad ?? 0);
     for (const zone of this.zones) {
       if (opts.flat && zone.kind !== 'door') continue;
       if (zone.group !== undefined && zone.group === opts.group) continue;
-      if (zMin < zone.zMax - 1 && zone.zMin < zMax - 1 && convexOverlap(rect, zone.rect)) return false;
+      for (const part of parts) {
+        if (part.overWindow && zone.kind === 'window') continue;
+        if (hits(part, zone)) return false;
+      }
     }
     if (!opts.flat) {
       for (const p of this.placed) {
         if (p.flat) continue;
-        if (zMin < p.zMax - 1 && p.zMin < zMax - 1 && convexOverlap(rect, p.rect)) return false;
+        const theirs = solids(p);
+        if (parts.some((a) => theirs.some((b) => hits(a, b)))) return false;
       }
     }
     if (opts.clear) {
@@ -365,8 +416,18 @@ export class Planner {
       if (dist < 0 || dist > entry.dims.d / 2 + 60) continue;
       if (s < entry.dims.w / 2 - 5 || s > run.len - entry.dims.w / 2 + 5) continue;
       if (run.kind !== 'wall' || run.height < pose.z + entry.dims.h) return false;
-      // Never across a door, passage or sliding door.
-      return !run.openings.some((o) => isPassage(o) && o.s0 < s + entry.dims.w / 2 && o.s1 > s - entry.dims.w / 2 && pose.z < o.top + 50);
+      // Never across a door, passage or sliding door. Stacked curtains may frame one: their
+      // panels stand clear of the opening and its jambs, and only the rod crosses it, above the head.
+      const w = entry.dims.w;
+      const stack = stackWidth(entry);
+      if (stack <= 0) return !run.openings.some((o) => isPassage(o) && o.s0 < s + w / 2 && o.s1 > s - w / 2 && pose.z < o.top + 50);
+      const lo = s - w / 2;
+      const hi = s + w / 2;
+      return !run.openings.some((o) => {
+        if (!isPassage(o) || o.s0 >= hi || o.s1 <= lo) return false;
+        const onPanel = o.s0 < lo + stack + JAMB_MARGIN || o.s1 > hi - stack - JAMB_MARGIN;
+        return onPanel || pose.z + entry.dims.h - ROD_BAND < o.top + 50;
+      });
     }
     return false;
   }
@@ -381,6 +442,7 @@ export class Planner {
       flat: opts.flat ?? false,
       group: opts.group,
       existing: false,
+      ...(stackWidth(entry) > 0 ? { parts: partsOf(entry, pose) } : {}),
     };
     this.placed.push(placed);
     if (opts.clear) this.zones.push({ rect: this.clearance(entry, pose, opts.clear), zMin: 0, zMax: PERSON, kind: 'clearance', group: opts.group });
@@ -484,6 +546,7 @@ export class Planner {
         z: Math.round(p.pose.z),
         rotationDeg: normaliseDeg(p.pose.rot),
         roomId: this.room.id,
+        ...(p.finishes && Object.keys(p.finishes).length > 0 ? { finishes: p.finishes } : {}),
       }));
   }
 }

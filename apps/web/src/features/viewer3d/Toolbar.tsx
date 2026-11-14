@@ -1,9 +1,9 @@
 /**
  * The Design toolbar: camera mode, whole-home furnishing, lighting preset and picture export.
  */
-import { planStore, selectLevel, type Level } from '@interio/core';
-import { LIGHTING_LABELS, LIGHTING_PRESETS, LIGHTING_SETTING, type LightingPreset } from '@interio/scene3d';
-import { Aperture, Box, Camera, Eraser, Layers, Maximize, Moon, ScanLine, Sparkles, Sun, Sunset } from 'lucide-react';
+import { planStore, selectLevel, usePlanStore, type Level } from '@interio/core';
+import { LIGHTING_LABELS, LIGHTING_PRESETS, LIGHTING_SETTING, OUTSIDE_LABELS, OUTSIDE_SETTING, OUTSIDE_VIEWS, outsideFromSettings, type LightingPreset, type OutsideView } from '@interio/scene3d';
+import { Aperture, Box, Building2, Camera, Cloud, Eraser, Layers, Maximize, Moon, ScanLine, Sparkles, Sun, Sunset, Trees } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { clearFurniture, furnishHome } from '../../lib/furnish';
 import { Button, Dialog, IconButton, Panel, Segmented, toast } from '../../ui';
@@ -18,6 +18,14 @@ const LIGHTING_ICON: Record<LightingPreset, ReactNode> = {
   evening: <Sunset className="h-4 w-4" />,
   night: <Moon className="h-4 w-4" />,
 };
+
+const OUTSIDE_ICON: Record<OutsideView, ReactNode> = {
+  greenery: <Trees className="h-4 w-4" />,
+  city: <Building2 className="h-4 w-4" />,
+  sky: <Cloud className="h-4 w-4" />,
+};
+
+const nextOutside = (v: OutsideView): OutsideView => OUTSIDE_VIEWS[(OUTSIDE_VIEWS.indexOf(v) + 1) % OUTSIDE_VIEWS.length]!;
 
 const itemCount = (n: number): string => (n === 1 ? '1 item' : `${n} items`);
 const roomCount = (n: number): string => (n === 1 ? '1 room' : `${n} rooms`);
@@ -56,6 +64,7 @@ export function Toolbar({ level }: { level: Level }) {
   const view = useViewer((s) => s.view);
   const cutaway = useViewer((s) => s.cutaway);
   const lighting = useLightingPreset();
+  const outside = usePlanStore((s) => outsideFromSettings(s.project?.settings));
   const [confirmClear, setConfirmClear] = useState(false);
   const ui = useViewer.getState();
   const count = Object.keys(level.items).length;
@@ -135,7 +144,8 @@ export function Toolbar({ level }: { level: Level }) {
           }
           onClick={furnishWholeHome}
         >
-          Furnish home
+          {/* Icon only below 2xl, as Showcase, so the toolbar keeps clear of the panels with the outside-view button in it. */}
+          <span className="sr-only 2xl:not-sr-only">Furnish home</span>
         </Button>
         <IconButton label="Clear furniture" size="sm" className="shrink-0" disabled={count === 0} data-testid="clear-furniture" onClick={() => setConfirmClear(true)}>
           <Eraser className="h-4 w-4" />
@@ -151,6 +161,17 @@ export function Toolbar({ level }: { level: Level }) {
             options={LIGHTING_PRESETS.map((preset) => ({ value: preset, title: LIGHTING_LABELS[preset], label: LIGHTING_ICON[preset] }))}
           />
         </div>
+        {/* One icon for the outside view: it steps through greenery, city and sky (the Walk view options list all three). */}
+        <IconButton
+          label={`Outside the windows: ${OUTSIDE_LABELS[outside]}. Click for ${OUTSIDE_LABELS[nextOutside(outside)]}`}
+          size="sm"
+          className="shrink-0"
+          data-testid="outside-view"
+          data-value={outside}
+          onClick={() => planStore.getState().setProjectSettings({ [OUTSIDE_SETTING]: nextOutside(outside) })}
+        >
+          {OUTSIDE_ICON[outside]}
+        </IconButton>
         <IconButton label="Save a picture of this view" size="sm" className="shrink-0" data-testid="export-picture" onClick={exportPicture}>
           <Camera className="h-4 w-4" />
         </IconButton>

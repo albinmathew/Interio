@@ -2,6 +2,7 @@
 import type { CatalogEntry } from '@interio/core';
 import type * as THREE from 'three';
 import type { BuildContext } from './kit';
+import { ACCESSORY_GENERATORS } from './accessories';
 import { APPLIANCES_GENERATORS } from './appliances';
 import { BATHROOM_GENERATORS } from './bathroom';
 import { BED_GENERATORS } from './beds';
@@ -26,6 +27,7 @@ const FAMILIES = {
   decor: DECOR_GENERATORS,
   office: OFFICE_GENERATORS,
   outdoor: OUTDOOR_GENERATORS,
+  accessories: ACCESSORY_GENERATORS,
 };
 
 /** Every premium generator by name. Two families may never use the same name: one would silently replace the other. */
