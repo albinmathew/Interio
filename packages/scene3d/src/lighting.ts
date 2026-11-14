@@ -96,7 +96,7 @@ function cinematicRig(preset: LightingPreset, hasEnv: boolean): LightingRig {
         ambient: 0,
         // Sunlit floors throw a lot of light back up: ceilings and the undersides of things stay airy.
         bounce: { color: '#fff1dd', intensity: 0.38 },
-        sun: { color: '#fff1dc', intensity: 4.6, direction: DAY_SUN },
+        sun: { color: '#fff1dc', intensity: 4.1, direction: DAY_SUN },
         // The sun, the windows and the sky carry the day: no lamps, no hot spots on the ceilings.
         lamps: null,
         windows: 1,
