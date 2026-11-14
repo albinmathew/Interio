@@ -9,7 +9,7 @@
 
 const WINDOW_MS = 250;
 /** Frame rates to hold while tracing: clear of the monitor's lower bounds (40 and 60 fps). */
-export const TARGET_FPS_60HZ = 50;
+export const TARGET_FPS_60HZ = 54;
 export const TARGET_FPS_HIGH = 72;
 const MIN_RATE = 2;
 const MAX_RATE = 400;

@@ -119,11 +119,13 @@ test.describe('photo mode on a GPU', () => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await openWalk(page, true);
+    // Pin walk mode's quality tier: its performance monitor would otherwise change the scene (and so
+    // rebuild the traced one) whenever the frame rate wanders, which this test is not about.
+    await page.goto(`${page.url()}?tier=high`);
+    await page.waitForFunction(() => (window as HookWindow).__interioWalk !== undefined);
     await page.getByTestId('walk-room-item').filter({ hasText: 'Living / Dining' }).click();
     await page.waitForFunction(() => (window as HookWindow).__interioPhoto !== undefined);
-    // Walk mode's performance monitor may still switch the scene to low quality in the first seconds
-    // (on a fast GPU it falls back after a few "inclines"); let it settle so the traced scene stays put.
-    await expect.poll(async () => (await photo(page))?.shadows === false, { timeout: 12_000 }).toBe(true).catch(() => {});
+    await page.waitForTimeout(1500);
     const canvas = page.locator('canvas');
     const live = await canvas.screenshot();
 
