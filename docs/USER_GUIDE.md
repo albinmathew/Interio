@@ -135,6 +135,7 @@ Every room has a floor finish, a wall finish and a ceiling colour. The 3D view a
 ## Lighting and pictures
 
 - **Lighting.** The Design toolbar switches between **Daylight**, **Warm evening** and **Night**. The choice is saved with the project and Walk mode follows it. Lamps and ceiling lights you place light their rooms in the evening and at night.
+- **Outside the windows.** The list next to the lighting buttons picks what the windows look out on in Walk mode: **Greenery** (trees and a garden, the default), **City** or **Open sky**. It is saved with the project.
 - **Picture.** The camera button in the Design toolbar saves a high-resolution picture of the current view without the panels.
 - **Showcase.** The **Showcase** view in the Design toolbar looks down on the home at a steep angle at the best quality the device allows; its picture is saved three times the size of the view.
 
@@ -171,13 +172,26 @@ Walk mode puts you inside the home at eye height, starting just inside the entra
 - **Look.** Click the view to look around with the mouse; `Esc` releases the pointer. Without that, drag to look.
 - **Click to move.** Turn on **Click to move** and click a point on the floor to walk there. This is the default on touch screens, where a joystick also appears.
 - **Jump to a room.** Use the room list, or click a point on the minimap.
-- **View options.** Field of view and eye height, a picture of the current view saved to your downloads, and full screen.
+- **View options.** Field of view and eye height (1.55 m to start), what the windows look out on, cove lights, head bob, a picture of the current view saved to your downloads, and full screen.
 
 Walls and furniture block you; doors, passages and open-plan boundaries let you through.
 
+### The look of the walkthrough
+
+Walk mode is drawn like an interior photograph:
+
+- **Outside.** Every window and glass door shows the world outside, bright as it is in a real interior picture: greenery, a city skyline or open sky, as chosen in the view options or the Design toolbar.
+- **Daylight.** The sun stands where the home's windows face, high by day and low and warm in the **Warm evening** preset, and falls through the windows and glass doors onto floors, beds and walls. Rooms are brightest by the glass.
+- **Lamps.** In the evening and at night lamp shades, pendants, bulbs, downlights and candles glow, and the lamps light pools around them.
+- **Cove lights.** Living rooms and bedrooms get a lowered ceiling edge with a hidden warm LED strip that washes the ceiling. They come on with the evening and night presets; **Cove lights** in the view options switches them on or off for the project.
+- **Floors.** Marble, stone and tile floors reflect the room, the lamps and the windows softly; polished wood a little.
+- **Movement.** Walking eases in and out, with a very slight head bob (**Head bob** in the view options turns it off).
+
+On a computer with a capable graphics card you also get soft shadows, glow around lights, ambient shading in corners, a warm colour grade and depth of field while the tour lingers. When the frame rate drops, reflections and depth of field go first, then the shadow detail. Without a graphics card (some laptops, remote desktops) the walkthrough keeps the outside view and the glowing lamps and leaves out the rest, so it stays smooth.
+
 ### The guided tour
 
-Press **Guided tour** to be walked through every room in turn. The bar at the bottom shows the room name and size, and has pause, previous room, next room, stop and a speed control. When the tour ends, **Tour again** starts it over.
+Press **Guided tour** to be walked through every room in turn, as in an interior film: the camera glides slowly from room to room, turns as it comes in to frame the room's main piece (the bed, the sofa, the dining table), then pans across to the windows and lingers before moving on. The bar at the bottom shows the room name and size, and has pause, previous room, next room, stop and a speed control. When the tour ends, **Tour again** starts it over.
 
 ## Save, export and share
 
