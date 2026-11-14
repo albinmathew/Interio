@@ -135,7 +135,7 @@ Every room has a floor finish, a wall finish and a ceiling colour. The 3D view a
 ## Lighting and pictures
 
 - **Lighting.** The Design toolbar switches between **Daylight**, **Warm evening** and **Night**. The choice is saved with the project and Walk mode follows it. Lamps and ceiling lights you place light their rooms in the evening and at night.
-- **Outside the windows.** The list next to the lighting buttons picks what the windows look out on in Walk mode: **Greenery** (trees and a garden, the default), **City** or **Open sky**. It is saved with the project.
+- **Outside the windows.** The button next to the lighting buttons steps through what the windows look out on in Walk mode: **Greenery** (trees and a garden, the default), **City** and **Open sky**. It is saved with the project, and the Walk view options list all three.
 - **Picture.** The camera button in the Design toolbar saves a high-resolution picture of the current view without the panels.
 - **Showcase.** The **Showcase** view in the Design toolbar looks down on the home at a steep angle at the best quality the device allows; its picture is saved three times the size of the view.
 
