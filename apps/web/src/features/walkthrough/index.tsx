@@ -39,6 +39,7 @@ import { buildWorld, planTour, startPose } from './route';
 import { Bridge, CameraRig, TargetMarker, type FrameStats, type SceneBridge } from './Scene';
 import { loadPose, savePose, useWalkUi, walkUi } from './store';
 import { declineTier, initialTier, tierOverride, walkLook, type TierState, type WalkTier } from './tier';
+import { usePhotoUi } from './photo/store';
 import { useWalkInput } from './useWalkInput';
 
 /** Dev and test hook: drive the walker without pointer lock. Dev builds only. */
@@ -89,6 +90,7 @@ export default function Walkthrough() {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   // Software renderers get the cheap look; GPUs that cannot hold the frame rate step down (see tier.ts).
   const [tierState, setTierState] = useState<TierState>(() => tierOverride(window.location.search) ?? initialTier(detectSoftwareRenderer()));
+  const tracing = usePhotoUi((s) => s.status === 'refining' || s.status === 'ready' || s.status === 'preparing');
   const [pinned, setPinned] = useState(() => tierOverride(window.location.search) !== null);
   const look = walkLook(tierState);
   const quality: RenderQuality = tierState.tier === 'low' ? 'low' : 'high';
@@ -256,7 +258,10 @@ export default function Walkthrough() {
       >
         <Outside view={outside} preset={lighting} rotation={rotation} fallback={rig.background} mode={cinematic ? 'background' : 'dome'} />
         {tierState.tier !== 'low' && warm && !pinned && (
-          <PerformanceMonitor flipflops={3} onDecline={() => setTierState(declineTier)} onFallback={() => setTierState({ tier: 'low', step: 0 })} />
+          // Only slow frames lower the quality: drei counts every "frames are fine" incline towards its
+          // fall-back, which dropped a smooth 60 fps walk to the low tier after a few seconds. Paused while
+          // photo mode traces, since tracing spends frame time on purpose.
+          !tracing && <PerformanceMonitor onDecline={() => setTierState(declineTier)} />
         )}
         <SceneLighting
           level={level}
