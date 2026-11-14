@@ -123,6 +123,14 @@ function glowPart(mesh: THREE.Mesh, m: THREE.Material): keyof typeof GLOW | 'bul
   return null;
 }
 
+/** A candle's flame: the wick of a lit candle, small and very bright (it blooms into a soft glow). */
+const flame = new THREE.MeshBasicMaterial({ name: 'candle.flame', color: new THREE.Color('#ffb35c').multiplyScalar(14) });
+/** Candle wax lit from within by its flame. */
+const litWax = new THREE.MeshStandardMaterial({ name: 'lacquer.cream:lit', color: '#f3e6cf', emissive: '#ffb066', emissiveIntensity: 0.55, roughness: 0.6 });
+
+/** Entries that hold candles (lit with the lamps in the evening and at night). */
+const isCandle = (entry: CatalogEntry) => /candle/.test(entry.id) || (entry.tags ?? []).some((t) => /candle/.test(t));
+
 const glows = new WeakMap<THREE.Material, Map<string, THREE.Material>>();
 
 /** A glowing copy of a lamp part's material, shared per source material (fabrics are shared with sofas: never touch the source). */
@@ -152,12 +160,23 @@ function glowMaterial(source: THREE.Material, part: keyof typeof GLOW): THREE.Ma
  */
 function useBulbs(root: THREE.Object3D, entry: CatalogEntry, lit: boolean): void {
   useLayoutEffect(() => {
-    if (!lit || entry.category !== 'lighting') return;
+    const candles = isCandle(entry);
+    if (!lit || (entry.category !== 'lighting' && !candles)) return;
     const swapped: [THREE.Mesh, THREE.Material | THREE.Material[], boolean][] = [];
     root.traverse((o) => {
       const mesh = o as THREE.Mesh;
       const m = mesh.material as THREE.Material | undefined;
       if (!mesh.isMesh || !m || Array.isArray(m)) return;
+      if (candles) {
+        const wick = !mesh.userData.slot && m.name === 'lacquer.black.gloss';
+        const wax = !mesh.userData.slot && m.name === 'lacquer.cream';
+        if (wick || wax) {
+          swapped.push([mesh, m, mesh.castShadow]);
+          mesh.material = wick ? flame : litWax;
+          mesh.castShadow = false;
+        }
+        return;
+      }
       const part = glowPart(mesh, m);
       if (!part) return;
       swapped.push([mesh, m, mesh.castShadow]);

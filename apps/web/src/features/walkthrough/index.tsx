@@ -197,8 +197,6 @@ export default function Walkthrough() {
         setTierState({ tier, step });
       },
       stats: () => bridge.current?.stats() ?? null,
-      // TEMP-DEBUG
-      ...({ lights: () => bridge.current?.lights() } as object),
     };
     window.__interioWalk = hook;
     return () => {

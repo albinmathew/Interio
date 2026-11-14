@@ -19,7 +19,6 @@ export interface SceneBridge {
   capture(): string;
   /** Cost of a frame: draw calls and triangles of the last one, and the time to draw one again. */
   stats(): FrameStats;
-  lights(): string[];
 }
 
 export interface FrameStats {
@@ -120,16 +119,6 @@ export function Bridge({ target }: { target: RefObject<SceneBridge | null> }) {
         if (walkPipeline.render) walkPipeline.render();
         else gl.render(scene, camera);
         return gl.domElement.toDataURL('image/png');
-      },
-      // TEMP-DEBUG
-      lights() {
-        const out: string[] = [];
-        scene.traverse((o) => {
-          const l = o as THREE.Light;
-          if (l.isLight) out.push(`${l.type} ${l.intensity.toFixed(2)} #${l.color.getHexString()} ${o.position.toArray().map((n) => n.toFixed(1)).join(',')}`);
-        });
-        out.push(`env ${scene.environmentIntensity} bg ${scene.backgroundIntensity} tm ${gl.toneMapping} exp ${gl.toneMappingExposure}`);
-        return out;
       },
       stats() {
         const calls = gl.info.render.calls;
