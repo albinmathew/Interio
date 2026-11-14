@@ -7,10 +7,11 @@
  * The tracer is loaded and built the first time photo mode is turned on, kept for the rest
  * of the walk, and freed when walk mode closes.
  */
-import { loadPhotoTracer, pathTracingSupport, type PhotoTracer } from '@interio/scene3d';
-import { useFrame, useThree } from '@react-three/fiber';
+import { loadPhotoTracer, mirrorPass, pathTracingSupport, type PhotoTracer } from '@interio/scene3d';
+import { useFrame, useThree, type RootState } from '@react-three/fiber';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type * as THREE from 'three';
+import { walkPipeline } from '../Effects';
 import type { SceneBridge } from '../Scene';
 import { useWalkUi } from '../store';
 import { FrameBudget } from './budget';
@@ -274,21 +275,46 @@ interface EngineState {
   timeToFirstImage: number | null;
 }
 
+/** Stands in for other render-priority callbacks while the traced picture covers the canvas. */
+const PAUSED = () => {};
+
+type Subscription = { ref: { current: unknown }; priority: number };
+
 /**
- * Mounted only while the tracer has the canvas: a render-priority frame callback, so
- * R3F stops drawing the live frame itself and this draws the traced one (over the live
- * frame while fading in).
+ * Mounted only while the tracer has the canvas: a frame callback at render priority 2, after
+ * walk mode's composer (priority 1). While the traced picture fades in, the composer draws
+ * the live frame underneath (or, without one, this does). Once it covers the canvas, the
+ * other render-priority callbacks (the composer, the floor reflection pass) are paused, so the
+ * GPU only traces; they are back the moment the walker moves.
  */
 function TakeOver({ tracer, state }: { tracer: PhotoTracer; state: RefObject<EngineState> }) {
-  useFrame((root, delta) => {
+  const paused = useRef(new Map<{ current: unknown }, unknown>());
+  const internal = useThree((s) => s.internal);
+
+  const resume = (): boolean => {
+    const had = paused.current.size > 0;
+    for (const [ref, fn] of paused.current) if (ref.current === PAUSED) ref.current = fn;
+    paused.current.clear();
+    return had;
+  };
+  useEffect(
+    () => () => {
+      resume();
+    },
+    [], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const frame = (root: RootState, delta: number) => {
     const s = state.current;
     const { gl, scene, camera } = root;
-    // Another render-priority callback (post-processing) draws the live frame; otherwise this does.
-    const othersDraw = root.internal.priority > 1;
     if (!s.engaged) {
-      if (!othersDraw) gl.render(scene, camera);
+      // Back to live this frame. If the composer was paused it skipped this frame: draw it now.
+      const skipped = resume();
+      if (skipped || root.internal.priority <= 1) drawLive(gl, scene, camera, skipped);
       return;
     }
+    // Another render-priority callback (the composer) draws the live frame; otherwise this does.
+    const othersDraw = root.internal.priority > 1 && paused.current.size === 0;
     const now = performance.now();
     if (tracer.passSamples < MAX_SAMPLES || tracer.previewing) tracer.step(s.budget.next(delta * 1000));
     if (tracer.hasImage && s.fadeStart < 0) {
@@ -297,6 +323,23 @@ function TakeOver({ tracer, state }: { tracer: PhotoTracer; state: RefObject<Eng
     }
     s.opacity = s.fadeStart < 0 ? 0 : Math.min(1, (now - s.fadeStart) / FADE_MS);
     tracer.draw(s.opacity, othersDraw ? null : { scene, camera });
-  }, 2);
+    if (s.opacity >= 1) {
+      if (paused.current.size === 0) s.budget.covered();
+      for (const sub of internal.subscribers as unknown as Subscription[]) {
+        if (sub.priority === 0 || sub.ref.current === frame || sub.ref.current === PAUSED) continue;
+        paused.current.set(sub.ref, sub.ref.current);
+        sub.ref.current = PAUSED;
+      }
+    }
+  };
+  useFrame(frame, 2);
   return null;
+}
+
+/** The live frame: through walk mode's composer (and floor reflection) when there is one. */
+function drawLive(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, composer: boolean): void {
+  if (composer && walkPipeline.render) {
+    mirrorPass.render?.();
+    walkPipeline.render();
+  } else gl.render(scene, camera);
 }

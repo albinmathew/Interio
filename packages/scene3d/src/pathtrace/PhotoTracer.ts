@@ -41,6 +41,12 @@ export interface PhotoTracerOptions {
   lampScale?: number;
   sunScale?: number;
   skyScale?: number;
+  /**
+   * Multiplier on area lights in the window openings. For the rasteriser they stand in for the sky
+   * light through the glass; traced, the sky comes through by itself, so they count it twice, but
+   * they also act as light portals that make a window-lit room converge far faster. Default 0.5.
+   */
+  windowScale?: number;
 }
 
 /** What `sync` found. `stale`: the traced picture no longer matches the scene and must not be shown. */
@@ -107,7 +113,7 @@ export class PhotoTracer {
 
   constructor(gl: THREE.WebGLRenderer, options: PhotoTracerOptions = {}) {
     this.gl = gl;
-    this.options = { maxPixels: 1920 * 1080, previewScale: 0.5, previewSamples: 16, takeoverSamples: 16, bounces: 5, tilePixels: TILE_PIXELS, lampScale: 0.6, sunScale: 1, skyScale: 2.5, ...options };
+    this.options = { maxPixels: 1920 * 1080, previewScale: 0.5, previewSamples: 16, takeoverSamples: 16, bounces: 5, tilePixels: TILE_PIXELS, lampScale: 0.6, sunScale: 1, skyScale: 2.5, windowScale: 0.5, ...options };
     // The WebGL tracer logs a deprecation notice in favour of its WebGPU sibling; R3F renders with WebGL.
     const warn = console.warn;
     console.warn = () => {};
@@ -126,7 +132,8 @@ export class PhotoTracer {
     t.rasterizeScene = false;
     t.synchronizeRenderSize = true;
     t.bounces = this.options.bounces;
-    t.transmissiveBounces = 4;
+    // Each glass pane is two surfaces; a door of two panes seen through a glass balustrade is six.
+    t.transmissiveBounces = 10;
     // Rough-after-glossy paths are the main source of fireflies indoors.
     t.filterGlossyFactor = 0.5;
     t.multipleImportanceSampling = true;
@@ -154,7 +161,7 @@ export class PhotoTracer {
     const { exposure, ...rest } = patch;
     this.options = { ...this.options, ...rest };
     this.tracer.bounces = this.options.bounces;
-    if (rest.lampScale !== undefined || rest.sunScale !== undefined) this.tracer.updateLights();
+    if (rest.lampScale !== undefined || rest.sunScale !== undefined || rest.windowScale !== undefined) this.tracer.updateLights();
     if (rest.skyScale !== undefined) this.tracer.updateEnvironment();
     if (exposure !== undefined) this.fixedExposure = exposure;
   }
@@ -411,11 +418,12 @@ export class PhotoTracer {
     const hidden = scene && camera ? hiddenLights(scene, camera) : [];
     for (const l of hidden) l.visible = false;
     const scaled: [THREE.Light, number][] = [];
-    const { lampScale, sunScale } = this.options;
+    const { lampScale, sunScale, windowScale } = this.options;
     scene?.traverseVisible((o) => {
       const l = o as THREE.Light & { isPointLight?: boolean; isSpotLight?: boolean; isDirectionalLight?: boolean };
       if (!l.isLight) return;
-      const k = l.isPointLight || l.isSpotLight ? lampScale : l.isDirectionalLight ? sunScale : 1;
+      const area = (l as THREE.Light & { isRectAreaLight?: boolean }).isRectAreaLight === true;
+      const k = l.isPointLight || l.isSpotLight ? lampScale : l.isDirectionalLight ? sunScale : area ? windowScale : 1;
       if (k === 1) return;
       scaled.push([l, l.intensity]);
       l.intensity *= k;

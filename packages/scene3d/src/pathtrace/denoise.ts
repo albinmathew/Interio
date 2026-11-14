@@ -51,11 +51,12 @@ class NormalDepthMaterial extends THREE.ShaderMaterial {
 class DemodulateMaterial extends THREE.ShaderMaterial {
   constructor() {
     super({
-      uniforms: { noisy: { value: null }, albedo: { value: null } },
+      uniforms: { noisy: { value: null }, albedo: { value: null }, normalDepth: { value: null } },
       vertexShader: VERTEX,
       fragmentShader: /* glsl */ `
         uniform sampler2D noisy;
         uniform sampler2D albedo;
+        uniform sampler2D normalDepth;
         varying vec2 vUv;
         float lum(vec3 c) { return dot(c, ${LUMA}); }
         void main() {
@@ -69,7 +70,9 @@ class DemodulateMaterial extends THREE.ShaderMaterial {
             sum += lum(max(texelFetch(noisy, clamp(px + ivec2(x, y), ivec2(0), size - 1), 0).rgb, 0.0));
           }
           float l = lum(c);
-          float cap = 4.0 * sum / 8.0 + 0.05;
+          // The view outside is a picture, not noise: only a stray sparkle (a reflection in the glass) is clamped there.
+          bool sky = texture2D(normalDepth, vUv).w >= ${FAR.toFixed(1)} * 0.5;
+          float cap = (sky ? 2.5 : 4.0) * sum / 8.0 + 0.05;
           if (l > cap) c *= cap / l;
           vec3 a = texture2D(albedo, vUv).rgb;
           gl_FragColor = vec4(c / max(a, vec3(0.04)), 1.0);
@@ -100,11 +103,13 @@ class AtrousMaterial extends THREE.ShaderMaterial {
           vec2 texel = 1.0 / vec2(textureSize(light, 0));
           vec4 centre = texture2D(light, vUv);
           vec4 g = texture2D(normalDepth, vUv);
-          // Nothing hit (the view outside, seen through glass): smooth it with its own kind only.
+          // Nothing hit: the view outside, seen directly or through glass.
           bool sky = g.w >= ${FAR.toFixed(1)} * 0.5;
           // Mirrors (albedo alpha 0) show a reflected picture, not light: blur them only a little, and only with each other.
           bool mirror = texture2D(albedo, vUv).a < 0.5;
           if (mirror && step > 2.5) { gl_FragColor = centre; return; }
+          // The outside view (seen directly or through clear glass) is already sharp and nearly noiseless.
+          if (sky) { gl_FragColor = centre; return; }
           // Brightness of the neighbourhood rather than of the pixel alone, so a stray bright or dark
           // sample cannot shield itself from its neighbours.
           float lc = 0.0;
@@ -363,6 +368,7 @@ export class Denoiser {
     const demod = this.demodulate.material as DemodulateMaterial;
     demod.uniforms.noisy!.value = noisy;
     demod.uniforms.albedo!.value = this.albedo.texture;
+    demod.uniforms.normalDepth!.value = this.normalDepth.texture;
     gl.setRenderTarget(this.ping);
     this.demodulate.render(gl);
 

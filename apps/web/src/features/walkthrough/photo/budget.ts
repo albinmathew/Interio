@@ -60,6 +60,14 @@ export class FrameBudget {
     return tiles;
   }
 
+  /**
+   * The traced picture now covers the canvas and the live frame is no longer drawn under it:
+   * frames got cheaper, so start from a brisker rate rather than the one the fade allowed.
+   */
+  covered(): void {
+    this.rate = Math.max(this.rate, 30);
+  }
+
   /** A new view starts from the last rate that worked, a little more cautiously. */
   reset(): void {
     this.rate = Math.max(MIN_RATE, this.rate * 0.8);
