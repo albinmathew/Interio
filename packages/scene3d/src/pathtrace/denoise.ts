@@ -102,9 +102,9 @@ class AtrousMaterial extends THREE.ShaderMaterial {
           vec4 g = texture2D(normalDepth, vUv);
           // Nothing hit (the view outside, seen through glass): smooth it with its own kind only.
           bool sky = g.w >= ${FAR.toFixed(1)} * 0.5;
-          // Mirrors (albedo alpha 0) show a reflected picture, not light: blur them only a touch, and only with each other.
+          // Mirrors (albedo alpha 0) show a reflected picture, not light: blur them only a little, and only with each other.
           bool mirror = texture2D(albedo, vUv).a < 0.5;
-          if (mirror && step > 1.5) { gl_FragColor = centre; return; }
+          if (mirror && step > 2.5) { gl_FragColor = centre; return; }
           // Brightness of the neighbourhood rather than of the pixel alone, so a stray bright or dark
           // sample cannot shield itself from its neighbours.
           float lc = 0.0;
@@ -259,6 +259,20 @@ export class Denoiser {
   private readonly atrous = new FullScreenQuad(new AtrousMaterial());
   private readonly output = new FullScreenQuad(new OutputMaterial());
   private readonly meterQuad = new FullScreenQuad(new MeterMaterial());
+  private readonly copier = new FullScreenQuad(
+    new THREE.ShaderMaterial({
+      uniforms: { map: { value: null } },
+      vertexShader: VERTEX,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D map;
+        varying vec2 vUv;
+        void main() { gl_FragColor = texture2D(map, vUv); }`,
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.NoBlending,
+      toneMapped: false,
+    }),
+  );
   private readonly meterTarget = new THREE.WebGLRenderTarget(METER_W, METER_H, { type: THREE.FloatType, depthBuffer: false });
   private readonly liveTarget = halfFloat(METER_W * 2, METER_H * 2);
   private readonly meterPixels = new Float32Array(METER_W * METER_H * 4);
@@ -379,7 +393,12 @@ export class Denoiser {
     const kept = this.result;
     if (!kept) return null;
     const copy = halfFloat(kept.width, kept.height);
-    copyTarget(this.gl, kept, copy);
+    (this.copier.material as THREE.ShaderMaterial).uniforms.map!.value = kept.texture;
+    const gl = this.gl;
+    const previous = gl.getRenderTarget();
+    gl.setRenderTarget(copy);
+    this.copier.render(gl);
+    gl.setRenderTarget(previous);
     return copy;
   }
 
@@ -467,38 +486,12 @@ export class Denoiser {
     this.normalDepthMaterial.dispose();
     for (const m of this.albedoMaterials.values()) m.dispose();
     this.albedoMaterials.clear();
-    for (const quad of [this.demodulate, this.atrous, this.output, this.meterQuad]) {
+    for (const quad of [this.demodulate, this.atrous, this.output, this.meterQuad, this.copier]) {
       quad.dispose();
       (quad as unknown as { material: THREE.Material }).material.dispose();
     }
-    copier?.dispose();
-    copier = null;
   }
 }
 
 const WHITE = new THREE.Color(1, 1, 1);
 const ONE3 = new THREE.Vector3(1, 1, 1);
-
-let copier: FullScreenQuad | null = null;
-
-function copyTarget(gl: THREE.WebGLRenderer, from: THREE.WebGLRenderTarget, to: THREE.WebGLRenderTarget): void {
-  copier ??= new FullScreenQuad(
-    new THREE.ShaderMaterial({
-      uniforms: { map: { value: null } },
-      vertexShader: VERTEX,
-      fragmentShader: /* glsl */ `
-        uniform sampler2D map;
-        varying vec2 vUv;
-        void main() { gl_FragColor = texture2D(map, vUv); }`,
-      depthTest: false,
-      depthWrite: false,
-      blending: THREE.NoBlending,
-      toneMapped: false,
-    }),
-  );
-  (copier.material as THREE.ShaderMaterial).uniforms.map!.value = from.texture;
-  const previous = gl.getRenderTarget();
-  gl.setRenderTarget(to);
-  copier.render(gl);
-  gl.setRenderTarget(previous);
-}

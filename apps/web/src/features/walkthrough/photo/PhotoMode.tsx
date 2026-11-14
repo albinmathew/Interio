@@ -76,8 +76,8 @@ export function PhotoMode({ bridge }: { bridge: RefObject<SceneBridge | null> })
 function useLoadedTracer(gl: THREE.WebGLRenderer, wanted: boolean, onFail: () => void): PhotoTracer | null {
   const [tracer, setTracer] = useState<PhotoTracer | null>(null);
   const held = useRef<PhotoTracer | null>(null);
+  const loading = useRef<Promise<void> | null>(null);
   const mounted = useRef(true);
-  const started = useRef(false);
   const failRef = useRef(onFail);
   failRef.current = onFail;
 
@@ -87,24 +87,26 @@ function useLoadedTracer(gl: THREE.WebGLRenderer, wanted: boolean, onFail: () =>
       mounted.current = false;
       held.current?.dispose();
       held.current = null;
-      started.current = false;
       setTracer(null);
     };
   }, [gl]);
 
   useEffect(() => {
-    if (!wanted || started.current) return;
-    started.current = true;
-    loadPhotoTracer()
+    // One tracer at a time: a load in flight (React's development double mount) is waited for, not repeated.
+    if (!wanted || held.current || loading.current) return;
+    loading.current = loadPhotoTracer()
       .then((mod) => {
-        if (!mounted.current) return;
+        if (!mounted.current || held.current) return;
         held.current = new mod.PhotoTracer(gl);
         setTracer(held.current);
       })
       .catch(() => {
         if (mounted.current) failRef.current();
+      })
+      .finally(() => {
+        loading.current = null;
       });
-  }, [gl, wanted]);
+  }, [gl, wanted, tracer]);
   return tracer;
 }
 
@@ -193,7 +195,7 @@ function Engine({ enabled, bridge, onFail }: { enabled: boolean; bridge: RefObje
       setEngaged(true);
     }
     const prepared = tracer.ready && !tracer.compiling;
-    publish(photoStatus({ enabled: true, available: true, prepared: prepared || s.engaged, tracing: s.engaged && tracer.hasImage, samples: tracer.samples }), tracer.samples, now);
+    publish(photoStatus({ enabled: true, available: true, prepared: prepared || s.engaged, tracing: s.engaged, samples: tracer.samples }), tracer.samples, now);
   });
 
   function publish(status: PhotoStatus, samples: number, now: number): void {

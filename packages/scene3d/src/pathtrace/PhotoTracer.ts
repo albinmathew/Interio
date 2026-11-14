@@ -53,7 +53,9 @@ interface TracerInternals {
   _pathTracer: { material: THREE.ShaderMaterial & { uniforms: Record<string, { value: unknown }> }; dispose(): void; _sobolTarget?: THREE.WebGLRenderTarget };
   _lowResPathTracer: { dispose(): void; _sobolTarget?: THREE.WebGLRenderTarget };
   _quad: FullScreenQuad;
-  _generator: { geometry: THREE.BufferGeometry; bvh: unknown; staticGeometryGenerator: { _intermediateGeometry: Map<string, { dispose(): void }> } };
+  _generator: { geometry: THREE.BufferGeometry; bvh: unknown; staticGeometryGenerator: { objects: THREE.Object3D[]; _intermediateGeometry: Map<string, { dispose(): void }> } };
+  _materials: THREE.Material[] | null;
+  _previousScene: THREE.Scene | null;
   _colorBackground?: THREE.Texture;
   _internalBackground?: THREE.Texture | null;
   scene: THREE.Scene | null;
@@ -299,7 +301,7 @@ export class PhotoTracer {
     t.reset();
   }
 
-  /** Traces `tiles` tiles (see `tileCount`), then refreshes the filtered picture. */
+  /** Traces `tiles` tiles (see `tilesPerSample`), then refreshes the filtered picture. */
   step(tiles: number): void {
     const t = this.tracer;
     if (this.internals.isCompiling) {
@@ -312,6 +314,7 @@ export class PhotoTracer {
       this.refilter(true);
       this.frozen = this.denoiser.freeze();
       this.frozenSamples = Math.floor(t.samples);
+      this.filteredAt = -1;
       this.pass = 'final';
       this.applyScale();
       t.reset();
@@ -357,7 +360,7 @@ export class PhotoTracer {
     const traced = this.denoiser.meterResult();
     if (traced === null) return;
     this.meteredAt = samples;
-    this.exposureTarget = Math.min(4, Math.max(0.35, Math.exp(this.liveLog - traced.logLuminance)));
+    this.exposureTarget = Math.min(4, Math.max(0.35, EXPOSURE_KEY * Math.exp(this.liveLog - traced.logLuminance)));
     this.balanceTarget.set(...whiteBalance(traced.illuminant, WHITE_BALANCE));
     if (first) {
       this.exposure = this.exposureTarget;
@@ -454,6 +457,9 @@ export class PhotoTracer {
         // Already gone.
       }
     }
+    // Free the GPU side, then drop the CPU copies too (BVH, attributes, materials, environment
+    // distribution: hundreds of megabytes in a furnished home), so nothing that still holds a
+    // reference to this tracer keeps them alive.
     disposeUniforms(t._pathTracer.material);
     t._pathTracer.material.dispose();
     t._quad.dispose();
@@ -465,6 +471,12 @@ export class PhotoTracer {
     for (const g of generator.staticGeometryGenerator._intermediateGeometry.values()) g.dispose();
     generator.staticGeometryGenerator._intermediateGeometry.clear();
     generator.bvh = null;
+    generator.geometry = new THREE.BufferGeometry();
+    generator.staticGeometryGenerator.objects = [];
+    t._materials = null;
+    t.scene = null;
+    t.camera = null;
+    t._previousScene = null;
     this.worker.dispose();
     this.materials.dispose();
     this.denoiser.dispose();
@@ -475,6 +487,12 @@ export class PhotoTracer {
     this.built = null;
   }
 }
+
+/**
+ * The traced picture's brightness relative to the live view's. A little under 1: traced light
+ * reaches further into corners, so the same average leaves whites near clipping.
+ */
+const EXPOSURE_KEY = 0.85;
 
 /** How far the colour of the light is pulled towards neutral: some warmth (an evening, lamplight) stays. */
 const WHITE_BALANCE = 0.6;
@@ -494,6 +512,7 @@ function disposeUniforms(material: THREE.ShaderMaterial): void {
         // Some uniform helpers have nothing to free.
       }
     }
+    uniform.value = null;
   }
 }
 
