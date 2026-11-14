@@ -92,7 +92,7 @@ function cinematicRig(preset: LightingPreset, hasEnv: boolean): LightingRig {
         background: '#dfe9f1',
         // Image-based light ignores walls: kept faint indoors, so the sun and the windows shape the rooms.
         environment: 0.08,
-        hemisphere: { sky: '#f4f7ff', ground: '#eadfce', intensity: hasEnv ? 0.42 : 0.6 },
+        hemisphere: { sky: '#f4f7ff', ground: '#eadfce', intensity: hasEnv ? 0.55 : 0.7 },
         ambient: 0,
         // Sunlit floors throw a lot of light back up: ceilings and the undersides of things stay airy.
         bounce: { color: '#fff1dd', intensity: 0.38 },

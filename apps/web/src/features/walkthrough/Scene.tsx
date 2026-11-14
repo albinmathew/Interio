@@ -8,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import * as THREE from 'three';
 import type { WalkController } from './controller';
+import { mirrorPass } from '@interio/scene3d';
 import { walkPipeline } from './Effects';
 import { useWalkUi } from './store';
 
@@ -127,6 +128,8 @@ export function Bridge({ target }: { target: RefObject<SceneBridge | null> }) {
         const px = new Uint8Array(4);
         const draw = () => {
           gl.info.reset();
+          // The floor reflection is its own pass, drawn before the main view.
+          mirrorPass.render?.();
           if (walkPipeline.render) walkPipeline.render();
           else gl.render(scene, camera);
           ctx.readPixels(0, 0, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, px);
@@ -135,7 +138,8 @@ export function Bridge({ target }: { target: RefObject<SceneBridge | null> }) {
         const t0 = performance.now();
         for (let i = 0; i < 5; i++) draw();
         const ms = Math.round(((performance.now() - t0) / 5) * 10) / 10;
-        return { calls, triangles, ms };
+        // Counts of one full frame as just drawn (every pass), not of whatever the last frame happened to be.
+        return { calls: gl.info.render.calls || calls, triangles: gl.info.render.triangles || triangles, ms };
       },
     };
     return () => {

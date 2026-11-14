@@ -9,7 +9,7 @@ describe('walk tiers', () => {
 
   it('steps down: reflections and depth of field first, then half the shadow map, then the low tier', () => {
     const high = walkLook({ tier: 'high', step: 0 });
-    expect(high).toMatchObject({ composer: true, reflections: true, dof: true, bloom: true, ao: true, shadows: true, shadowMapSize: 4096, lighting: 'cinematic' });
+    expect(high).toMatchObject({ composer: true, reflections: true, dof: true, bloom: true, ao: true, shadows: true, shadowMapSize: 4096, lighting: 'cinematic', dpr: 1, samples: 4 });
 
     let s: TierState = initialTier(false);
     s = declineTier(s);

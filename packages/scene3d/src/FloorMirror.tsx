@@ -74,6 +74,9 @@ export function makeReflective(material: THREE.MeshStandardMaterial, r: FloorRef
   };
 }
 
+/** The mirrored view of the current frame, while a `<FloorMirror>` is mounted: frame-cost probes call it with the main render. */
+export const mirrorPass: { render: (() => void) | null } = { render: null };
+
 const BIAS = new THREE.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -108,46 +111,57 @@ export function FloorMirror({ scale = 0.5 }: { scale?: number }) {
   }, [target]);
 
   const tmp = useMemo(() => ({ eye: new THREE.Vector3(), look: new THREE.Vector3(), rot: new THREE.Matrix4() }), []);
-  useFrame(({ camera }) => {
-    const cam = camera as THREE.PerspectiveCamera;
-    cam.updateMatrixWorld();
-    const { eye, look, rot } = tmp;
-    eye.setFromMatrixPosition(cam.matrixWorld);
-    if (eye.y <= 0.01) {
-      shared.reflectOn.value = 0;
-      return;
-    }
-    shared.reflectOn.value = 1;
-    // The camera mirrored in the floor plane, looking at the mirrored point it looks at.
-    rot.extractRotation(cam.matrixWorld);
-    look.set(0, 0, -1).applyMatrix4(rot).add(eye);
-    mirror.position.set(eye.x, -eye.y, eye.z);
-    mirror.up.set(0, 1, 0).applyMatrix4(rot).reflect(UP);
-    mirror.lookAt(look.x, -look.y, look.z);
-    mirror.near = cam.near;
-    mirror.far = cam.far;
-    mirror.updateMatrixWorld();
-    mirror.projectionMatrix.copy(cam.projectionMatrix);
-    mirror.projectionMatrixInverse.copy(cam.projectionMatrixInverse);
-    shared.reflectMatrix.value.copy(BIAS).multiply(mirror.projectionMatrix).multiply(mirror.matrixWorldInverse);
-
-    const restore: THREE.Object3D[] = [];
-    for (const o of hidden) {
-      if (o.visible) {
-        o.visible = false;
-        restore.push(o);
+  const camera = useThree((s) => s.camera);
+  const draw = useMemo(
+    () => () => {
+      const cam = camera as THREE.PerspectiveCamera;
+      cam.updateMatrixWorld();
+      const { eye, look, rot } = tmp;
+      eye.setFromMatrixPosition(cam.matrixWorld);
+      if (eye.y <= 0.01) {
+        shared.reflectOn.value = 0;
+        return;
       }
-    }
-    const autoUpdate = gl.shadowMap.autoUpdate;
-    // Shadow maps were drawn for this frame's main view already (or will be): do not draw them twice.
-    gl.shadowMap.autoUpdate = false;
-    const previous = gl.getRenderTarget();
-    gl.setRenderTarget(target);
-    gl.clear();
-    gl.render(scene, mirror);
-    gl.setRenderTarget(previous);
-    gl.shadowMap.autoUpdate = autoUpdate;
-    for (const o of restore) o.visible = true;
-  }, -1);
+      shared.reflectOn.value = 1;
+      // The camera mirrored in the floor plane, looking at the mirrored point it looks at.
+      rot.extractRotation(cam.matrixWorld);
+      look.set(0, 0, -1).applyMatrix4(rot).add(eye);
+      mirror.position.set(eye.x, -eye.y, eye.z);
+      mirror.up.set(0, 1, 0).applyMatrix4(rot).reflect(UP);
+      mirror.lookAt(look.x, -look.y, look.z);
+      mirror.near = cam.near;
+      mirror.far = cam.far;
+      mirror.updateMatrixWorld();
+      mirror.projectionMatrix.copy(cam.projectionMatrix);
+      mirror.projectionMatrixInverse.copy(cam.projectionMatrixInverse);
+      shared.reflectMatrix.value.copy(BIAS).multiply(mirror.projectionMatrix).multiply(mirror.matrixWorldInverse);
+
+      const restore: THREE.Object3D[] = [];
+      for (const o of hidden) {
+        if (o.visible) {
+          o.visible = false;
+          restore.push(o);
+        }
+      }
+      const autoUpdate = gl.shadowMap.autoUpdate;
+      // Shadow maps were drawn for this frame's main view already (or will be): do not draw them twice.
+      gl.shadowMap.autoUpdate = false;
+      const previous = gl.getRenderTarget();
+      gl.setRenderTarget(target);
+      gl.clear();
+      gl.render(scene, mirror);
+      gl.setRenderTarget(previous);
+      gl.shadowMap.autoUpdate = autoUpdate;
+      for (const o of restore) o.visible = true;
+    },
+    [camera, gl, scene, target, mirror, tmp],
+  );
+  useEffect(() => {
+    mirrorPass.render = draw;
+    return () => {
+      if (mirrorPass.render === draw) mirrorPass.render = null;
+    };
+  }, [draw]);
+  useFrame(draw, -1);
   return null;
 }

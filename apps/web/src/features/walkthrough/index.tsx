@@ -99,10 +99,12 @@ export default function Walkthrough() {
   const rotation = panoramaRotation(panorama, sun.azimuth);
   // Shader compilation and texture uploads make the first seconds slow: judge the frame rate after that.
   const [warm, setWarm] = useState(false);
+  // Each step down recompiles materials too: give the monitor the same grace after every change of tier.
   useEffect(() => {
+    setWarm(false);
     const t = window.setTimeout(() => setWarm(true), 4000);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [tierState]);
 
   const world = useMemo(
     () => (level ? buildWorld(level, { resolveEntry: getEntry, mesh: selectLevelMesh(level), rooms: selectRooms(level) }) : null),

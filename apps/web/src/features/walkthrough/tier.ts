@@ -87,7 +87,9 @@ export function walkLook({ tier, step }: TierState): WalkLook {
     shadowMapSize: high || step < 1 ? 4096 : 2048,
     shadowSoftness: high ? 4 : 3,
     windowLights: high ? 6 : 4,
-    dpr: high ? [1, 2] : 1,
+    // Pixel ratio 1 with 4x multisampling: at 2 on a Retina screen the post chain costs about four times as much
+    // (measured 47 to 50 ms a frame on an M5 Pro) for a little more sharpness.
+    dpr: 1,
     samples: 4,
   };
 }
