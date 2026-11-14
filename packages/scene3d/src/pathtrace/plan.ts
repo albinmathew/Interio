@@ -52,6 +52,20 @@ export function tileGrid(pixels: number, tilePixels = TILE_PIXELS): number {
   return Math.max(1, Math.min(24, Math.round(Math.sqrt(pixels / tilePixels))));
 }
 
+/* ------------------------------------------------------------ white balance */
+
+/**
+ * Gains that move the colour of the light (`illuminant`, linear RGB) `strength` of the way to
+ * neutral grey while keeping its brightness. 0 keeps the colour, 1 neutralises it.
+ */
+export function whiteBalance(illuminant: readonly [number, number, number] | null, strength: number): [number, number, number] {
+  if (!illuminant) return [1, 1, 1];
+  const [r, g, b] = illuminant.map((c) => Math.max(c, 1e-4)) as [number, number, number];
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const gain = (c: number) => Math.min(2, Math.max(0.5, 1 + (y / c - 1) * strength));
+  return [gain(r), gain(g), gain(b)];
+}
+
 /* ------------------------------------------------------------------ hashing */
 
 const f32 = new Float32Array(1);

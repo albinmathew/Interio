@@ -91,7 +91,8 @@ function looksLikeGlass(m: AnyMaterial): boolean {
 }
 
 /** Copies the fields the tracer reads from `src` onto `out`, then tunes them for tracing. */
-export function writeTraceMaterial(src: AnyMaterial, role: TraceRole, out: TraceMaterial): TraceMaterial {
+export function writeTraceMaterial(material: THREE.Material, role: TraceRole, out: TraceMaterial): TraceMaterial {
+  const src = material as AnyMaterial;
   out.name = src.name;
   out.color.copy(src.color ?? WHITE);
   out.map = src.map ?? null;
@@ -221,7 +222,9 @@ export class TraceMaterials {
     let out = byRole[role];
     if (!out) {
       out = new THREE.MeshPhysicalMaterial() as TraceMaterial;
-      writeTraceMaterial(src as AnyMaterial, role, out);
+      // The tracer reads this deprecated field; an own value keeps three's deprecation warning quiet.
+      Object.defineProperty(out, 'iridescenceThicknessRange', { value: [100, 400], writable: true });
+      writeTraceMaterial(src, role, out);
       byRole[role] = out;
     }
     return out;
@@ -230,7 +233,7 @@ export class TraceMaterials {
   /** Re-reads every live material (after a finish, texture or lamp change). */
   refresh(): void {
     for (const [src, byRole] of this.made) {
-      for (const role of Object.keys(byRole) as TraceRole[]) writeTraceMaterial(src as AnyMaterial, role, byRole[role]!);
+      for (const role of Object.keys(byRole) as TraceRole[]) writeTraceMaterial(src, role, byRole[role]!);
     }
   }
 

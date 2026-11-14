@@ -57,7 +57,7 @@ export function PhotoMode({ bridge }: { bridge: RefObject<SceneBridge | null> })
 
   useEffect(() => {
     const support = pathTracingSupport(gl);
-    photoUi.set({ available: support.ok, reason: support.reason ?? '' });
+    photoUi.set({ available: support.ok, reason: support.reason ?? '', ...(support.ok ? {} : { status: 'unavailable' as const }) });
   }, [gl]);
 
   useEffect(() => {
@@ -69,30 +69,41 @@ export function PhotoMode({ bridge }: { bridge: RefObject<SceneBridge | null> })
   return <Engine enabled={enabled} bridge={bridge} onFail={() => setFailed(true)} />;
 }
 
+/**
+ * The tracer, loaded the first time photo mode is wanted and then kept (turning photo mode off
+ * and on again reuses it: no new build, no new shader compile). Freed when the canvas goes.
+ */
 function useLoadedTracer(gl: THREE.WebGLRenderer, wanted: boolean, onFail: () => void): PhotoTracer | null {
   const [tracer, setTracer] = useState<PhotoTracer | null>(null);
+  const held = useRef<PhotoTracer | null>(null);
+  const mounted = useRef(true);
   const started = useRef(false);
   const failRef = useRef(onFail);
   failRef.current = onFail;
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      held.current?.dispose();
+      held.current = null;
+      started.current = false;
+      setTracer(null);
+    };
+  }, [gl]);
+
   useEffect(() => {
     if (!wanted || started.current) return;
     started.current = true;
-    let alive = true;
-    let made: PhotoTracer | null = null;
     loadPhotoTracer()
       .then((mod) => {
-        if (!alive) return;
-        made = new mod.PhotoTracer(gl);
-        setTracer(made);
+        if (!mounted.current) return;
+        held.current = new mod.PhotoTracer(gl);
+        setTracer(held.current);
       })
       .catch(() => {
-        if (alive) failRef.current();
+        if (mounted.current) failRef.current();
       });
-    return () => {
-      alive = false;
-      made?.dispose();
-      started.current = false;
-    };
   }, [gl, wanted]);
   return tracer;
 }
@@ -102,6 +113,8 @@ function Engine({ enabled, bridge, onFail }: { enabled: boolean; bridge: RefObje
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   const tracer = useLoadedTracer(gl, enabled, onFail);
+  const tracerRef = useRef(tracer);
+  tracerRef.current = tracer;
   const [engaged, setEngaged] = useState(false);
   const state = useRef({
     engaged: false,
@@ -201,7 +214,8 @@ function Engine({ enabled, bridge, onFail }: { enabled: boolean; bridge: RefObje
     const capture = Object.assign(
       () => {
         const s = state.current;
-        const shot = tracer && s.engaged && tracer.hasImage ? tracer.capture() : null;
+        const t = tracerRef.current;
+        const shot = t && s.engaged && t.hasImage ? t.capture() : null;
         s.lastCapture = shot ? 'traced' : 'live';
         return shot ?? live();
       },

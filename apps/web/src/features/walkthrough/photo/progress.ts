@@ -13,10 +13,13 @@
  */
 export type PhotoStatus = 'off' | 'unavailable' | 'preparing' | 'live' | 'refining' | 'ready';
 
-/** Samples per pixel at which the picture counts as clean. */
-export const READY_SAMPLES = 96;
-/** Tracing stops here: the picture no longer visibly changes. */
-export const MAX_SAMPLES = 1024;
+/**
+ * Samples per pixel at which the (denoised) picture counts as ready: convincing to look at and
+ * save. It goes on refining, at full size, after that.
+ */
+export const READY_SAMPLES = 16;
+/** Tracing stops here: the picture no longer visibly changes, and the GPU can rest. */
+export const MAX_SAMPLES = 256;
 
 export function photoStatus(opts: { enabled: boolean; available: boolean; prepared: boolean; tracing: boolean; samples: number }): PhotoStatus {
   if (!opts.available) return 'unavailable';

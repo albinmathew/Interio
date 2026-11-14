@@ -16,7 +16,7 @@ import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { GradientEquirectTexture, WebGLPathTracer } from 'three-gpu-pathtracer';
 import { BvhWorker } from './bvhWorker';
 import { Denoiser } from './denoise';
-import { NO_UPDATE, TILE_PIXELS, needsUpdate, planSceneUpdate, tileGrid, type SceneSignature, type SceneUpdate } from './plan';
+import { NO_UPDATE, TILE_PIXELS, needsUpdate, planSceneUpdate, tileGrid, whiteBalance, type SceneSignature, type SceneUpdate } from './plan';
 import { TraceMaterials } from './proxies';
 import { signScene } from './signature';
 
@@ -25,9 +25,9 @@ export interface PhotoTracerOptions {
   maxPixels?: number;
   /** Preview pass: traced at this fraction of the final width and height. Default 0.5. */
   previewScale?: number;
-  /** Samples of the preview pass before the full-size pass starts. 0 skips the preview. Default 48. */
+  /** Samples of the preview pass before the full-size pass starts. 0 skips the preview. Default 16. */
   previewSamples?: number;
-  /** Samples the full-size pass needs before it replaces the preview on screen. Default 24. */
+  /** Samples the full-size pass needs before it replaces the preview on screen. Default 16. */
   takeoverSamples?: number;
   /** Most light bounces. Default 5. */
   bounces?: number;
@@ -105,7 +105,7 @@ export class PhotoTracer {
 
   constructor(gl: THREE.WebGLRenderer, options: PhotoTracerOptions = {}) {
     this.gl = gl;
-    this.options = { maxPixels: 1920 * 1080, previewScale: 0.5, previewSamples: 48, takeoverSamples: 24, bounces: 5, tilePixels: TILE_PIXELS, lampScale: 0.6, sunScale: 1, skyScale: 2.5, ...options };
+    this.options = { maxPixels: 1920 * 1080, previewScale: 0.5, previewSamples: 16, takeoverSamples: 16, bounces: 5, tilePixels: TILE_PIXELS, lampScale: 0.6, sunScale: 1, skyScale: 2.5, ...options };
     // The WebGL tracer logs a deprecation notice in favour of its WebGPU sibling; R3F renders with WebGL.
     const warn = console.warn;
     console.warn = () => {};
@@ -356,7 +356,7 @@ export class PhotoTracer {
     if (traced === null) return;
     this.meteredAt = samples;
     this.exposureTarget = Math.min(4, Math.max(0.35, Math.exp(this.liveLog - traced.logLuminance)));
-    this.balanceTarget.copy(whiteBalance(traced.illuminant, WHITE_BALANCE));
+    this.balanceTarget.set(...whiteBalance(traced.illuminant, WHITE_BALANCE));
     if (first) {
       this.exposure = this.exposureTarget;
       this.balance.copy(this.balanceTarget);
@@ -476,15 +476,6 @@ export class PhotoTracer {
 
 /** How far the colour of the light is pulled towards neutral: some warmth (an evening, lamplight) stays. */
 const WHITE_BALANCE = 0.6;
-
-/** Gains that move the light's colour `strength` of the way to neutral grey, keeping its brightness. */
-export function whiteBalance(illuminant: [number, number, number] | null, strength: number): THREE.Vector3 {
-  if (!illuminant) return new THREE.Vector3(1, 1, 1);
-  const [r, g, b] = illuminant.map((c) => Math.max(c, 1e-4)) as [number, number, number];
-  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const gain = (c: number) => Math.min(2, Math.max(0.5, 1 + (y / c - 1) * strength));
-  return new THREE.Vector3(gain(r), gain(g), gain(b));
-}
 
 function hasPixels(texture: THREE.Texture): boolean {
   const image = texture.image as { data?: ArrayLike<number>; width?: number } | undefined;

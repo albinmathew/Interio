@@ -6,7 +6,8 @@
 import type * as THREE from 'three';
 import { isSoftwareRenderer } from '../quality';
 
-export { NO_UPDATE, needsUpdate, planSceneUpdate, type SceneSignature, type SceneUpdate } from './plan';
+export { Hasher, NO_UPDATE, TILE_PIXELS, needsUpdate, planSceneUpdate, tileGrid, whiteBalance, type SceneSignature, type SceneUpdate } from './plan';
+export { traceRole, writeTraceMaterial, type TraceMaterial, type TraceRole } from './proxies';
 export { signScene } from './signature';
 export type { PhotoTracer, PhotoTracerOptions, SyncResult } from './PhotoTracer';
 

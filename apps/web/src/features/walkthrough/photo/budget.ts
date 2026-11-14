@@ -13,13 +13,13 @@ export const TARGET_FPS_60HZ = 50;
 export const TARGET_FPS_HIGH = 72;
 const MIN_RATE = 2;
 const MAX_RATE = 400;
-const MAX_TILES_PER_FRAME = 6;
+const MAX_TILES_PER_FRAME = 3;
 
 export class FrameBudget {
   /** Typical frame interval while not tracing: the display's refresh interval, near enough. */
   private refreshMs = 1000 / 60;
   /** Tiles per second. */
-  private rate = 12;
+  private rate = 20;
   private carry = 0;
   private windowMs = 0;
   private windowFrames = 0;
@@ -49,7 +49,7 @@ export class FrameBudget {
       const target = this.targetFps;
       // Back off hard below the target, creep up above it.
       if (fps < target) this.rate *= Math.max(0.6, fps / target - 0.05);
-      else if (fps > target + 1) this.rate *= 1.1;
+      else if (fps > target + 1) this.rate *= 1.12;
       this.rate = Math.min(MAX_RATE, Math.max(MIN_RATE, this.rate));
       this.windowMs = 0;
       this.windowFrames = 0;
