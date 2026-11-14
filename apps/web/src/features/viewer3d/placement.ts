@@ -405,6 +405,35 @@ export interface Overlap {
  * Items that intersect another item or a wall, keyed by item id. Touching does not
  * count: `tolerance` (mm) lets items sit flush against walls and each other.
  */
+/** Pieces this thin (rugs, doormats) lie under furniture and never count as overlapping it. */
+const FLAT = 30;
+/** Height of the band at the top of stacked curtains that holds the rod, mm. */
+const CURTAIN_ROD = 90;
+
+interface Solid {
+  poly: Pt[];
+  z0: number;
+  z1: number;
+}
+
+/**
+ * What is really solid inside an item's box. Stacked curtains (`params.stack`) are two
+ * gathered panels at the ends of the rod plus the rod itself, not a wall of fabric
+ * across the window: a bed or sofa may stand under the rod between the panels.
+ */
+function solidsOf(entry: CatalogEntry, item: Item, size: Size & { h: number }, poly: Pt[]): Solid[] {
+  const z0 = item.z;
+  const z1 = item.z + size.h;
+  const stack = entry.model.kind === 'parametric' ? Number(entry.model.params?.stack ?? 0) * (item.scale ?? 1) : 0;
+  if (!(stack > 0) || stack * 2 >= size.w) return [{ poly, z0, z1 }];
+  const { u } = itemAxes(item.rotationDeg);
+  const panels = [-1, 1].map((side) => {
+    const c = add({ x: item.x, y: item.y }, mul(u, side * (size.w / 2 - stack / 2)));
+    return { poly: footprint({ x: c.x, y: c.y, rotationDeg: item.rotationDeg }, { w: stack, d: size.d }), z0, z1 };
+  });
+  return [...panels, { poly, z0: z1 - CURTAIN_ROD, z1 }];
+}
+
 export function findOverlaps(
   level: Pick<Level, 'items' | 'walls' | 'vertices' | 'openings'>,
   resolveEntry: (catalogId: string) => CatalogEntry | undefined,
@@ -414,7 +443,8 @@ export function findOverlaps(
     const entry = resolveEntry(item.catalogId);
     if (!entry) return [];
     const size = itemSize(entry, item);
-    return [{ item, poly: footprint(item, size), z0: item.z, z1: item.z + size.h, radius: Math.hypot(size.w, size.d) / 2 }];
+    const poly = footprint(item, size);
+    return [{ item, poly, z0: item.z, z1: item.z + size.h, radius: Math.hypot(size.w, size.d) / 2, flat: size.h <= FLAT, solids: solidsOf(entry, item, size, poly) }];
   });
   // Dividers have no body: nothing to bump into.
   const walls = Object.values(level.walls)
@@ -426,9 +456,14 @@ export function findOverlaps(
     const a = boxes[i]!;
     for (let j = i + 1; j < boxes.length; j++) {
       const b = boxes[j]!;
+      // Rugs and other flat pieces lie under furniture by design.
+      if (a.flat || b.flat) continue;
       if (Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0) <= 10) continue;
       if (Math.hypot(a.item.x - b.item.x, a.item.y - b.item.y) > a.radius + b.radius) continue;
-      if (penetration(a.poly, b.poly) > tolerance) {
+      const clash = a.solids.some((sa) =>
+        b.solids.some((sb) => Math.min(sa.z1, sb.z1) - Math.max(sa.z0, sb.z0) > 10 && penetration(sa.poly, sb.poly) > tolerance),
+      );
+      if (clash) {
         entry(a.item.id).items.push(b.item.id);
         entry(b.item.id).items.push(a.item.id);
       }

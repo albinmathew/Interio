@@ -8,6 +8,14 @@ type NewItem = Omit<Item, 'id'>;
  * Independent checks: none of this reuses the layout engine's code.  *
  * ------------------------------------------------------------------ */
 
+interface Solid {
+  rect: Pt[];
+  zMin: number;
+  zMax: number;
+  /** A curtain rod: it may run across the top of a window. */
+  rod?: boolean;
+}
+
 interface Box {
   item: NewItem;
   rect: Pt[];
@@ -15,6 +23,8 @@ interface Box {
   zMax: number;
   flat: boolean;
   anchor: 'floor' | 'wall' | 'ceiling';
+  /** What is really solid inside the box: curtains stacked beside a window are two panels and a rod. */
+  solids: Solid[];
 }
 
 function rectOf(x: number, y: number, w: number, d: number, rotDeg: number): Pt[] {
@@ -26,17 +36,28 @@ function rectOf(x: number, y: number, w: number, d: number, rotDeg: number): Pt[
   ].map((p) => vec.add({ x, y }, vec.rotate(p, rotDeg)));
 }
 
+/** Stacked curtains: each gathered panel is `params.stack` mm wide at an end of the rod; the rod fills the top 90 mm. */
+const ROD = 90;
+
 function boxOf(item: NewItem): Box {
   const entry = getEntry(item.catalogId);
   if (!entry) throw new Error(`unknown catalog id ${item.catalogId}`);
-  return {
-    item,
-    rect: rectOf(item.x, item.y, entry.dims.w, entry.dims.d, item.rotationDeg ?? 0),
-    zMin: item.z ?? 0,
-    zMax: (item.z ?? 0) + entry.dims.h,
-    flat: entry.dims.h <= 30,
-    anchor: entry.anchor,
-  };
+  const rot = item.rotationDeg ?? 0;
+  const z = item.z ?? 0;
+  const { w, d, h } = entry.dims;
+  const rect = rectOf(item.x, item.y, w, d, rot);
+  const stack = entry.model.kind === 'parametric' ? Number(entry.model.params?.stack ?? 0) : 0;
+  const solids: Solid[] =
+    stack > 0
+      ? [
+          ...[-1, 1].map((side) => {
+            const c = vec.add({ x: item.x, y: item.y }, vec.rotate({ x: side * (w / 2 - stack / 2), y: 0 }, rot));
+            return { rect: rectOf(c.x, c.y, stack, d, rot), zMin: z, zMax: z + h };
+          }),
+          { rect, zMin: z + h - ROD, zMax: z + h, rod: true },
+        ]
+      : [{ rect, zMin: z, zMax: z + h }];
+  return { item, rect, zMin: z, zMax: z + h, flat: h <= 30, anchor: entry.anchor, solids };
 }
 
 /** Overlap depth of two convex polygons along the best separating axis (0 when they are apart). */
@@ -125,21 +146,28 @@ function checkLayout(level: Level, roomId: string, added: NewItem[], existing: N
       const a = boxes[i]!;
       const b = boxes[j]!;
       if (a.flat || b.flat) continue;
-      if (Math.min(a.zMax, b.zMax) - Math.max(a.zMin, b.zMin) <= 1) continue;
-      expect(penetration(a.rect, b.rect), `${label} ${a.item.catalogId} overlaps ${b.item.catalogId}`).toBeLessThanOrEqual(2);
+      for (const sa of a.solids) {
+        for (const sb of b.solids) {
+          if (Math.min(sa.zMax, sb.zMax) - Math.max(sa.zMin, sb.zMin) <= 1) continue;
+          expect(penetration(sa.rect, sb.rect), `${label} ${a.item.catalogId} overlaps ${b.item.catalogId}`).toBeLessThanOrEqual(2);
+        }
+      }
     }
   }
 
-  // Doors, sliding doors and passages stay clear; windows are not blocked.
+  // Doors, sliding doors and passages stay clear; windows are not blocked (a curtain rod may cross the top of one).
   for (const o of roomOpenings(level, geom.interior, new Set(geom.edgeWalls))) {
     for (const b of boxes.slice(existing.length)) {
-      const hit = penetration(b.rect, o.rect) > 2;
-      if (o.kind === 'window') {
-        const ventilator = o.sill >= 1700;
-        const blocks = hit && b.zMin < o.top && b.zMax > (ventilator ? o.sill + 300 : o.sill);
-        expect(blocks, `${label} ${b.item.catalogId} blocks a window`).toBe(false);
-      } else if (b.zMin < o.top) {
-        expect(hit, `${label} ${b.item.catalogId} blocks a ${o.kind}`).toBe(false);
+      for (const part of b.solids) {
+        const hit = penetration(part.rect, o.rect) > 2;
+        if (o.kind === 'window') {
+          if (part.rod) continue;
+          const ventilator = o.sill >= 1700;
+          const blocks = hit && part.zMin < o.top && part.zMax > (ventilator ? o.sill + 300 : o.sill);
+          expect(blocks, `${label} ${b.item.catalogId} blocks a window`).toBe(false);
+        } else if (part.zMin < o.top) {
+          expect(hit, `${label} ${b.item.catalogId} blocks a ${o.kind}`).toBe(false);
+        }
       }
     }
   }
