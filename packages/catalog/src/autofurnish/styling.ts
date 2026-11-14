@@ -108,6 +108,11 @@ class Stylist {
     return this.p.placed.filter((q) => re.test(q.entry.id));
   }
 
+  /** Plants standing on the floor (not the small ones on a surface). */
+  floorPlants(): Placed[] {
+    return this.find(/^plant\./).filter((q) => q.zMin === 0);
+  }
+
   /** Pieces standing on top of a host. */
   onTop(host: Placed): Placed[] {
     return this.p.placed.filter((q) => q !== host && Math.abs(q.zMin - host.zMax) <= 1 && convexOverlap(q.rect, host.rect));
@@ -416,7 +421,7 @@ function living(s: Stylist): void {
     }
   }
   // Art over the sofa when it stands against a wall, otherwise on the longest free wall.
-  const arts = s.seed.order('living-art', ARTS);
+  const arts = [...s.seed.order('living-art', ['art.large', 'pair:art.portrait']), 'art.landscape'];
   if (s.find(/^art\./).length === 0) {
     const over = sofa ? s.artOver(sofa, arts) : [];
     if (over.length === 0) s.artOnWall(arts, [unit && s.behind(unit)?.run].filter((r): r is Run => !!r));
@@ -425,8 +430,8 @@ function living(s: Stylist): void {
   if (s.full) s.dressSurface(unit, [s.seed.pick('unit-plant', SMALL_PLANTS), s.seed.pick('unit-object', ['books.stack', 'vase.trio'])]);
   if (table) dining(s, table);
   // A second big plant, by the glazing.
-  if (s.full && s.p.area >= 16 && s.find(/^plant\./).length < 2) s.plant(s.seed.order('living-plant', PLANTS).filter((id) => !s.find(/^plant\./).some((q) => q.entry.id === id)));
-  if (!s.full && s.find(/^plant\./).length === 0) s.plant(s.seed.order('living-plant', PLANTS));
+  if (s.full && s.p.area >= 16 && s.floorPlants().length < 2) s.plant(s.seed.order('living-plant', PLANTS).filter((id) => !s.floorPlants().some((q) => q.entry.id === id)));
+  if (!s.full && s.floorPlants().length === 0) s.plant(s.seed.order('living-plant', PLANTS));
 }
 
 function dining(s: Stylist, table = s.find(/^table\.dining/)[0]): void {
@@ -445,7 +450,7 @@ function dining(s: Stylist, table = s.find(/^table\.dining/)[0]): void {
     if (s.full) s.dressSurface(board, [s.seed.pick('board-lamp', ['lamp.table.round', 'lamp.table.square']), s.seed.pick('board-object', ['vase.branches', 'vase.trio', 'bowl.wood'])]);
     if (s.find(/^art\./).length < (s.type === 'living' ? 2 : 1)) s.artOver(board, s.seed.order('board-art', ['art.landscape', 'pair:art.portrait', 'art.large']));
   }
-  if (s.type === 'dining' && s.find(/^plant\./).length === 0) s.plant(s.seed.order('dining-plant', PLANTS));
+  if (s.type === 'dining' && s.floorPlants().length === 0) s.plant(s.seed.order('dining-plant', PLANTS));
   if (s.type === 'dining' && s.find(/^art\./).length === 0) s.artOnWall(s.seed.order('dining-art', ARTS));
 }
 
@@ -458,7 +463,7 @@ function bedroom(s: Stylist): void {
     if (s.find(/^art\./).length === 0) s.artOver(bed, s.seed.order('bed-art', ARTS));
     if (s.full) s.footOfBed(bed);
   }
-  if (s.find(/^plant\./).length === 0) s.plant(s.seed.order('bed-plant', PLANTS));
+  if (s.floorPlants().length === 0) s.plant(s.seed.order('bed-plant', PLANTS));
   if (!s.full) return;
   const dresser = s.find(/^dresser/)[0];
   s.dressSurface(dresser, [s.seed.pick('dresser-object', ['tray.candles', 'vase.trio']), 'books.stack']);
@@ -480,7 +485,7 @@ function study(s: Stylist): void {
   const desk = s.find(/^desk/)[0];
   if (desk && s.onTop(desk).length === 0) s.dressEnds(desk, ['lamp.table.square', s.full ? 'books.stack' : undefined], 90);
   if (s.find(/^art\./).length === 0) s.artOnWall(s.seed.order('study-art', ['art.landscape', 'pair:art.portrait', 'art.large']));
-  if (s.find(/^plant\./).length === 0) s.plant(s.seed.order('study-plant', PLANTS));
+  if (s.floorPlants().length === 0) s.plant(s.seed.order('study-plant', PLANTS));
 }
 
 function kitchen(s: Stylist): void {
@@ -525,7 +530,7 @@ function bathroom(s: Stylist): void {
     const rail = E('towel.rail');
     s.addBest(rail, (c) => -(basin ? vec.dist({ x: c.pose.x, y: c.pose.y }, basin.pose) : c.centreOffset) - (c.underWindow ? 500 : 0), { z: rail?.mountHeight, step: 100 });
   }
-  if (s.full && s.p.area >= 3.5 && s.find(/^plant\./).length === 0) s.plant(['plant.snake'], { window: false });
+  if (s.full && s.p.area >= 3.5 && s.floorPlants().length === 0) s.plant(['plant.snake'], { window: false });
 }
 
 function foyer(s: Stylist): void {
@@ -533,18 +538,25 @@ function foyer(s: Stylist): void {
   s.dressSurface(console, [s.seed.pick('console-lamp', ['lamp.table.square', 'lamp.table.round']), s.full ? s.seed.pick('console-object', ['vase.branches', 'bowl.wood', 'vase.trio']) : undefined].filter((v): v is string => !!v));
   if (s.find(/^(art|mirror)\./).length === 0) s.artOnWall(s.seed.order('foyer-art', ['art.portrait', 'art.landscape']));
   if (s.full) runner(s);
-  if (s.full && s.p.area >= 3.5 && s.find(/^plant\./).length === 0) s.plant(s.seed.order('foyer-plant', ['plant.snake', 'plant.potted']), { window: false });
+  if (s.full && s.p.area >= 3.5 && s.floorPlants().length === 0) s.plant(s.seed.order('foyer-plant', ['plant.snake', 'plant.potted']), { window: false });
 }
 
 function corridor(s: Stylist): void {
   if (s.full) runner(s);
-  // Art along the long walls, spaced out.
-  if (s.mounted) {
-    const longest = [...s.p.runs].sort((a, b) => b.len - a.len || a.index - b.index)[0];
+  // Art along the longest wall, spaced out between the doors.
+  if (s.mounted && s.find(/^art\./).length === 0) {
+    const longest = [...s.p.runs].filter((r) => r.kind === 'wall').sort((a, b) => b.len - a.len || a.index - b.index)[0];
     const pieces = longest ? Math.min(3, Math.floor(longest.len / 3000)) : 0;
-    for (let i = 0; i < pieces; i++) s.artOnWall(s.seed.order(`corridor-art-${i}`, ['art.landscape', 'art.portrait']));
+    const kinds = s.seed.order('corridor-art', ['art.landscape', 'art.portrait']);
+    for (let i = 0; longest && i < pieces; i++) {
+      const target = (longest.len * (i + 0.5)) / pieces;
+      const entry = E(kinds[i % kinds.length]!);
+      // The free spot nearest to an even spacing along the wall.
+      const near = entry ? s.p.wallCandidates(entry, { z: entry.mountHeight, step: 100, runs: [longest] }).sort((a, b) => Math.abs(a.t - target) - Math.abs(b.t - target))[0] : undefined;
+      if (near && Math.abs(near.t - target) < longest.len / pieces / 2) s.artAt(longest, near.t, entry!.id);
+    }
   }
-  if (s.full && s.p.area >= 6 && s.find(/^plant\./).length === 0) s.plant(['plant.snake'], { window: false, tries: 20 });
+  if (s.full && s.p.area >= 6 && s.floorPlants().length === 0) s.plant(['plant.snake'], { window: false, tries: 20 });
 }
 
 /** A runner along the longest stretch of floor that is clear of door swings. */
@@ -570,10 +582,11 @@ function balcony(s: Stylist): void {
   // Pots along the railing.
   const railings = s.p.runs.filter((r) => r.kind === 'railing').sort((a, b) => b.len - a.len || a.index - b.index);
   const total = railings.reduce((sum, r) => sum + r.len, 0);
-  const wanted = Math.min(s.full ? 3 : 1, Math.floor(total / 1800));
+  // One pot for every 1.8 m of railing, at most four, counting what stands there already.
+  const wanted = Math.min(s.full ? 4 : 2, Math.floor(total / 1800));
   const ids = s.seed.order('balcony-plants', ['plant.snake', 'outdoor.planter', 'plant.snake']);
-  let done = 0;
-  for (const id of ids) {
+  let done = s.find(/^(plant\.|outdoor\.planter)/).length;
+  for (const id of [...ids, ...ids]) {
     if (done >= wanted) break;
     if (s.addBest(E(id), (c) => -c.cornerDist * 2 + Math.min(c.doorDist, 3000) * 0.3, { runs: railings, step: 100, gap: 40 })) done++;
   }
