@@ -264,7 +264,7 @@ export default function Walkthrough() {
           shadowSoftness={look.shadowSoftness}
         />
         {look.windowLights > 0 && <WindowLights glazing={glazing} count={look.windowLights} panorama={panorama?.small ?? null} rotation={rotation} strength={rig.windows ?? 0} />}
-        <PlanScene level={level} resolveEntry={getEntry} showCeilings closedDoors={frontDoors} lampsLit={lighting !== 'daylight'} quality={quality} clearGlass coves={coves ? (lighting === 'daylight' ? 0.5 : 1) : null} />
+        <PlanScene level={level} resolveEntry={getEntry} showCeilings closedDoors={frontDoors} lampsLit={lighting !== 'daylight'} quality={quality} clearGlass coves={coves ? (lighting === 'daylight' ? 0.5 : 1) : null} reflections={look.reflections} />
         <CameraRig controller={controller} />
         <TargetMarker controller={controller} />
         <Bridge target={bridge} />

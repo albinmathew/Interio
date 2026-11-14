@@ -58,3 +58,5 @@ export { WindowLights, type WindowLightsProps } from './WindowLights';
 export { GRADES, NO_AO, clampPass, gradePass, sceneGtao, setGrade, type Grade } from './post';
 export { COVE_DROP, COVE_ROOMS, COVE_WASH, COVE_WIDTH, coves, insetPolygon, type Cove } from './cove';
 export { Coves, type CovesProps } from './Coves';
+export { FloorMirror, hideFromMirror, makeReflective } from './FloorMirror';
+export { floorReflection, type FloorReflection } from './reflectance';
