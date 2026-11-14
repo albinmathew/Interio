@@ -33,3 +33,4 @@ export { DEFAULT_FLOOR, surfaceFinish, type SurfaceFinish } from './surfaces';
 export { DOOR_OPEN_DEG, doorLeafAngle, openingParts, railingParts, skirtingBoxes, type BoxSpec, type OpeningParts } from './parts';
 export { isFaded, wallHidesRoom, type FadeWall } from './wallFade';
 export { detectSoftwareRenderer, isSoftwareRenderer, type RenderQuality } from './quality';
+export * from './pathtrace';
