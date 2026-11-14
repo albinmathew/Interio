@@ -2,41 +2,80 @@
  * Furnishes every room of the sample home with `autoFurnish` and renders the
  * result, for a visual check of the layouts.
  *
- *   pnpm --filter @interio/catalog render-rooms -- <output prefix>
+ *   pnpm --filter @interio/catalog render-rooms <output prefix> [options]
  *
- * Writes `<prefix>-home.png` (whole level from above) and one `<prefix>-<room>.png`
- * per room, and prints what was placed.
+ * Options:
+ *   --styling none|light|full   styling layer (default full)
+ *   --views home,plan,rooms,top,eye   which pictures (default home,plan,rooms)
+ *       home   the whole level from above at an angle
+ *       plan   the whole level straight down
+ *       rooms  each room from above at an angle, walls cut low
+ *       top    each room straight down
+ *       eye    each room at eye level from two corners, full-height walls
+ *   --room <name part>          only rooms whose name contains this (case-insensitive)
+ *
+ * Writes `<prefix>-<view>.png` / `<prefix>-<room>[-<view>].png` and prints what was placed.
  */
 import fs from 'node:fs';
-import { createSampleLevel, type Item } from '@interio/core';
+import { createSampleLevel, deriveRooms, vec, type Item } from '@interio/core';
 import { autoFurnish } from '../src/index';
 import { dataUrlToBuffer, openRenderPage } from './lib/browser';
-import type { RenderApi } from './render/page';
+import type { LevelRenderOptions, RenderApi } from './render/page';
 
 declare const interioRender: RenderApi;
 
-const prefix = process.argv[2] ?? 'rooms';
+const args = process.argv.slice(2).filter((a) => a !== '--');
+const flag = (name: string): string | undefined => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : undefined;
+};
+const prefix = args.find((a, i) => !a.startsWith('--') && (i === 0 || !args[i - 1]!.startsWith('--'))) ?? 'rooms';
+const styling = (flag('--styling') ?? 'full') as 'none' | 'light' | 'full';
+const views = new Set((flag('--views') ?? 'home,plan,rooms').split(','));
+const only = flag('--room')?.toLowerCase();
+
 const level = createSampleLevel();
 const items: Omit<Item, 'id'>[] = [];
 for (const room of Object.values(level.rooms)) {
-  const placed = autoFurnish(level, room.id);
+  const placed = autoFurnish(level, room.id, { styling });
   items.push(...placed);
-  console.log(`${room.name} (${room.type}): ${placed.map((i) => i.catalogId).join(', ') || 'nothing'}`);
+  console.log(`${room.name} (${room.type}, ${placed.length}): ${placed.map((i) => i.catalogId).join(', ') || 'nothing'}`);
 }
+console.log(`total ${items.length} items`);
 
+const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 const session = await openRenderPage();
 try {
-  const shot = async (name: string, opts: { roomId?: string; elevation: number; azimuth: number; width: number; height: number }) => {
+  const shot = async (name: string, opts: LevelRenderOptions) => {
     const png = await session.page.evaluate(([l, i, o]) => interioRender.renderLevel(l, i, o), [level, items, opts] as const);
     const out = `${prefix}-${name}.png`;
     fs.writeFileSync(out, dataUrlToBuffer(png));
     console.log('wrote', out);
   };
-  await shot('home', { elevation: 62, azimuth: 0, width: 1500, height: 1200 });
-  await shot('plan', { elevation: 89.5, azimuth: 0, width: 1500, height: 1250 });
+  if (views.has('home')) await shot('home', { elevation: 62, azimuth: 0, width: 1500, height: 1200 });
+  if (views.has('plan')) await shot('plan', { elevation: 89.5, azimuth: 0, width: 1500, height: 1250 });
+  const geoms = deriveRooms(level);
   for (const room of Object.values(level.rooms)) {
-    if (room.type === 'corridor') continue;
-    await shot(room.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), { roomId: room.id, elevation: 48, azimuth: 0, width: 1000, height: 800 });
+    if (only && !room.name.toLowerCase().includes(only)) continue;
+    const name = slug(room.name);
+    if (views.has('rooms') && room.type !== 'corridor') await shot(name, { roomId: room.id, elevation: 48, azimuth: 0, width: 1000, height: 800 });
+    if (views.has('top')) await shot(`${name}-top`, { roomId: room.id, elevation: 89.5, azimuth: 0, width: 1000, height: 800, wallHeight: 2700 });
+    if (views.has('eye')) {
+      const geom = geoms.find((g) => g.roomId === room.id);
+      if (!geom) continue;
+      // From the two corners furthest apart, looking across the room.
+      const corners = [...geom.interior].sort((a, b) => vec.dist(b, geom.centroid) - vec.dist(a, geom.centroid));
+      const picks = [corners[0]!, corners.find((c) => vec.dist(c, corners[0]!) > 1500) ?? corners[1]!];
+      for (const [k, corner] of picks.entries()) {
+        const inset = vec.add(corner, vec.scale(vec.norm(vec.sub(geom.centroid, corner)), 350));
+        await shot(`${name}-eye${k + 1}`, {
+          roomId: room.id,
+          width: 1200,
+          height: 800,
+          eye: { x: inset.x, y: inset.y, z: 1550, tx: geom.centroid.x, ty: geom.centroid.y, tz: 1000, fov: 72 },
+        });
+      }
+    }
   }
 } finally {
   await session.close();

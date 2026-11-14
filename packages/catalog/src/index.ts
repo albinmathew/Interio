@@ -15,5 +15,5 @@ export { CATALOG, entriesFor, getEntry } from './catalog';
 export { buildParametric, hasGenerator, registerGenerator, type Generator } from './parametric';
 export { furnitureMaterial, setFurnitureTextureResolver, type BuildContext, type FurnitureTextures } from './premium';
 export { fitToDims } from './fit';
-export { autoFurnish, type AutoFurnishOptions } from './autofurnish';
+export { autoFurnish, styleRoom, type AutoFurnishOptions, type StyleRoomOptions, type StylingLevel } from './autofurnish';
 export { placeEntry, type PlaceEntryOptions } from './autofurnish/placeEntry';
