@@ -174,9 +174,18 @@ with a 2048 px instead of 4096 px shadow map; `low` (software renderers) the for
 always had, plus the outside panorama (drawn as a depth-tested dome, so only pixels seen through glass
 cost anything) and glowing lamps and coves without bloom. `?tier=high|medium|medium1|low` pins a tier.
 
-Frame cost, furnished and styled sample home (108 items), 1280 x 800 at pixel ratio 1, every pass
-included (`__interioWalk.stats()`, best of six, three viewpoints), Apple M5 Pro (Metal):
-high 9.8 ms by day / 13.9 ms in the evening, medium 10.1 / 12.6 ms, medium with the smaller shadow map
-9.2 / 11.6 ms, low 2.6 / 2.3 ms. SwiftShader (the e2e suite and CI), low tier, frame interval: 29 to
-57 ms by day and 33 to 82 ms in the evening across the viewpoints, against 49 to 59 ms and 31 to 120 ms
-for the walk mode before this change on the same home and machine (shared and noisy: no regression).
+Frame cost, furnished and styled sample home (108 items), 1280 x 800, every pass included (floor
+reflection, shadow maps, post-processing; `__interioWalk.stats()`, best of six, three viewpoints), Apple
+M5 Pro (Metal). All GPU tiers draw at pixel ratio 1 with 4x multisampling: at a Retina ratio of 2 the
+high tier cost 47 to 50 ms a frame. Daylight / evening, mean of the viewpoints:
+
+| Tier | Screen ratio 1 | Screen ratio 2 (Retina) |
+|---|---|---|
+| high | 11.7 / 17.9 ms | 13.0 / 16.8 ms |
+| medium | 10.5 / 11.7 ms | 9.7 / 10.6 ms |
+| medium, 2048 px shadow map | 9.4 / 14.6 ms | 8.9 / 11.4 ms |
+| low | 2.6 / 3.5 ms | 3.2 / 2.8 ms |
+
+SwiftShader (the e2e suite and CI), low tier, frame interval by `requestAnimationFrame`: 28 to 57 ms
+by day and 33 to 82 ms in the evening across the viewpoints, against 49 to 59 ms and 31 to 120 ms for
+walk mode before this change on the same home and machine (a shared, noisy machine: no regression).

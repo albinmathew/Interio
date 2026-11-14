@@ -88,7 +88,7 @@ export function CinematicEffects({ look, preset, exposure, focus }: CinematicEff
   useEffect(() => {
     if (!gtao) return;
     // World units are metres: occlusion reaches about half a metre, as in a real room.
-    gtao.updateGtaoMaterial({ radius: 0.4, distanceExponent: 1.3, thickness: 1, scale: 1, samples: 16 });
+    gtao.updateGtaoMaterial({ radius: 0.4, distanceExponent: 1.3, thickness: 0.35, scale: 1, samples: 24 });
     gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 8, radiusExponent: 1, rings: 2, samples: 16 });
     gtao.blendIntensity = 1;
   }, [gtao]);
