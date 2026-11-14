@@ -51,9 +51,10 @@ test.describe('cinematic walk', () => {
 
     // The Design toolbar offers the same choice, next to the lighting presets.
     await gotoMode(page, 'design');
-    const select = page.getByTestId('outside-view');
-    await expect(select).toHaveValue('city');
-    await select.selectOption('sky');
+    const toggle = page.getByTestId('outside-view');
+    await expect(toggle).toHaveAttribute('data-value', 'city');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('data-value', 'sky');
     expect((await savedSettings(page, id))['scene.outside']).toBe('sky');
 
     // And it survives a reload.
