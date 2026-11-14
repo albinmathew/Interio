@@ -81,7 +81,7 @@ const AIM: Record<'day' | 'evening', Partial<Record<RoomType, number>>> = {
 };
 
 /** Height of the sun above the horizon, degrees: high and soft by day, low and warm for golden hour. */
-export const SUN_ELEVATION: Record<'day' | 'evening', number> = { day: 42, evening: 13 };
+export const SUN_ELEVATION: Record<'day' | 'evening', number> = { day: 36, evening: 19 };
 
 /** World direction towards the sun for an azimuth (radians, `atan2(z, x)`) and elevation (degrees). */
 export function sunVector(azimuth: number, elevationDeg: number): [number, number, number] {
@@ -97,11 +97,14 @@ export const planAzimuth = (d: Pt): number => Math.atan2(-d.y, d.x);
  * scores less than at an angle: an oblique sun throws a long, raking patch across the
  * floor and up the side wall, which is what reads as sunlight in a picture.
  */
-function through(sunPlan: Pt, g: Glazing): number {
+function through(sunPlan: Pt, g: Glazing, rake: number): number {
   const d = vec.dot(sunPlan, g.outward);
   if (d <= 0) return 0;
-  return d * (0.55 + 0.45 * Math.sqrt(Math.max(0, 1 - d * d)));
+  return d * (1 - rake + rake * Math.sqrt(Math.max(0, 1 - d * d)));
 }
+
+/** How much an oblique sun is preferred: a little by day (deep into the room), a lot at golden hour (long streaks). */
+const RAKE: Record<'day' | 'evening', number> = { day: 0.2, evening: 0.45 };
 
 export interface SunPlan {
   /** Points from the scene towards the sun (world, unit). */
@@ -135,7 +138,7 @@ export function planSun(glazing: Glazing[], preset: LightingPreset): SunPlan {
     // Plan direction for world azimuth a: world (cos a, sin a) is plan (cos a, -sin a).
     const sunPlan = { x: Math.cos(a), y: -Math.sin(a) };
     let score = 0;
-    for (const g of glazing) score += (weights[g.roomType] ?? 0.1) * g.area * through(sunPlan, g);
+    for (const g of glazing) score += (weights[g.roomType] ?? 0.1) * g.area * through(sunPlan, g, RAKE[time]);
     if (score > bestScore + 1e-6) {
       bestScore = score;
       best = a;

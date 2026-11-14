@@ -8,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import * as THREE from 'three';
 import type { WalkController } from './controller';
+import { walkPipeline } from './Effects';
 import { useWalkUi } from './store';
 
 export interface SceneBridge {
@@ -16,6 +17,16 @@ export interface SceneBridge {
   pick(clientX: number, clientY: number): Pt | null;
   /** PNG data URL of the current view. */
   capture(): string;
+  /** Cost of a frame: draw calls and triangles of the last one, and the time to draw one again. */
+  stats(): FrameStats;
+  lights(): string[];
+}
+
+export interface FrameStats {
+  calls: number;
+  triangles: number;
+  /** Milliseconds to draw a frame, every pass included, measured with the GPU finishing each one (average of five). */
+  ms: number;
 }
 
 /** Runs the controller once per frame and puts the camera at its eyes. */
@@ -84,13 +95,49 @@ export function Bridge({ target }: { target: RefObject<SceneBridge | null> }) {
       },
       capture() {
         // Render and read back in the same task: the drawing buffer is not preserved between frames.
-        gl.render(scene, camera);
+        if (walkPipeline.render) walkPipeline.render();
+        else gl.render(scene, camera);
         return gl.domElement.toDataURL('image/png');
+      },
+      // TEMP-DEBUG
+      lights() {
+        const out: string[] = [];
+        scene.traverse((o) => {
+          const l = o as THREE.Light;
+          if (l.isLight) out.push(`${l.type} ${l.intensity.toFixed(2)} #${l.color.getHexString()} ${o.position.toArray().map((n) => n.toFixed(1)).join(',')}`);
+        });
+        out.push(`env ${scene.environmentIntensity} bg ${scene.backgroundIntensity} tm ${gl.toneMapping} exp ${gl.toneMappingExposure}`);
+        return out;
+      },
+      stats() {
+        const calls = gl.info.render.calls;
+        const triangles = gl.info.render.triangles;
+        const ctx = gl.getContext();
+        const px = new Uint8Array(4);
+        const draw = () => {
+          gl.info.reset();
+          if (walkPipeline.render) walkPipeline.render();
+          else gl.render(scene, camera);
+          ctx.readPixels(0, 0, 1, 1, ctx.RGBA, ctx.UNSIGNED_BYTE, px);
+        };
+        draw();
+        const t0 = performance.now();
+        for (let i = 0; i < 5; i++) draw();
+        const ms = Math.round(((performance.now() - t0) / 5) * 10) / 10;
+        return { calls, triangles, ms };
       },
     };
     return () => {
       target.current = null;
     };
   }, [gl, scene, camera, raycaster, target]);
+  // Count every pass of a frame in `gl.info` (shadow maps, post-processing), not only the last one.
+  useEffect(() => {
+    gl.info.autoReset = false;
+    return () => {
+      gl.info.autoReset = true;
+    };
+  }, [gl]);
+  useFrame(() => gl.info.reset(), -1000);
   return null;
 }

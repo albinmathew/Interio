@@ -28,6 +28,8 @@ export interface LevelMeshesProps {
   details?: boolean;
   /** Tiling PBR textures for floors and feature walls. Default true; flat colours otherwise. */
   textures?: boolean;
+  /** Clear window glass, for views from inside. Default false (a light tint that reads from above). */
+  clearGlass?: boolean;
 }
 
 /** The cut tops of full-height walls: a neutral mid grey, as on an architectural section. */
@@ -57,7 +59,7 @@ function material(level: Level, g: MeshGroup, textures: boolean): THREE.MeshStan
  * mesh carries `userData.group` (the core MeshGroup) so pointer handlers can tell what
  * was hit; joinery meshes do not.
  */
-export function LevelMeshes({ level, showCeilings = false, cutaway = false, doorsOpen = true, closedDoors, details = true, textures = true }: LevelMeshesProps) {
+export function LevelMeshes({ level, showCeilings = false, cutaway = false, doorsOpen = true, closedDoors, details = true, textures = true, clearGlass }: LevelMeshesProps) {
   const mesh = selectLevelMesh(level);
   const rooms = level.rooms;
   const walls = level.walls;
@@ -117,7 +119,7 @@ export function LevelMeshes({ level, showCeilings = false, cutaway = false, door
       })}
       {details && (
         <>
-          <OpeningsLayer level={level} doorsOpen={doorsOpen} closedDoors={closedDoors} fade={fade} />
+          <OpeningsLayer level={level} doorsOpen={doorsOpen} closedDoors={closedDoors} fade={fade} clearGlass={clearGlass} />
           <RailingsLayer level={level} />
           <SkirtingLayer level={level} mesh={mesh} />
           <ContactShade level={level} ceilings={showCeilings} fade={fade} />

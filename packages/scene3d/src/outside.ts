@@ -117,17 +117,15 @@ export function shrinkPanorama(srcWidth: number, srcHeight: number, read: (i: nu
       const tx = Math.min(width - 1, Math.floor((x / srcWidth) * width));
       const t = ty * width + tx;
       const [r, g, b] = read(y * srcWidth + x);
-      rgb[t * 3] += r;
-      rgb[t * 3 + 1] += g;
-      rgb[t * 3 + 2] += b;
-      count[t] += 1;
+      rgb[t * 3] = rgb[t * 3]! + r;
+      rgb[t * 3 + 1] = rgb[t * 3 + 1]! + g;
+      rgb[t * 3 + 2] = rgb[t * 3 + 2]! + b;
+      count[t] = count[t]! + 1;
     }
   }
   for (let t = 0; t < count.length; t++) {
     const n = count[t] || 1;
-    rgb[t * 3] /= n;
-    rgb[t * 3 + 1] /= n;
-    rgb[t * 3 + 2] /= n;
+    for (let c = 0; c < 3; c++) rgb[t * 3 + c] = rgb[t * 3 + c]! / n;
   }
   return { width, height, rgb };
 }
@@ -138,7 +136,7 @@ export function shrinkPanorama(srcWidth: number, srcHeight: number, read: (i: nu
  * of it, with the panorama turned by `rotationY` (as `scene.backgroundRotation.y`).
  * Linear RGB.
  */
-export function radianceThrough(p: Panorama, outward: readonly [number, number, number], rotationY = 0): [number, number, number] {
+export function radianceThrough(p: Panorama, outward: readonly [number, number, number], rotationY = 0, maxLuminance = Infinity): [number, number, number] {
   const sum: [number, number, number] = [0, 0, 0];
   let weight = 0;
   const [ox, oy, oz] = outward;
@@ -155,11 +153,16 @@ export function radianceThrough(p: Panorama, outward: readonly [number, number, 
       const wz = dx * s + dz * c;
       const facing = wx * ox + dy * oy + wz * oz;
       if (facing <= 0) continue;
-      const w = facing * solid;
       const t = (y * p.width + x) * 3;
-      sum[0] += p.rgb[t]! * w;
-      sum[1] += p.rgb[t + 1]! * w;
-      sum[2] += p.rgb[t + 2]! * w;
+      const r = p.rgb[t]!;
+      const g = p.rgb[t + 1]!;
+      const b = p.rgb[t + 2]!;
+      const w = facing * solid;
+      // `maxLuminance` caps the sun's disc: the directional light already carries it.
+      const k = w * Math.min(1, maxLuminance / Math.max(luminance(r, g, b), 1e-9));
+      sum[0] += r * k;
+      sum[1] += g * k;
+      sum[2] += b * k;
       weight += w;
     }
   }

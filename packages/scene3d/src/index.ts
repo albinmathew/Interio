@@ -53,3 +53,8 @@ export {
   type Panorama,
 } from './outside';
 export { SUN_ELEVATION, exteriorGlazing, planAzimuth, planSun, sunVector, type Glazing, type SunPlan } from './sun';
+export { Outside, loadPanorama, panoramaRotation, usePanorama, type OutsideProps, type PanoramaInfo } from './Backdrop';
+export { WindowLights, type WindowLightsProps } from './WindowLights';
+export { GRADES, NO_AO, clampPass, gradePass, sceneGtao, setGrade, type Grade } from './post';
+export { COVE_DROP, COVE_ROOMS, COVE_WASH, COVE_WIDTH, coves, insetPolygon, type Cove } from './cove';
+export { Coves, type CovesProps } from './Coves';
