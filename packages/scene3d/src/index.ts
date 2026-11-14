@@ -33,3 +33,23 @@ export { DEFAULT_FLOOR, surfaceFinish, type SurfaceFinish } from './surfaces';
 export { DOOR_OPEN_DEG, doorLeafAngle, openingParts, railingParts, skirtingBoxes, type BoxSpec, type OpeningParts } from './parts';
 export { isFaded, wallHidesRoom, type FadeWall } from './wallFade';
 export { detectSoftwareRenderer, isSoftwareRenderer, type RenderQuality } from './quality';
+export {
+  COVE_SETTING,
+  DEFAULT_OUTSIDE,
+  OUTSIDE_ASSETS,
+  OUTSIDE_LABELS,
+  OUTSIDE_SETTING,
+  OUTSIDE_VIEWS,
+  brightestPoint,
+  coveLightsOn,
+  outsideFromSettings,
+  panoramaDirection,
+  radianceThrough,
+  resolveOutside,
+  rotationForSun,
+  shrinkPanorama,
+  type OutsideAsset,
+  type OutsideView,
+  type Panorama,
+} from './outside';
+export { SUN_ELEVATION, exteriorGlazing, planAzimuth, planSun, sunVector, type Glazing, type SunPlan } from './sun';
