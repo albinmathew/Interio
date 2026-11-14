@@ -60,3 +60,4 @@ export { COVE_DROP, COVE_ROOMS, COVE_WASH, COVE_WIDTH, coves, insetPolygon, type
 export { Coves, type CovesProps } from './Coves';
 export { FloorMirror, hideFromMirror, makeReflective, mirrorPass } from './FloorMirror';
 export { floorReflection, type FloorReflection } from './reflectance';
+export * from './pathtrace';

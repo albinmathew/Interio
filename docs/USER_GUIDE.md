@@ -193,6 +193,10 @@ On a computer with a capable graphics card you also get soft shadows, glow aroun
 
 Press **Guided tour** to be walked through every room in turn, as in an interior film: the camera glides slowly from room to room, turns as it comes in to frame the room's main piece (the bed, the sofa, the dining table), then pans across to the windows and lingers before moving on. The bar at the bottom shows the room name and size, and has pause, previous room, next room, stop and a speed control. When the tour ends, **Tour again** starts it over.
 
+### Photo mode
+
+The **Photo** button (an aperture, next to the picture button) turns on photo mode. Stand still for a moment and the view turns into a path-traced, photographic picture: light bounces around the room, glass lets the outside in, and glossy floors and mirrors reflect. The first picture appears within a couple of seconds and is ready, as the label above the view says, after about five to ten seconds; it keeps getting sharper and cleaner for a while after that. Move, look around, jump to a room or change the scene and the normal view is back at once; stand still again and it refines again. A paused guided tour is refined too. While photo mode shows its picture, the picture button saves that picture. Photo mode needs a graphics card: on computers without one (or in browsers that render 3D in software) the button is greyed out. The choice is remembered until you close the tab.
+
 ## Save, export and share
 
 - **Saving.** Projects are saved automatically in this browser. The header shows **Saved** once a change is stored. Clearing the browser's site data removes them.

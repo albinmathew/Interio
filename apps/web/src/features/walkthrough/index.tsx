@@ -34,6 +34,7 @@ import { WalkController, type TourState, type WalkState } from './controller';
 import { CinematicEffects } from './Effects';
 import { CurrentRoom, Hint, Joystick, ResumePrompt, RoomsPanel, TourBar, ViewOptions, roomInfo, type RoomInfo } from './Hud';
 import { Minimap } from './Minimap';
+import { PhotoHud, PhotoMode } from './photo';
 import { buildWorld, planTour, startPose } from './route';
 import { Bridge, CameraRig, TargetMarker, type FrameStats, type SceneBridge } from './Scene';
 import { loadPose, savePose, useWalkUi, walkUi } from './store';
@@ -276,7 +277,7 @@ export default function Walkthrough() {
         <TargetMarker controller={controller} />
         <Bridge target={bridge} />
         {look.composer && <CinematicEffects look={look} preset={lighting} exposure={rig.exposure ?? 1} focus={focus} />}
-        {/* photo mode mounts here */}
+        <PhotoMode bridge={bridge} />
       </Canvas>
 
       <div ref={fadeEl} className="pointer-events-none absolute inset-0 bg-ink" style={{ opacity: 0 }} aria-hidden />
@@ -296,6 +297,7 @@ export default function Walkthrough() {
             />
           </div>
           <ViewOptions onScreenshot={screenshot} onFullscreen={toggleFullscreen} canFullscreen={document.fullscreenEnabled === true} />
+          <PhotoHud />
         </div>
         {/* Phones: joystick and map on one row, tour controls on their own row underneath. */}
         <div className="flex flex-wrap items-end justify-between gap-2">
