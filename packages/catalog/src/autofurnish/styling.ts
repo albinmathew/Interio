@@ -30,7 +30,7 @@ const KNEE = 900;
 
 /** The most styling pieces a room of this floor area takes. */
 export function stylingCap(area: number, level: Exclude<StylingLevel, 'none'>): number {
-  return level === 'full' ? Math.min(18, 3 + Math.floor(area * 0.55)) : Math.min(8, 2 + Math.floor(area * 0.25));
+  return level === 'full' ? Math.min(18, 3 + Math.floor(area * 0.55)) : Math.min(8, 3 + Math.floor(area * 0.3));
 }
 
 interface Behind {
@@ -64,18 +64,12 @@ class Stylist {
   add(entry: CatalogEntry | undefined, pose: Pose, opts: PlaceOptions = {}): Placed | null {
     if (!entry || this.count >= this.cap) return null;
     if (entry.anchor !== 'floor' && !this.mounted) return null;
-    const DBG = (globalThis as { STYLE_DEBUG?: boolean }).STYLE_DEBUG;
-    if (!this.p.can(entry, pose, opts)) {
-      if (DBG) console.log('reject can', entry.id, Math.round(pose.x), Math.round(pose.y), pose.z);
-      return null;
-    }
-    if (DBG) console.log('try', entry.id);
+    if (!this.p.can(entry, pose, opts)) return null;
     const mark = this.p.mark();
     const placed = this.p.place(entry, pose, opts);
     if (!placed.flat && placed.zMin < KNEE) {
       const after = walkState(this.p);
       if (!stillWalkable(this.walk, after, entry.dims.w, entry.dims.d)) {
-        if (DBG) console.log('reject walk', entry.id, this.walk, after);
         this.p.rollback(mark);
         return null;
       }
@@ -298,8 +292,11 @@ class Stylist {
     const runner = E('rug.runner');
     if (!runner || this.full === false) return;
     for (const side of [-1, 1]) {
-      const pose = this.p.offset(bed.pose, side * (bed.entry.dims.w / 2 + runner.dims.w / 2 - 200), -L / 2 + runner.dims.d / 2 - 300, bed.pose.rot);
-      this.add(runner, pose, { flat: true });
+      // From beside the pillows to past the foot.
+      for (const head of [300, 550]) {
+        const pose = this.p.offset(bed.pose, side * (bed.entry.dims.w / 2 + runner.dims.w / 2 - 200), L / 2 - head - runner.dims.d / 2, bed.pose.rot);
+        if (this.add(runner, pose, { flat: true })) break;
+      }
     }
   }
 
@@ -534,8 +531,8 @@ function bathroom(s: Stylist): void {
 }
 
 function foyer(s: Stylist): void {
-  const console = s.find(/^table\.console/)[0];
-  s.dressSurface(console, [s.seed.pick('console-lamp', ['lamp.table.square', 'lamp.table.round']), s.full ? s.seed.pick('console-object', ['vase.branches', 'bowl.wood', 'vase.trio']) : undefined].filter((v): v is string => !!v));
+  const hallTable = s.find(/^table\.console/)[0];
+  s.dressSurface(hallTable, [s.seed.pick('console-lamp', ['lamp.table.square', 'lamp.table.round']), s.full ? s.seed.pick('console-object', ['vase.branches', 'bowl.wood', 'vase.trio']) : undefined].filter((v): v is string => !!v));
   if (s.find(/^(art|mirror)\./).length === 0) s.artOnWall(s.seed.order('foyer-art', ['art.portrait', 'art.landscape']));
   if (s.full) runner(s);
   if (s.full && s.p.area >= 3.5 && s.floorPlants().length === 0) s.plant(s.seed.order('foyer-plant', ['plant.snake', 'plant.potted']), { window: false });

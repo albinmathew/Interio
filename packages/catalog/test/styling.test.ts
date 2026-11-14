@@ -115,7 +115,7 @@ const shrink = (rect: Pt[], by: number): Pt[] => {
 };
 
 /** Every placement rule, for `added` on top of the items already in the room. */
-function checkRules(level: Level, roomId: string, added: NewItem[], existing: NewItem[] = []): void {
+export function checkRules(level: Level, roomId: string, added: NewItem[], existing: NewItem[] = []): void {
   const geom = deriveRooms(level).find((g) => g.roomId === roomId)!;
   const label = `${level.rooms[roomId]!.name}:`;
   const pieces = [...existing, ...added].map(pieceOf);
@@ -266,7 +266,7 @@ function expectWalkable(level: Level, roomId: string, main: NewItem[], all: NewI
 }
 
 /** Styles a room furnished with its main pieces only and checks that people can still walk through it. */
-function expectStyleWalkable(source: Level, roomId: string): void {
+export function expectStyleWalkable(source: Level, roomId: string): void {
   const level = structuredClone(source);
   const main = autoFurnish(level, roomId, { styling: 'none' });
   for (const item of main) ops.addItem(level, item);

@@ -13,12 +13,16 @@
  *       top    each room straight down
  *       eye    each room at eye level from two corners, full-height walls
  *   --room <name part>          only rooms whose name contains this (case-insensitive)
+ *   --level <file.json>         a level saved as JSON instead of the sample home (keep real drawings out of the repo)
+ *   --scheme <id>               nudge the first room's seed point until the home gets this colour scheme
  *
  * Writes `<prefix>-<view>.png` / `<prefix>-<room>[-<view>].png` and prints what was placed.
  */
 import fs from 'node:fs';
-import { createSampleLevel, deriveRooms, vec, type Item } from '@interio/core';
+import { createSampleLevel, deriveRooms, vec, type Item, type Level } from '@interio/core';
 import { autoFurnish } from '../src/index';
+import { homeScheme } from '../src/autofurnish/schemes';
+import { RoomSeed } from '../src/autofurnish/seed';
 import { dataUrlToBuffer, openRenderPage } from './lib/browser';
 import type { LevelRenderOptions, RenderApi } from './render/page';
 
@@ -34,7 +38,15 @@ const styling = (flag('--styling') ?? 'full') as 'none' | 'light' | 'full';
 const views = new Set((flag('--views') ?? 'home,plan,rooms').split(','));
 const only = flag('--room')?.toLowerCase();
 
-const level = createSampleLevel();
+const levelFile = flag('--level');
+const level: Level = levelFile ? (JSON.parse(fs.readFileSync(levelFile, 'utf8')) as Level) : createSampleLevel();
+const scheme = flag('--scheme');
+if (scheme) {
+  const first = Object.values(level.rooms)[0]!;
+  const start = { ...first.seed };
+  for (let k = 0; k < 40 && homeScheme(new RoomSeed(level, first)).id !== scheme; k++) first.seed = { x: start.x + ((k % 7) - 3) * 100, y: start.y + (Math.floor(k / 7) - 3) * 100 };
+  console.log('scheme', homeScheme(new RoomSeed(level, first)).id);
+}
 const items: Omit<Item, 'id'>[] = [];
 for (const room of Object.values(level.rooms)) {
   const placed = autoFurnish(level, room.id, { styling });
