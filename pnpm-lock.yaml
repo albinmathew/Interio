@@ -360,6 +360,9 @@ importers:
       three:
         specifier: ^0.187.0
         version: 0.187.0
+      three-gpu-pathtracer:
+        specifier: 0.0.28
+        version: 0.0.28(three-mesh-bvh@0.9.18(three@0.187.0))(three@0.187.0)(xatlas-web@0.1.0)
       three-mesh-bvh:
         specifier: ^0.9.18
         version: 0.9.18(three@0.187.0)
@@ -1803,6 +1806,13 @@ packages:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
 
+  three-gpu-pathtracer@0.0.28:
+    resolution: {integrity: sha512-Ybfa6qpRIU2QP4EXQJaawYZzVN4raSFqsr9qhXXVSiCi59fjef0pyyXztYYWqAnX7bweKmD70p2xMEWehl019A==}
+    peerDependencies:
+      three: '>=0.187.0'
+      three-mesh-bvh: '>=0.9.17'
+      xatlas-web: ^0.1.0
+
   three-mesh-bvh@0.8.3:
     resolution: {integrity: sha512-4G5lBaF+g2auKX3P0yqx+MJC6oVt6sB5k+CchS6Ob0qvH0YIhuUk1eYr7ktsIpY+albCqE80/FVQGV190PmiAg==}
     peerDependencies:
@@ -2012,6 +2022,9 @@ packages:
     resolution: {integrity: sha512-Tb2FUhB4vUsGQlfSquQLYkApkuPAFQXGFzxWKHHumVz2dK+X1RUm/HnID4+TfIGYJ1kTcwOaCk/buYCEJr6YjQ==}
     engines: {node: '>=20.11'}
     hasBin: true
+
+  xatlas-web@0.1.0:
+    resolution: {integrity: sha512-PprVfuXbaIskxLTLBUQRaWfgSy9xUQqAMIRooOw0P6NYqwgh6T0voeer6+Z5M7AFt5SGXUybuww/uDGs1yw8vQ==}
 
   xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}
@@ -3134,6 +3147,12 @@ snapshots:
 
   tapable@2.3.3: {}
 
+  three-gpu-pathtracer@0.0.28(three-mesh-bvh@0.9.18(three@0.187.0))(three@0.187.0)(xatlas-web@0.1.0):
+    dependencies:
+      three: 0.187.0
+      three-mesh-bvh: 0.9.18(three@0.187.0)
+      xatlas-web: 0.1.0
+
   three-mesh-bvh@0.8.3(three@0.187.0):
     dependencies:
       three: 0.187.0
@@ -3305,6 +3324,8 @@ snapshots:
       isexe: 2.0.0
 
   why-is-node-running@3.2.1: {}
+
+  xatlas-web@0.1.0: {}
 
   xml-name-validator@5.0.0: {}
 
