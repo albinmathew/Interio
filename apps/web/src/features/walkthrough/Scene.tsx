@@ -29,12 +29,19 @@ export interface FrameStats {
   ms: number;
 }
 
-/** Runs the controller once per frame and puts the camera at its eyes. */
+/** Height of the head bob, mm, at walking speed: barely there, felt more than seen. */
+const BOB = 9;
+/** Steps per metre walked (two per stride). */
+const STEPS_PER_METRE = 1.45;
+
+/** Runs the controller once per frame and puts the camera at its eyes, with a softened look and a slight head bob. */
 export function CameraRig({ controller }: { controller: WalkController }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const fov = useWalkUi((s) => s.fov);
   const eyeHeight = useWalkUi((s) => s.eyeHeight);
+  const headBob = useWalkUi((s) => s.headBob);
   const eye = useRef(eyeHeight);
+  const view = useRef<{ yaw: number; pitch: number; phase: number; bob: number } | null>(null);
 
   useEffect(() => {
     camera.fov = fov;
@@ -43,11 +50,26 @@ export function CameraRig({ controller }: { controller: WalkController }) {
 
   useFrame((_, dt) => {
     controller.update(dt);
+    const step = Math.min(dt, 0.1);
     // Glide to a new eye height instead of snapping.
-    eye.current += (eyeHeight - eye.current) * (1 - Math.exp(-Math.min(dt, 0.1) / 0.12));
-    camera.position.set(controller.x / 1000, eye.current / 1000, -controller.y / 1000);
+    eye.current += (eyeHeight - eye.current) * (1 - Math.exp(-step / 0.12));
+    const v = (view.current ??= { yaw: controller.yaw, pitch: controller.pitch, phase: 0, bob: 0 });
+    // The view follows the controller through a short critically damped lag: a steadier, heavier camera.
+    // Jumps (a fade, a teleport) snap instead of swinging round.
+    const k = 1 - Math.exp(-step / 0.045);
+    const dyaw = Math.atan2(Math.sin(controller.yaw - v.yaw), Math.cos(controller.yaw - v.yaw));
+    if (Math.abs(dyaw) > 1.2 || controller.fade > 0.5) v.yaw = controller.yaw;
+    else v.yaw += dyaw * k;
+    v.pitch += (controller.pitch - v.pitch) * k;
+    // Head bob: a step every so many millimetres walked, faded in with speed, never during the tour.
+    const speed = controller.manual ? controller.speed : 0;
+    v.phase += (speed * step * STEPS_PER_METRE * Math.PI) / 1000;
+    const wanted = headBob ? Math.min(1, speed / 1500) : 0;
+    v.bob += (wanted - v.bob) * (1 - Math.exp(-step / 0.25));
+    const bob = v.bob * BOB * (Math.abs(Math.sin(v.phase)) - 0.6);
+    camera.position.set(controller.x / 1000, (eye.current + bob) / 1000, -controller.y / 1000);
     // The camera looks down -Z; plan heading 0 is +X, so yaw is offset by a quarter turn.
-    camera.rotation.set(controller.pitch, controller.yaw - Math.PI / 2, 0, 'YXZ');
+    camera.rotation.set(v.pitch, v.yaw - Math.PI / 2, v.bob * 0.0025 * Math.sin(v.phase), 'YXZ');
   });
   return null;
 }

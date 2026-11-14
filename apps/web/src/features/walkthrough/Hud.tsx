@@ -3,7 +3,8 @@
  * caption, hint, resume prompt and the touch joystick. Everything floats over
  * the view and only the controls themselves take pointer events.
  */
-import type { Id, RoomType } from '@interio/core';
+import { planStore, usePlanStore, type Id, type RoomType } from '@interio/core';
+import { COVE_SETTING, OUTSIDE_LABELS, OUTSIDE_SETTING, OUTSIDE_VIEWS, coveLightsOn, lightingFromSettings, outsideFromSettings, type OutsideView } from '@interio/scene3d';
 import {
   Archive,
   Bath,
@@ -146,6 +147,42 @@ export function CurrentRoom({ room }: { room: RoomInfo | null }) {
 
 /* ----------------------------------------------------------- view options */
 
+function Toggle({ label, checked, onChange, testId, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; testId: string; hint?: string }) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-2 text-xs font-medium text-ink-soft" title={hint}>
+      {label}
+      <input
+        type="checkbox"
+        className="h-4 w-4 accent-accent"
+        checked={checked}
+        data-testid={testId}
+        onChange={(e) => {
+          onChange(e.currentTarget.checked);
+          // Hand the keyboard back to walking.
+          e.currentTarget.blur();
+        }}
+      />
+    </label>
+  );
+}
+
+/** The world outside the windows, saved with the project (also offered in the Design toolbar). */
+export function OutsidePicker({ size = 'sm' }: { size?: 'sm' | 'md' }) {
+  const outside = usePlanStore((s) => outsideFromSettings(s.project?.settings));
+  return (
+    <div data-testid="walk-outside" data-value={outside}>
+      <Segmented<OutsideView>
+        size={size}
+        value={outside}
+        onChange={(v) => {
+          if (v !== outside) planStore.getState().setProjectSettings({ [OUTSIDE_SETTING]: v });
+        }}
+        options={OUTSIDE_VIEWS.map((v) => ({ value: v, label: OUTSIDE_LABELS[v], title: `${OUTSIDE_LABELS[v]} outside the windows` }))}
+      />
+    </div>
+  );
+}
+
 function Slider({ label, value, text, min, max, step, onChange, testId }: { label: string; value: number; text: string; min: number; max: number; step: number; onChange: (v: number) => void; testId: string }) {
   return (
     <label className="flex flex-col gap-1">
@@ -170,7 +207,8 @@ function Slider({ label, value, text, min, max, step, onChange, testId }: { labe
 }
 
 export function ViewOptions({ onScreenshot, onFullscreen, canFullscreen }: { onScreenshot: () => void; onFullscreen: () => void; canFullscreen: boolean }) {
-  const { fov, eyeHeight, moveMode, settingsOpen, fullscreen } = useWalkUi();
+  const { fov, eyeHeight, moveMode, settingsOpen, fullscreen, headBob } = useWalkUi();
+  const coves = usePlanStore((s) => coveLightsOn(s.project?.settings, lightingFromSettings(s.project?.settings)));
   return (
     <div className="flex flex-col items-end gap-2">
       <Panel className="pointer-events-auto flex items-center gap-0.5 p-0.5">
@@ -207,6 +245,18 @@ export function ViewOptions({ onScreenshot, onFullscreen, canFullscreen }: { onS
           <div className="flex flex-col gap-3 p-3">
             <Slider label="Field of view" text={`${Math.round(fov)}°`} value={fov} min={FOV_RANGE.min} max={FOV_RANGE.max} step={1} onChange={(v) => walkUi.set({ fov: v })} testId="walk-fov" />
             <Slider label="Eye height" text={metres(eyeHeight)} value={eyeHeight} min={EYE_RANGE.min} max={EYE_RANGE.max} step={50} onChange={(v) => walkUi.set({ eyeHeight: v })} testId="walk-eye-height" />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-ink-soft">Outside the windows</span>
+              <OutsidePicker />
+            </div>
+            <Toggle
+              label="Cove lights"
+              hint="Hidden warm LED strips round the ceilings of living rooms and bedrooms. On by default for evening and night."
+              checked={coves}
+              testId="walk-coves"
+              onChange={(on) => planStore.getState().setProjectSettings({ [COVE_SETTING]: on })}
+            />
+            <Toggle label="Head bob" hint="A very slight bob of the head while walking" checked={headBob} testId="walk-head-bob" onChange={(on) => walkUi.set({ headBob: on })} />
             <div className="flex flex-col gap-1">
               <span className="text-xs font-medium text-ink-soft">Mouse</span>
               <Segmented<MoveMode>

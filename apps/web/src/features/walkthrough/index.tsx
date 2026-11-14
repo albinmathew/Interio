@@ -215,6 +215,13 @@ export default function Walkthrough() {
   }, [world, tourPlan]);
   const route = useMemo(() => (tourStatus === 'playing' || tourStatus === 'paused' ? tourPlan?.stops.map((s) => s.leg.points) : undefined), [tourPlan, tourStatus]);
 
+  // Depth of field while the tour lingers: keep the room's main piece sharp.
+  const focus = useCallback(() => {
+    const f = controller?.tourFocus();
+    if (!controller || !f) return null;
+    return Math.hypot((f.x - controller.x) / 1000, (f.y - controller.y) / 1000);
+  }, [controller]);
+
   const screenshot = useCallback(() => {
     const shot = bridge.current?.capture();
     if (!shot || !world) return;
@@ -268,7 +275,7 @@ export default function Walkthrough() {
         <CameraRig controller={controller} />
         <TargetMarker controller={controller} />
         <Bridge target={bridge} />
-        {look.composer && <CinematicEffects look={look} preset={lighting} exposure={rig.exposure ?? 1} focus={() => null} />}
+        {look.composer && <CinematicEffects look={look} preset={lighting} exposure={rig.exposure ?? 1} focus={focus} />}
         {/* photo mode mounts here */}
       </Canvas>
 

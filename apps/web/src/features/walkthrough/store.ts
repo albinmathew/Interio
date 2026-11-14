@@ -3,7 +3,7 @@
  * controller's discrete state (current room, tour) for React to render.
  * Plan data stays in the plan store.
  */
-import { DEFAULTS, type Id } from '@interio/core';
+import type { Id } from '@interio/core';
 import { create } from 'zustand';
 import type { TourState } from './controller';
 import type { Pose } from './route';
@@ -12,7 +12,8 @@ import type { Pose } from './route';
 export type MoveMode = 'look' | 'click';
 
 export const FOV_RANGE = { min: 40, max: 110, initial: 70 } as const;
-export const EYE_RANGE = { min: 1000, max: 1900, initial: DEFAULTS.eyeHeight } as const;
+/** A gentle eye height: a touch below a standing adult's eyes, as interior photographers shoot. */
+export const EYE_RANGE = { min: 1000, max: 1900, initial: 1550 } as const;
 export const TOUR_SPEEDS = [0.5, 1, 2, 4] as const;
 
 const IDLE_TOUR: TourState = { status: 'idle', index: 0, total: 0, phase: null, roomId: null, visited: [], speed: 1 };
@@ -21,6 +22,8 @@ export interface WalkUi {
   fov: number;
   eyeHeight: number;
   tourSpeed: number;
+  /** A very slight bob of the head while walking. */
+  headBob: boolean;
   moveMode: MoveMode;
   roomsOpen: boolean;
   mapOpen: boolean;
@@ -45,6 +48,7 @@ export const useWalkUi = create<WalkUi>(() => ({
   fov: FOV_RANGE.initial,
   eyeHeight: EYE_RANGE.initial,
   tourSpeed: 1,
+  headBob: true,
   moveMode: coarse ? 'click' : 'look',
   roomsOpen: wide,
   mapOpen: wide,

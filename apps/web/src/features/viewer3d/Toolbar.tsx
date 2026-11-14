@@ -1,12 +1,12 @@
 /**
  * The Design toolbar: camera mode, whole-home furnishing, lighting preset and picture export.
  */
-import { planStore, selectLevel, type Level } from '@interio/core';
-import { LIGHTING_LABELS, LIGHTING_PRESETS, LIGHTING_SETTING, type LightingPreset } from '@interio/scene3d';
+import { planStore, selectLevel, usePlanStore, type Level } from '@interio/core';
+import { LIGHTING_LABELS, LIGHTING_PRESETS, LIGHTING_SETTING, OUTSIDE_LABELS, OUTSIDE_SETTING, OUTSIDE_VIEWS, outsideFromSettings, type LightingPreset, type OutsideView } from '@interio/scene3d';
 import { Aperture, Box, Camera, Eraser, Layers, Maximize, Moon, ScanLine, Sparkles, Sun, Sunset } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { clearFurniture, furnishHome } from '../../lib/furnish';
-import { Button, Dialog, IconButton, Panel, Segmented, toast } from '../../ui';
+import { Button, Dialog, IconButton, Panel, Segmented, Select, toast } from '../../ui';
 import { captureBridge, captureFileName, downloadDataUrl, exportScale } from './capture';
 import { saveFirstLayout } from './firstLayout';
 import { useLightingPreset, useViewer, type ViewMode } from './state';
@@ -56,6 +56,7 @@ export function Toolbar({ level }: { level: Level }) {
   const view = useViewer((s) => s.view);
   const cutaway = useViewer((s) => s.cutaway);
   const lighting = useLightingPreset();
+  const outside = usePlanStore((s) => outsideFromSettings(s.project?.settings));
   const [confirmClear, setConfirmClear] = useState(false);
   const ui = useViewer.getState();
   const count = Object.keys(level.items).length;
@@ -151,6 +152,23 @@ export function Toolbar({ level }: { level: Level }) {
             options={LIGHTING_PRESETS.map((preset) => ({ value: preset, title: LIGHTING_LABELS[preset], label: LIGHTING_ICON[preset] }))}
           />
         </div>
+        <Select
+          aria-label="Outside the windows"
+          title="What the windows look out on when you walk through the home"
+          className="!h-8 !w-[6.5rem] shrink-0 text-[13px]"
+          value={outside}
+          data-testid="outside-view"
+          onChange={(e) => {
+            const view = e.currentTarget.value as OutsideView;
+            if (view !== outside) planStore.getState().setProjectSettings({ [OUTSIDE_SETTING]: view });
+          }}
+        >
+          {OUTSIDE_VIEWS.map((v) => (
+            <option key={v} value={v}>
+              {OUTSIDE_LABELS[v]}
+            </option>
+          ))}
+        </Select>
         <IconButton label="Save a picture of this view" size="sm" className="shrink-0" data-testid="export-picture" onClick={exportPicture}>
           <Camera className="h-4 w-4" />
         </IconButton>

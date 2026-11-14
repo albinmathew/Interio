@@ -15,7 +15,8 @@ import {
   type RoomGeom,
   type RoomGraph,
 } from '@interio/core';
-import { buildCollider, overlaps, type Collider } from './collision';
+import { buildCollider, isFree, overlaps, type Collider } from './collision';
+import { smoothPath } from './curve';
 import {
   buildNavGrid,
   cellCentre,
@@ -230,6 +231,8 @@ export interface TourLeg {
   length: number;
   /** No walkable connection: fade and jump instead of walking. */
   jump: boolean;
+  /** The camera's glide along `points`: a smooth curve through its corners, sampled every 50 mm. Empty for a jump. */
+  glide: Pt[];
 }
 
 export interface TourStop {
@@ -240,7 +243,54 @@ export interface TourStop {
   viewDeg: number;
   /** How to get here from the previous stop (from the start pose for the first stop). */
   leg: TourLeg;
+  /** The room's main piece (bed, sofa, dining table...), or null when it has none. */
+  focus: Pt | null;
+  /** Heading that frames the main piece (the longest view without one), plan degrees. */
+  focusDeg: number;
+  /** Heading towards the room's largest window or glazed door, or null when it has none. */
+  windowDeg: number | null;
 }
+
+/** True where the tour camera may pass: walkable floor, clear of walls and furniture, in a room or a doorway. */
+export function glideClear(world: WalkWorld, p: Pt): boolean {
+  return isWalkable(world.nav, p) && isFree(world.collider, p, world.collider.radius - 10) && inRoomOrDoorway(world.level, world.rooms, p);
+}
+
+/** The smooth glide along a walking route (see `smoothPath`), checked against walls and furniture. */
+export function glideAlong(world: WalkWorld, route: Pt[]): Pt[] {
+  return smoothPath(route, (p) => glideClear(world, p));
+}
+
+/** What a room is about, in the order a photographer would frame it. Matched on catalog ids. */
+const MAIN_PIECES: RegExp[] = [/^bed\./, /^sofa\./, /^table\.dining/, /^kitchen\.island/, /^desk/, /^bathtub/, /^table\./, /^armchair/, /^basin|^kitchen\.sink/];
+
+/** The room's main piece: its bed, sofa or dining table (the one nearest the middle when there are several). */
+export function roomFocus(world: WalkWorld, roomId: Id): Pt | null {
+  const geom = world.rooms.find((r) => r.roomId === roomId);
+  if (!geom) return null;
+  const items = Object.values(world.level.items).filter((i) => (i.roomId ? i.roomId === roomId : vec.pointInPolygon(i, geom.polygon)));
+  for (const pattern of MAIN_PIECES) {
+    const hits = items.filter((i) => pattern.test(i.catalogId)).sort((a, b) => vec.dist(a, geom.centroid) - vec.dist(b, geom.centroid));
+    if (hits[0]) return { x: hits[0].x, y: hits[0].y };
+  }
+  return null;
+}
+
+/** Centre of the room's widest window or glazed sliding door. */
+export function roomWindow(world: WalkWorld, roomId: Id): Pt | null {
+  const geom = world.rooms.find((r) => r.roomId === roomId);
+  if (!geom) return null;
+  const walls = new Set(geom.edgeWalls);
+  let best: { at: Pt; width: number } | null = null;
+  for (const o of Object.values(world.level.openings)) {
+    if ((o.kind !== 'window' && o.kind !== 'sliding') || !walls.has(o.wallId)) continue;
+    const f = openingFrame(world.level, o.id);
+    if (f && (!best || o.width > best.width)) best = { at: f.center, width: o.width };
+  }
+  return best?.at ?? null;
+}
+
+const headingTo = (from: Pt, to: Pt) => (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
 
 export interface TourPlan {
   start: Pose;
@@ -290,8 +340,13 @@ export function planTour(world: WalkWorld, from?: Pose): TourPlan | null {
     const eye = standPoint(world, roomId, here >= 0 ? g.component[here] : undefined);
     if (!eye) continue; // no floor to stand on (a room packed solid): nothing to show
     const points = findPath(g, at, eye);
-    const leg: TourLeg = points ? { points, length: pathLength(points), jump: false } : { points: [], length: 0, jump: true };
-    stops.push({ roomId, eye, viewDeg: longestView(g, eye, roomIndexOf(g, roomId)), leg });
+    const leg: TourLeg = points ? { points, length: pathLength(points), jump: false, glide: glideAlong(world, points) } : { points: [], length: 0, jump: true, glide: [] };
+    const viewDeg = longestView(g, eye, roomIndexOf(g, roomId));
+    const focus = roomFocus(world, roomId);
+    const window = roomWindow(world, roomId);
+    // Standing on top of the piece (a small room): frame the room instead.
+    const focusDeg = focus && vec.dist(focus, eye) > 600 ? headingTo(eye, focus) : viewDeg;
+    stops.push({ roomId, eye, viewDeg, leg, focus, focusDeg, windowDeg: window ? headingTo(eye, window) : null });
     at = eye;
   }
   return { start, stops };
