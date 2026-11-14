@@ -503,7 +503,7 @@ export class PhotoTracer {
 const EXPOSURE_KEY = 0.85;
 
 /** How far the colour of the light is pulled towards neutral: some warmth (an evening, lamplight) stays. */
-const WHITE_BALANCE = 0.6;
+const WHITE_BALANCE = 0.35;
 
 function hasPixels(texture: THREE.Texture): boolean {
   const image = texture.image as { data?: ArrayLike<number>; width?: number } | undefined;
