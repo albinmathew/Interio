@@ -14,6 +14,7 @@ import { ContactShade, DadoLayer, OpeningsLayer, RailingsLayer, SkirtingLayer, W
 import { hideFromMirror, makeReflective } from './FloorMirror';
 import { createSurfaceMaterial } from './materials';
 import { createMuralMaterial } from './murals';
+import { muralSpan } from './muralSpecs';
 import { floorReflection } from './reflectance';
 import { surfaceFinish } from './surfaces';
 import { fadeWalls, WallFadeController } from './wallFade';
@@ -55,7 +56,7 @@ function material(level: Level, g: MeshGroup, textures: boolean): THREE.MeshStan
     case 'wallSide':
       if (!finish) return createSurfaceMaterial(undefined, { color: EXTERIOR_WALL_COLOR, roughness: 0.9 });
       // A mural is the picture itself, not a detail: it shows whatever the texture setting.
-      if (parseMuralFinish(finish)) return createMuralMaterial(finish, g.geometry)!;
+      if (parseMuralFinish(finish)) return createMuralMaterial(finish, g.geometry, g.wallId ? muralSpan(level, g.wallId, g.side ?? 'left', finish) : null)!;
       return createSurfaceMaterial(finish, TRIM, { textures, surface });
     case 'wallTop':
       return createSurfaceMaterial(undefined, g.wallKind === 'wall' ? { color: WALL_CUT_COLOR, roughness: 0.9 } : TRIM);
@@ -80,7 +81,7 @@ export function LevelMeshes({ level, showCeilings = false, cutaway = false, door
         group,
         geometry: geometryFromMesh(group.geometry),
         // Read through `level` at build time: rooms and walls are part of the mesh cache key, so this stays in step.
-        material: material({ rooms, walls } as Level, group, textures),
+        material: material({ rooms, walls, vertices: level.vertices } as Level, group, textures),
       })),
     [mesh, rooms, walls, textures],
   );

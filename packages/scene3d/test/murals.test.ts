@@ -1,7 +1,7 @@
-import { MURAL_DADO_HEIGHT, buildLevelMesh, createSampleLevel, type Level, type MeshGroup } from '@interio/core';
+import { MURAL_DADO_HEIGHT, buildLevel, buildLevelMesh, createSampleLevel, type Level, type MeshGroup } from '@interio/core';
 import { describe, expect, it } from 'vitest';
 import { DADO_CAP, DADO_DEPTH, dadoParts } from '../src/dado';
-import { applyMuralTransform, faceExtent, faceRunsLeftward, muralRegion, muralTransform, paintAspect, type FaceExtent } from '../src/muralSpecs';
+import { applyMuralTransform, faceExtent, faceRunsLeftward, muralRegion, muralSpan, muralTransform, paintAspect, type FaceExtent } from '../src/muralSpecs';
 import { PATTERNS } from '../src/texturePixels';
 
 const face: FaceExtent = { u0: 1.2, u1: 4.8, v0: 0, v1: 2.7 };
@@ -182,5 +182,34 @@ describe('beadboard', () => {
       if (low && !prev) grooves++;
     }
     expect(grooves).toBe(12);
+  });
+});
+
+describe('muralSpan', () => {
+  // One straight 4 m wall in two pieces (a partition meets it at x = 1.5 m), and a wall round the corner.
+  const level = buildLevel({
+    walls: [
+      { a: { x: 0, y: 0 }, b: { x: 1500, y: 0 }, thickness: 150 },
+      { a: { x: 1500, y: 0 }, b: { x: 4000, y: 0 }, thickness: 150 },
+      { a: { x: 4000, y: 0 }, b: { x: 4000, y: 3000 }, thickness: 150 },
+      { a: { x: 1500, y: 0 }, b: { x: 1500, y: 3000 }, thickness: 100 },
+    ],
+  });
+  const [w1, w2, corner] = Object.values(level.walls);
+
+  it('runs across in-line pieces of wall showing the same mural on the same side', () => {
+    for (const w of [w1!, w2!]) w.finishLeft = 'wall.mural.meadow.dado';
+    corner!.finishLeft = 'wall.mural.meadow.dado';
+    // In the u of each piece: the whole 4 m run, from where that piece starts.
+    expect(muralSpan(level, w1!.id, 'left', 'wall.mural.meadow.dado')).toEqual({ u0: 0, u1: 4 });
+    expect(muralSpan(level, w2!.id, 'left', 'wall.mural.meadow.dado')).toEqual({ u0: -1.5, u1: 2.5 });
+  });
+
+  it('stops at a different finish, the other side, or a corner', () => {
+    w2!.finishLeft = 'wall.mural.meadow';
+    expect(muralSpan(level, w1!.id, 'left', 'wall.mural.meadow.dado')).toEqual({ u0: 0, u1: 1.5 });
+    w2!.finishLeft = undefined;
+    w2!.finishRight = 'wall.mural.meadow.dado';
+    expect(muralSpan(level, w1!.id, 'left', 'wall.mural.meadow.dado')).toEqual({ u0: 0, u1: 1.5 });
   });
 });

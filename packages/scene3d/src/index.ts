@@ -25,7 +25,7 @@ export { ContactShade, DadoLayer, OpeningsLayer, RailingsLayer, SkirtingLayer, t
 export { DADO_CAP, DADO_DEPTH, dadoParts, type DadoWall, type PanelSpec } from './dado';
 export { createMuralMaterial, provideMuralImage, setMuralImageLoader, type MuralFace, type MuralImageLoader } from './murals';
 export { muralThumbnail, paintMural } from './muralArt';
-export { applyMuralTransform, faceExtent, faceRunsLeftward, muralRegion, muralTransform, paintAspect, type FaceExtent, type MuralTransform } from './muralSpecs';
+export { applyMuralTransform, faceExtent, faceRunsLeftward, muralRegion, muralSpan, muralTransform, paintAspect, type FaceExtent, type MuralTransform } from './muralSpecs';
 export { contactShading, type ContactShading, type ShadeQuad } from './shading';
 export { applyFit, fitModel, rotateBoundsY, type Bounds, type ModelFit } from './fit';
 export { createSurfaceMaterial, setTextureBaseUrl, type SurfaceFallback, type SurfaceMaterialOptions } from './materials';

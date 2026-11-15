@@ -7,7 +7,7 @@
  * (`offset` / `repeat`), so openings cut through it exactly where they cut the wall, and
  * the path tracer (which reads the same transform) shows it in the same place.
  */
-import { MURAL_DADO_HEIGHT } from '@interio/core';
+import { MURAL_DADO_HEIGHT, type Id, type Level } from '@interio/core';
 
 /** The part of a wall face a mural covers, in mesh UV units (metres). */
 export interface FaceExtent {
@@ -114,4 +114,51 @@ export function applyMuralTransform(t: MuralTransform, u: number, v: number): [n
 export function paintAspect(region: FaceExtent): number {
   const a = (region.u1 - region.u0) / Math.max(1e-6, region.v1 - region.v0);
   return Math.min(4, Math.max(0.75, Math.round(a * 4) / 4));
+}
+
+/**
+ * The run of wall a mural spans, in the `u` of wall `wallId` (metres from its first
+ * vertex): the wall itself plus the walls joined to it end to end in a straight line whose
+ * face on the same side shows the same finish. A plan often splits one straight wall into
+ * pieces (where a partition meets it); the picture then runs across them all instead of
+ * starting again on each piece.
+ */
+export function muralSpan(level: Pick<Level, 'walls' | 'vertices'>, wallId: Id, side: 'left' | 'right', finish: string): { u0: number; u1: number } | null {
+  const wall = level.walls[wallId];
+  const a = wall && level.vertices[wall.a];
+  const b = wall && level.vertices[wall.b];
+  if (!wall || !a || !b) return null;
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len < 1) return null;
+  const dir = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+  const along = (p: { x: number; y: number }) => (p.x - a.x) * dir.x + (p.y - a.y) * dir.y;
+  const off = (p: { x: number; y: number }) => Math.abs((p.x - a.x) * dir.y - (p.y - a.y) * dir.x);
+  // A wall in line with this one, whose face on our side shows the same finish.
+  const inLine = (id: Id): [number, number] | null => {
+    const w = level.walls[id];
+    const p = w && level.vertices[w.a];
+    const q = w && level.vertices[w.b];
+    if (!w || !p || !q || w.kind !== wall.kind || off(p) > 5 || off(q) > 5) return null;
+    const same = (q.x - p.x) * dir.x + (q.y - p.y) * dir.y > 0;
+    const theirSide = same ? side : side === 'left' ? 'right' : 'left';
+    if ((theirSide === 'left' ? w.finishLeft : w.finishRight) !== finish) return null;
+    return [Math.min(along(p), along(q)), Math.max(along(p), along(q))];
+  };
+  let s0 = 0;
+  let s1 = len;
+  const used = new Set<Id>([wallId]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const id of Object.keys(level.walls)) {
+      if (used.has(id)) continue;
+      const r = inLine(id);
+      // Joined end to end: it starts where the run ends (or ends where it starts).
+      if (!r || (Math.abs(r[0] - s1) > 5 && Math.abs(r[1] - s0) > 5)) continue;
+      used.add(id);
+      s0 = Math.min(s0, r[0]);
+      s1 = Math.max(s1, r[1]);
+      grew = true;
+    }
+  }
+  return { u0: s0 / 1000, u1: s1 / 1000 };
 }

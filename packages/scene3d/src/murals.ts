@@ -102,18 +102,21 @@ export interface MuralFace {
 }
 
 /**
- * A new material showing mural `finishId` across one wall face, or null when the id is not
- * a mural. Each call returns its own material and its own placement of the shared picture;
+ * A new material showing mural `finishId` across one wall face (or the part of `span`, the
+ * run of in-line walls showing it, that this face covers), or null when the id is not a mural. Each call returns its own material and its own placement of the shared picture;
  * dispose it when done.
  */
-export function createMuralMaterial(finishId: string, face: MuralFace): THREE.MeshStandardMaterial | null {
+export function createMuralMaterial(finishId: string, face: MuralFace, span?: { u0: number; u1: number } | null): THREE.MeshStandardMaterial | null {
   const mural = parseMuralFinish(finishId);
   const def = resolveSurfaceFinish(finishId, 'wall');
   if (!mural || !def) return null;
   const material = new THREE.MeshStandardMaterial({ name: def.id, color: def.color, roughness: def.roughness, metalness: 0 });
   if (typeof document === 'undefined') return material;
 
-  const region = muralRegion(faceExtent(face.uvs), mural.dado);
+  // The picture runs across the whole straight run of wall showing it (`span`), of which this face is part.
+  const own = faceExtent(face.uvs);
+  const extent = span ? { ...own, u0: Math.min(own.u0, span.u0), u1: Math.max(own.u1, span.u1) } : own;
+  const region = muralRegion(extent, mural.dado);
   const mirror = faceRunsLeftward(face.positions, face.normals, face.uvs, face.indices);
   let disposed = false;
   let placed: THREE.Texture | null = null;
