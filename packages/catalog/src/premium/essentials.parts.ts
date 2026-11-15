@@ -54,10 +54,10 @@ export const ESS_ALTAR_SLOTS: FinishSlot[] = [
   { id: 'fronts', label: 'Cabinet fronts', kind: 'lacquer', default: 'lacquer.greige' },
 ];
 
-/** Crockery unit: greige carcass and fronts, walnut fluted panel and interiors, a white quartz counter, brass frames and channels. */
+/** Crockery unit: greige carcass and doors; walnut fluted panel, drawers, interiors and plinth; a white quartz counter; brass frames and channels. */
 export const ESS_CROCKERY_SLOTS: FinishSlot[] = [
-  { id: 'fronts', label: 'Carcass and fronts', kind: 'lacquer', default: 'lacquer.greige' },
-  { id: 'wood', label: 'Fluted panel and interiors', kind: 'wood', default: 'wood.walnut' },
+  { id: 'fronts', label: 'Carcass and doors', kind: 'lacquer', default: 'lacquer.greige' },
+  { id: 'wood', label: 'Fluted panel, drawers, shelves and plinth', kind: 'wood', default: 'wood.walnut' },
   { id: 'counter', label: 'Counter top', kind: 'stone', default: 'stone.quartz.white' },
   { id: 'metal', label: 'Door frames, pulls and channels', kind: 'metal', default: 'metal.brass' },
 ];
