@@ -32,33 +32,49 @@ const GLASS = 'glass.clear';
 /** The LED strips (emissive after build). No other fixed part uses this colour. */
 const LED = '#ffe8c4';
 
-const LED_GLOW: Glow = { tint: new THREE.Color('#ffd9a0'), intensity: 1.9, surface: 1 };
+/** Like a lamp's opal diffuser: bright enough to bloom in the walk view with the room lights low. */
+const LED_GLOW: Glow = { tint: new THREE.Color('#ffe0b0'), intensity: 5, surface: 1 };
 
 const tinted = new WeakMap<THREE.Material, THREE.Material>();
 
 /**
- * Copies of the catalog's shared materials for the display glass (a warm, bronze
- * tint) and the blue glaze (glossy, where a custom colour is matte lacquer). They
- * stay physical materials under the same names, so the app tunes the glass like
- * any other and the lite renderer swaps them like any other.
+ * Copies of the catalog's shared materials, never the shared ones themselves:
+ * - the display glass, bronze-tinted. Still a physical material named `glass.clear`,
+ *   so the app tunes it like any other glass.
+ * - the blue glaze, glossy where a custom colour is matte lacquer.
+ * - the white china, with a faint warm glow: the cabinet's LEDs lighting it. A
+ *   standard material, so the lite renderer keeps the glow.
  */
-function retint(source: THREE.Material, kind: 'glass' | 'glaze'): THREE.Material {
+function retint(source: THREE.Material, kind: 'glass' | 'glaze' | 'china'): THREE.Material {
   let m = tinted.get(source);
   if (!m) {
-    const c = (source as THREE.MeshPhysicalMaterial).clone();
-    if (kind === 'glass') c.color.set('#6b5a46');
-    else {
-      c.roughness = 0.2;
-      c.clearcoat = 1;
-      c.clearcoatRoughness = 0.08;
+    const src = source as THREE.MeshPhysicalMaterial;
+    if (kind === 'china') {
+      m = new THREE.MeshStandardMaterial({
+        name: src.name,
+        color: src.color.clone(),
+        map: src.map ?? null,
+        roughness: 0.14,
+        metalness: 0,
+        emissive: new THREE.Color('#ffe2b8'),
+        emissiveIntensity: 0.28,
+      });
+    } else {
+      const c = src.clone();
+      if (kind === 'glass') c.color.set('#6b5a46');
+      else {
+        c.roughness = 0.2;
+        c.clearcoat = 1;
+        c.clearcoatRoughness = 0.08;
+      }
+      m = c;
     }
-    tinted.set(source, c);
-    m = c;
+    tinted.set(source, m);
   }
   return m;
 }
 
-/** Lights the LED strips and gives the glass and the glaze their own looks. */
+/** Lights the LED strips and gives the glass, the glaze and the china their own looks. */
 function finish(group: THREE.Group): THREE.Group {
   group.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -69,6 +85,7 @@ function finish(group: THREE.Group): THREE.Group {
       mesh.castShadow = false;
     } else if (name === GLASS) mesh.material = retint(mesh.material, 'glass');
     else if (name === GLAZE) mesh.material = retint(mesh.material, 'glaze');
+    else if (name === CHINA) mesh.material = retint(mesh.material, 'china');
   });
   return group;
 }
@@ -331,10 +348,11 @@ function dressShelf(m: Model, s: Shelf, kind: Arrangement, flip: boolean): void 
       // A stack of dinner plates and a stack of bowls, side plates between them.
       const r = Math.min(0.125, w * 0.22, d * 0.42);
       const n = Math.max(3, Math.min(7, Math.floor((s.h - 0.06) / 0.012)));
-      m.fixed(CHINA, lathe(plateStack(r, n), sx(-0.24), s.y, s.zb + d * 0.48, 22));
+      m.fixed(CHINA, lathe(plateStack(r, n), sx(-0.25), s.y, s.zb + d * 0.42, 22));
       const R = Math.min(0.085, w * 0.16);
-      m.fixed(CHINA, lathe(bowlStack(R, R * 0.75, 3), sx(0.26), s.y, s.zb + d * 0.5, 22));
-      m.fixed(CHINA, lathe(plateStack(r * 0.62, Math.max(2, n - 2)), sx(0.03), s.y, s.zb + d * 0.62, 22));
+      m.fixed(CHINA, lathe(bowlStack(R, R * 0.75, 3), sx(0.27), s.y, s.zb + d * 0.42, 22));
+      const rs = Math.min(0.055, w * 0.12, d * 0.18);
+      m.fixed(CHINA, lathe(plateStack(rs, Math.max(2, n - 2)), sx(0.02), s.y, s.zb + d * 0.8, 20));
       break;
     }
   }
@@ -486,8 +504,8 @@ export function buildCrockery(entry: CatalogEntry, ctx?: BuildContext): THREE.Ob
     m.fixed(GLASS, box(cx1 - cx0 - 0.004, shelfT, zf - zb, 0, y - shelfT, (zb + zf) / 2));
     m.fixed(LED, box(cx1 - cx0 - 0.02, 0.003, 0.004, 0, y - shelfT + 0.0025, zf + 0.0025));
   }
-  // LED profiles down both sides of the cabinet, behind the doors, and across its top.
-  for (const x of [cx0 + 0.006, cx1 - 0.006]) m.fixed(LED, box(0.006, ih - 0.02, 0.012, x, inBot + 0.01, uFront - 0.045));
+  // LED profiles up the back corners of the cabinet (clear of the door stiles), and across its top behind the doors.
+  for (const x of [cx0 + 0.012, cx1 - 0.012]) m.fixed(LED, box(0.008, ih - 0.02, 0.008, x, inBot + 0.01, zb + 0.005));
   m.fixed(LED, box(cx1 - cx0 - 0.03, 0.005, 0.012, 0, inTop - 0.006, uFront - 0.045));
 
   /* Glass doors: slim brass frames, bronze-tinted glass, long pulls on the meeting stiles. */
