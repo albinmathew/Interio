@@ -486,10 +486,16 @@ function dining(s: Stylist, table = s.find(/^table\.dining/)[0]): void {
   if (s.type === 'dining' && s.find(/^art\./).length === 0) s.artOnWall(s.seed.order('dining-art', ARTS));
 }
 
+/** Books and a candle tray on the lit shelves over a desk: low pieces, under the cupboards above. */
+function dressDeskShelves(s: Stylist): void {
+  for (const shelf of s.find(/^shelf\.floating/)) if (s.onTop(shelf).length === 0) s.dressEnds(shelf, ['books.stack', 'tray.candles'], 60);
+}
+
 function bedroom(s: Stylist): void {
   const bed = s.find(/^bed\./)[0];
   s.curtains();
   s.bedsideLamps();
+  dressDeskShelves(s);
   if (bed) {
     s.bedRug(bed);
     if (s.find(/^art\./).length === 0) s.artOver(bed, s.seed.order('bed-art', ARTS));
@@ -514,6 +520,7 @@ function bedroom(s: Stylist): void {
 
 function study(s: Stylist): void {
   s.curtains();
+  dressDeskShelves(s);
   const desk = s.find(/^desk/)[0];
   // A desk lamp at one end; books too on a bare desk.
   if (desk && !s.onTop(desk).some((q) => q.entry.id.startsWith('lamp'))) s.dressEnds(desk, ['lamp.table.square', s.full && s.onTop(desk).length === 0 ? 'books.stack' : undefined], 90);

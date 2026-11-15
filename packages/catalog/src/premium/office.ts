@@ -5,6 +5,7 @@
  */
 import type { CatalogEntry, FinishSlot } from '@interio/core';
 import * as THREE from 'three';
+import { lightStrips } from './glow';
 import { Model, box, cyl, param, rbox, slab, type BuildContext } from './kit';
 import { Parts, beam, clamp, placeBox, rod, softBox } from './seating.parts';
 import { slabTop } from './tables';
@@ -378,7 +379,7 @@ function buildFloatingShelf(entry: CatalogEntry, ctx?: BuildContext): THREE.Obje
   // A slim metal edge along the front.
   m.part('trim', box(W, H - strip, trim, 0, strip, D / 2 - trim / 2));
   m.fixed(SHELF_LED, box(W - 0.04, strip, 0.012, 0, 0, D / 2 - 0.03));
-  return m.build();
+  return lightStrips(m.build(), SHELF_LED);
 }
 
 /** Generators of this family, registered by `premium/index.ts`. */

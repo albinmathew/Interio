@@ -17,6 +17,7 @@
 import type { CatalogEntry, FinishSlot } from '@interio/core';
 import * as THREE from 'three';
 import { alongX, alongZ, arcLathe, disc, edgeProfile, plate, rrect, sweep, withHoles } from './kitchen.kit';
+import { lightStrips } from './glow';
 import { Model, box, cyl, param, rbox, tube, type BuildContext } from './kit';
 
 /* ------------------------------------------------------------------ slots */
@@ -347,7 +348,7 @@ export function buildKitchenWall(entry: CatalogEntry, ctx?: BuildContext): THREE
     }
     // The bottom and top read as shelves too.
     m.part('shelves', rbox(W - 2 * P - 0.002, 0.022, inner - back - 0.012, 0.003, 0, 0.004 + P, (back + 0.008 + inner) / 2 - 0.002, 2));
-    return m.build();
+    return lightStrips(m.build(), LED);
   }
   frontGrid(m, {
     x0: -W / 2,
@@ -361,7 +362,7 @@ export function buildKitchenWall(entry: CatalogEntry, ctx?: BuildContext): THREE
     edge: 'bottom',
     hinge: param(entry, 'hinge', 'left'),
   });
-  return m.build();
+  return lightStrips(m.build(), LED);
 }
 
 /* ------------------------------------------------------------- tall unit */
