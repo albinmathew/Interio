@@ -618,9 +618,42 @@ function bathroom(p: Planner, opts: TemplateOptions): void {
   ceilingItem(p, opts, 'light.ceiling.flush');
 }
 
+/**
+ * A utility counter: the sink unit in a corner and a stone slab beside it at the same
+ * height, with the front-load washing machine under the slab. Returns false when no wall
+ * takes the run.
+ */
+function utilityCounter(p: Planner): boolean {
+  const sink = E('utility.sink');
+  const slab = E('utility.slab');
+  const washer = E('washer.front');
+  if (!sink || !slab || !washer) return false;
+  const total = sink.dims.w + slab.dims.w;
+  const run: CatalogEntry = { ...sink, id: 'utility.run', dims: { ...sink.dims, w: total } };
+  const best = p.bestWall(run, (c) => -c.cornerDist * 2 + Math.min(c.doorDist, 2000) * 0.2 - (c.underWindow ? 300 : 0), { clear: 650 });
+  if (!best) return false;
+  // The sink at the end nearer a corner.
+  const lo = best.t - total / 2;
+  const hi = best.t + total / 2;
+  const sinkFirst = lo <= best.run.len - hi;
+  const sinkT = sinkFirst ? lo + sink.dims.w / 2 : hi - sink.dims.w / 2;
+  const slabT = sinkFirst ? hi - slab.dims.w / 2 : lo + slab.dims.w / 2;
+  const g = p.group();
+  const placed = [
+    p.tryPlace(sink, p.against(best.run, sinkT, sink), { clear: 650, group: g }),
+    p.tryPlace(slab, p.against(best.run, slabT, slab, slab.mountHeight ?? 880), { group: g }),
+    p.tryPlace(washer, p.against(best.run, slabT, washer), { clear: 650, group: g }),
+  ];
+  if (placed.every(Boolean)) return true;
+  for (const q of placed) if (q) p.remove(q);
+  return false;
+}
+
 function utility(p: Planner, opts: TemplateOptions): void {
   const washer = E('washer.front');
-  if (washer && !p.has('washer.')) {
+  // The sink counter with the washer under its slab; else the washer (and a dryer) on its own.
+  const counter = !p.has('washer.') && !p.has('utility.') && utilityCounter(p);
+  if (washer && !counter && !p.has('washer.')) {
     const best = p.bestWall(washer, (c) => -c.cornerDist + Math.min(c.doorDist, 2000) * 0.2, { clear: 600 });
     if (best) {
       const g = p.group();

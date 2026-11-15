@@ -598,6 +598,20 @@ export function buildKitchenBarEnd(entry: CatalogEntry, ctx?: BuildContext): THR
   return m.build();
 }
 
+/**
+ * A stone slab on wall brackets, the counter over a front-load washing machine in a
+ * utility: the slab is the whole piece, so the machine stands under it. Its top lines up
+ * with the utility sink unit beside it.
+ */
+export function buildUtilitySlab(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3D {
+  const m = new Model(entry, ctx);
+  const { W, D, H } = m;
+  worktop(m, -W / 2, W / 2, -D / 2, D / 2, H, H);
+  // A shadow line under the front edge so the slab reads as floating.
+  m.fixed(SHADOW, box(W - 0.01, 0.002, D - 0.04, 0, 0.001, -0.01));
+  return m.build();
+}
+
 /** Generators of this family, registered by `premium/index.ts`. */
 export const KITCHEN_GENERATORS: Record<string, (entry: CatalogEntry, ctx?: BuildContext) => THREE.Object3D> = {
   kitchenBase: buildKitchenBase,
@@ -607,4 +621,5 @@ export const KITCHEN_GENERATORS: Record<string, (entry: CatalogEntry, ctx?: Buil
   kitchenEnd: buildKitchenEnd,
   kitchenBar: buildKitchenBar,
   kitchenBarEnd: buildKitchenBarEnd,
+  utilitySlab: buildUtilitySlab,
 };

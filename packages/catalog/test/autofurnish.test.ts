@@ -1,5 +1,6 @@
 import { buildLevel, createSampleLevel, deriveRooms, newId, openingFrame, vec, type Item, type Level, type Pt, type RoomType } from '@interio/core';
 import { describe, expect, it } from 'vitest';
+import { UTILITY_TOP } from '../src/entries/kitchen';
 import { autoFurnish, getEntry } from '../src/index';
 import { intrudes, stackOf } from './rules';
 
@@ -374,7 +375,9 @@ describe('autoFurnish scales with the room', () => {
     expect(count(bath, 'bathtub') + count(bath, 'shower'), 'bathtub or shower').toBe(1);
     expect(ids(bath)).toContain('basin.vanity');
     const study = run(3000, 3400, 'study', [door(600, 0), windowAt(1500, 3400)]);
-    for (const id of ['desk', 'chair.office']) expect(ids(study)).toContain(id);
+    // A work-from-home desk: laptop, monitor and keyboard on it, overhead cupboards above it.
+    for (const id of ['desk', 'chair.office', 'laptop', 'monitor', 'keyboard']) expect(ids(study)).toContain(id);
+    expect(count(study, 'storage.overhead.')).toBe(1);
     expect(count(study, 'bookcase.')).toBe(1);
     const dining = run(3600, 4200, 'dining', [door(600, 0)]);
     expect(count(dining, 'table.dining')).toBe(1);
@@ -382,6 +385,14 @@ describe('autoFurnish scales with the room', () => {
     expect(ids(dining)).toContain('sideboard');
     const utility = run(1800, 2200, 'utility', [door(500, 0, 1, 750)]);
     expect(count(utility, 'washer.')).toBe(1);
+    // A sink counter with the washing machine standing under its slab.
+    expect(ids(utility)).toContain('utility.sink');
+    const slab = utility.find((i) => i.catalogId === 'utility.slab')!;
+    const washer = utility.find((i) => i.catalogId === 'washer.front')!;
+    expect(slab).toBeDefined();
+    expect(Math.hypot(slab.x - washer.x, slab.y - washer.y)).toBeLessThan(30);
+    expect(slab.z).toBeGreaterThanOrEqual(getEntry('washer.front')!.dims.h + 20);
+    expect(slab.z + getEntry('utility.slab')!.dims.h).toBe(UTILITY_TOP);
     const store = run(1800, 2000, 'storage', [door(500, 0, 1, 750)]);
     expect(ids(store)).toContain('shelf.metal');
     const foyer = run(2200, 2400, 'foyer', [door(1100, 0, 1, 1000)]);

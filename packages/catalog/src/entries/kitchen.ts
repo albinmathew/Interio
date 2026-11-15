@@ -1,6 +1,6 @@
 /** Catalog entries: kitchen. Ids are stable: saved projects reference them. */
 import type { CatalogEntry } from '@interio/core';
-import { KITCHEN_BASE_SLOTS, KITCHEN_OPEN_SLOTS, KITCHEN_SHELF_SLOTS, KITCHEN_WALL_SLOTS, type Row } from '../premium/kitchen';
+import { KITCHEN_BASE_SLOTS, KITCHEN_OPEN_SLOTS, KITCHEN_SHELF_SLOTS, KITCHEN_WALL_SLOTS, K_WORKTOP, type Row } from '../premium/kitchen';
 import { WORKTOP, gen, wall } from './helpers';
 
 const drawers = (cols: number, h = 1): Row => ({ h, cols, kind: 'drawer' });
@@ -10,8 +10,18 @@ const base = { slots: KITCHEN_BASE_SLOTS };
 export const TALL = 2170;
 /** Depth of a tall unit: a base unit's carcass and front, so the fronts are flush. */
 export const TALL_DEPTH = 580;
+/** Utility counter height: a front-load washing machine (850 mm) fits under its 40 mm slab. */
+export const UTILITY_TOP = 920;
 
 export const KITCHEN_ENTRIES: CatalogEntry[] = [
+  gen('utility.sink', 'Utility sink unit', 'kitchen', ['utility'], 'kitchenBase', [600, 600, 1050], ['sink', 'utility', 'laundry sink', 'wash', 'basin'], {
+    ...base,
+    params: { rows: [doors(1)], sink: 'inset', counter: UTILITY_TOP },
+  }),
+  gen('utility.slab', 'Counter slab over washer', 'kitchen', ['utility'], 'utilitySlab', [700, 600, 40], ['slab', 'counter', 'worktop', 'washing machine', 'laundry', 'granite'], {
+    ...wall(UTILITY_TOP - 40),
+    slots: [K_WORKTOP],
+  }),
   gen('kitchen.base', 'Base cabinet', 'kitchen', ['kitchen'], 'kitchenBase', [600, 600, WORKTOP], ['base unit', 'counter', 'modular'], {
     ...base,
     params: { rows: [drawers(1, 0.2), doors(1, 0.8)] },
