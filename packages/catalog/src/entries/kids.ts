@@ -19,5 +19,12 @@ export const KIDS_ENTRIES: CatalogEntry[] = [
       params: { wardrobe: 'left' },
     }),
   ),
+  // The same with the wardrobe at the right-hand end (seen from the front).
+  ...([2100, 2400] as const).map((w) =>
+    gen(`study.storage.kids.${w}.r`, `Study and storage wall ${(w / 1000).toFixed(1)} m, wardrobe right`, 'storage', ['bedroom', 'study'], 'kidsStudy', [w, 600, 2400], ['study', 'desk', 'study table', 'wardrobe', 'storage', 'kids', 'children', 'built-in', 'overhead', 'shelf'], {
+      slots: KIDS_STUDY_SLOTS,
+      params: { wardrobe: 'right' },
+    }),
+  ),
   gen('toy.teddy', 'Teddy bear', 'decor', ['bedroom'], 'kidsTeddy', [260, 200, 300], ['teddy', 'teddy bear', 'toy', 'soft toy', 'kids', 'children', 'plush'], { slots: KIDS_TEDDY_SLOTS }),
 ];

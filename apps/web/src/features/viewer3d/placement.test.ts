@@ -37,7 +37,8 @@ const AC = entry('ac', 900, 220, 300, { anchor: 'wall', mountHeight: 2300 });
 const LAMP = entry('lamp', 400, 400, 500, { anchor: 'ceiling' });
 const RUG = entry('rug', 2400, 1700, 15, { category: 'decor' });
 const CURTAINS = entry('curtains', 2400, 180, 2700, { category: 'decor', anchor: 'wall', model: { kind: 'parametric', generator: 'box', params: { stack: 450 } } });
-const ENTRIES: Record<string, CatalogEntry> = { sofa: SOFA, chair: CHAIR, ac: AC, lamp: LAMP, rug: RUG, curtains: CURTAINS };
+const TEDDY = entry('teddy', 260, 200, 300);
+const ENTRIES: Record<string, CatalogEntry> = { sofa: SOFA, chair: CHAIR, ac: AC, lamp: LAMP, rug: RUG, curtains: CURTAINS, teddy: TEDDY };
 const resolve = (id: string) => ENTRIES[id];
 
 const level: Level = createSampleLevel();
@@ -265,6 +266,17 @@ describe('overlap warnings', () => {
     expect(findOverlaps(between, resolve).size).toBe(0);
     const inPanel = withItems(item('c', 'curtains', 6500, 2100), item('b', 'chair', 6500 - 1200 + 225, 2100));
     expect(findOverlaps(inPanel, resolve).get('b')?.items).toEqual(['c']);
+  });
+
+  it('lets a small piece rest on a larger one, but not stand half off it or in it on the floor', () => {
+    // A teddy on the sofa's seat, within its footprint.
+    const onSofa = withItems(item('a', 'sofa', 6500, 2100), item('t', 'teddy', 6500, 2100, 0, 450));
+    expect(findOverlaps(onSofa, resolve).size).toBe(0);
+    // Half off the sofa's edge, or on the floor inside it: flagged.
+    const halfOff = withItems(item('a', 'sofa', 6500, 2100), item('t', 'teddy', 6500, 2100 + 450, 0, 450));
+    expect(findOverlaps(halfOff, resolve).get('t')?.items).toEqual(['a']);
+    const onFloor = withItems(item('a', 'sofa', 6500, 2100), item('t', 'teddy', 6500, 2100));
+    expect(findOverlaps(onFloor, resolve).get('t')?.items).toEqual(['a']);
   });
 
   it('flags an item pushed into a wall but not one snapped flush against it', () => {

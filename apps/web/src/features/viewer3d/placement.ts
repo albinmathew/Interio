@@ -434,6 +434,13 @@ function solidsOf(entry: CatalogEntry, item: Item, size: Size & { h: number }, p
   return [...panels, { poly, z0: z1 - CURTAIN_ROD, z1 }];
 }
 
+/** Height up to which a raised piece within another's footprint counts as resting on it, mm. */
+const RESTING = 450;
+
+function restsOn(small: { z0: number; z1: number; poly: Pt[] }, host: { z0: number; z1: number; poly: Pt[] }): boolean {
+  return small.z0 > host.z0 + 50 && small.z1 - small.z0 <= RESTING && small.z0 < host.z1 && small.poly.every((pt) => pointInPolygon(pt, host.poly));
+}
+
 export function findOverlaps(
   level: Pick<Level, 'items' | 'walls' | 'vertices' | 'openings'>,
   resolveEntry: (catalogId: string) => CatalogEntry | undefined,
@@ -458,6 +465,9 @@ export function findOverlaps(
       const b = boxes[j]!;
       // Rugs and other flat pieces lie under furniture by design.
       if (a.flat || b.flat) continue;
+      // A small piece raised off the floor within another's footprint rests on it (a teddy or
+      // a cushion on a bed, a vase on a shelf).
+      if (restsOn(a, b) || restsOn(b, a)) continue;
       if (Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0) <= 10) continue;
       if (Math.hypot(a.item.x - b.item.x, a.item.y - b.item.y) > a.radius + b.radius) continue;
       const clash = a.solids.some((sa) =>
