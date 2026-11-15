@@ -6,6 +6,7 @@
  */
 import { vec, type CatalogEntry, type Id, type PackageItem, type Pt } from '@interio/core';
 import { getEntry } from '../catalog';
+import { CURTAIN_STACK } from '../entries/accessories';
 import { convexOverlap, rectCorners, rotationFacing } from '../autofurnish/geometry';
 import { gridPoses, longestRunAngle } from '../autofurnish/placeEntry';
 import { APPROACH, stackWidth, WALL_GAP, type PlaceOptions, type Placed, type Planner, type Pose, type Run, type WallCandidate, type Zone } from '../autofurnish/planner';
@@ -147,6 +148,8 @@ export interface LineContext {
   combined: boolean;
   /** Planners of balconies that open off the room (for `overflow`). */
   balconies: () => Placer[];
+  /** Planners of the rooms the room opens onto, each with the point it is entered from (for `overflow: 'adjacentRoom'`). */
+  nextRooms: () => { placer: Placer; at: Pt }[];
   /** May a piece of the same kind that is not the package's (a queen bed for a king) be swapped? */
   replace: boolean;
   /** Existing items taken out by a swap. */
@@ -201,14 +204,23 @@ function putBack(p: Planner, pieces: Placed[]): void {
   }
 }
 
-/** Places what is missing of one line, giving it the space of the template's optional pieces when it needs it. */
+/**
+ * Places what is missing of one line, giving it the space of the template's optional pieces
+ * when it needs it. A line that may go next door tries its own room that way first.
+ */
 export function guaranteeLine(ctx: LineContext): LineOutcome {
+  if (ctx.line.overflow !== 'adjacentRoom') return guaranteeHere(ctx);
+  const here = guaranteeHere({ ...ctx, nextRooms: () => [] });
+  return here.reason ? attempt(ctx) : here;
+}
+
+function guaranteeHere(ctx: LineContext): LineOutcome {
   const p = ctx.placer.p;
   const ids = ctx.line.catalogIds;
   const snap = snapshot(p);
   const removed = ctx.removed.length;
   const first = attempt(ctx);
-  if (!first.reason || ctx.line.overflow) return first;
+  if (!first.reason || ctx.line.overflow === 'adjacentBalcony') return first;
   const extras = p.placed.filter((q) => !q.existing && OPTIONAL.test(q.entry.id) && !ctx.keep.has(q.entry.id));
   if (extras.length === 0) return first;
   const got = countOf(p, ids);
@@ -250,6 +262,7 @@ function attempt(ctx: LineContext): LineOutcome {
   if (id0.startsWith('partition.')) return partition(ctx);
   if (line.overflow === 'adjacentBalcony') return overflow(ctx);
   const need = line.count ?? 1;
+  if (line.overflow === 'adjacentRoom') return nextRoom(ctx, need);
   let reason: string | undefined;
   while (countOf(p, line.catalogIds) < need) {
     const out = placeOne(ctx);
@@ -707,6 +720,56 @@ function betweenZones(placer: Placer, entry: CatalogEntry, sofa: Placed, table: 
 }
 
 /* ------------------------------------------------------------- overflow */
+
+/** How far an overflowing piece may stand from the point it stays near (the front door, in a straight line), mm. */
+const NEXT_ROOM_REACH = 6000;
+
+/** Wall beside a window or sliding door is kept for the next room's own curtains. */
+function besideGlazing(c: WallCandidate, entry: CatalogEntry): boolean {
+  const lo = c.t - entry.dims.w / 2;
+  const hi = c.t + entry.dims.w / 2;
+  const keep = CURTAIN_STACK + 150;
+  return c.run.openings.some((o) => (o.kind === 'window' || o.kind === 'sliding') && lo < o.s1 + keep && hi > o.s0 - keep);
+}
+
+/**
+ * A piece the room has no wall for (a shoe rack in a small foyer): on a wall of the room or
+ * passage it opens onto, as near the front door as it fits, with room to stand in front of it.
+ */
+function nextRoom(ctx: LineContext, need: number): LineOutcome {
+  const p = ctx.placer.p;
+  const ids = ctx.line.catalogIds;
+  let reason: string | undefined;
+  while (countOf(p, ids) < need) {
+    const out = placeOne(ctx);
+    if ('reason' in out) {
+      reason = out.reason;
+      break;
+    }
+    setFinishes(out.placed, ctx.line);
+  }
+  if (!reason) return {};
+  const rooms = ctx.nextRooms();
+  const have = () => countOf(p, ids) + rooms.reduce((n, r) => n + countOf(r.placer.p, ids), 0);
+  // The package's first choice in every room before the next choice.
+  for (const id of ids) {
+    const entry = E(id);
+    if (!entry) continue;
+    for (const { placer, at } of rooms) {
+      const score = (c: WallCandidate) => {
+        const d = vec.dist(c.pose, at);
+        return d > NEXT_ROOM_REACH || besideGlazing(c, entry) ? -Infinity : -d;
+      };
+      while (have() < need) {
+        const placed = placer.wall(entry, score, { clear: 550 });
+        if (!placed) break;
+        setFinishes(placed, ctx.line);
+      }
+      if (have() >= need) return {};
+    }
+  }
+  return { reason: rooms.length ? `${reason}, here or within ${NEXT_ROOM_REACH / 1000} m of the entrance` : reason };
+}
 
 /** Planters: a few in the room where they are out of the way, the rest on a balcony that opens off it. */
 function overflow(ctx: LineContext): LineOutcome {

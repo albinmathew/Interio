@@ -33,9 +33,10 @@ export interface PackageItem {
   note?: string;
   /**
    * Where to put it when the room itself has no space: a balcony that opens off the room
-   * (for planters), or nowhere (default).
+   * (planters), the room or passage the room opens onto, as near it as it fits (a shoe rack
+   * for a small foyer), or nowhere (default).
    */
-  overflow?: 'adjacentBalcony';
+  overflow?: 'adjacentBalcony' | 'adjacentRoom';
 }
 
 export interface PackageSurface {

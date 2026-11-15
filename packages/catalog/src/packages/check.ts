@@ -12,6 +12,7 @@ import {
   type PackageItem,
   type PackageLineStatus,
   type PackageSurface,
+  type Pt,
   type Room,
   type RoomGeom,
 } from '@interio/core';
@@ -137,6 +138,41 @@ export function overflowBalconies(level: Level, roomId: Id): Id[] {
     .flatMap((r) => adjacentBalconies(level, r.id));
 }
 
+/** Room types an `adjacentRoom` overflow may use through any opening: the shared parts of the home. */
+const SHARED = new Set<string>(['living', 'dining', 'corridor', 'foyer']);
+/** Room types it never uses, even when open to the room. */
+const PRIVATE = new Set<string>(['bedroom', 'bathroom', 'kitchen', 'utility', 'balcony', 'storage']);
+
+/**
+ * Where a room's `adjacentRoom` overflow goes: the living, dining or passage spaces it opens
+ * onto (and any other non-private space it is open to, such as a work nook), then the shared
+ * spaces those open onto, nearest first. `at` is the point to stay near: the room's entrance
+ * door when it has one (a foyer), else the way in from the room.
+ */
+export function overflowRooms(level: Level, roomId: Id): { roomId: Id; at: Pt }[] {
+  const graph = roomGraph(level);
+  const entrance = graph.entrances.find((e) => e.roomId === roomId)?.door;
+  const out = new Map<Id, Pt>();
+  let frontier: Id[] = [roomId];
+  for (let hop = 0; hop < 2 && frontier.length; hop++) {
+    const next: Id[] = [];
+    const found: { id: Id; at: Pt }[] = [];
+    for (const from of frontier) {
+      for (const e of graph.edges) {
+        const other = e.a === from ? e.b : e.b === from ? e.a : null;
+        const type = level.rooms[other ?? '']?.type ?? '';
+        if (!other || other === roomId || out.has(other) || found.some((f) => f.id === other)) continue;
+        if (!(SHARED.has(type) || (e.via === 'divider' && !PRIVATE.has(type)))) continue;
+        found.push({ id: other, at: entrance ?? e.door });
+        next.push(other);
+      }
+    }
+    for (const f of found) out.set(f.id, f.at);
+    frontier = next;
+  }
+  return [...out].map(([id, at]) => ({ roomId: id, at }));
+}
+
 /* ---------------------------------------------------------------- matching */
 
 const DINING_NAME = /dining/i;
@@ -211,6 +247,7 @@ function itemLine(ctx: CheckContext, line: PackageItem, roomId: Id): Pick<Packag
   const inRoom = (rid: Id) => Object.values(level.items).filter((i) => i.roomId === rid && ids.has(i.catalogId));
   let found = inRoom(roomId);
   if (line.overflow === 'adjacentBalcony') found = [...found, ...overflowBalconies(level, roomId).flatMap(inRoom)];
+  if (line.overflow === 'adjacentRoom') found = [...found, ...overflowRooms(level, roomId).flatMap((r) => inRoom(r.roomId))];
   let need = line.count ?? 1;
   if (isWindowLine(line)) {
     const p = plannerIn(ctx, roomId);

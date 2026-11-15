@@ -413,6 +413,35 @@ describe('a bedroom whose only glazing is a sliding door near a corner', () => {
   });
 });
 
+describe('a foyer too small for the shoe rack', () => {
+  // A 1.1 x 1.3 m foyer in the corner of the living room, open to it on two sides; the
+  // entrance door's swing takes its only solid wall.
+  const w = (x1: number, y1: number, x2: number, y2: number, kind?: 'divider') => ({ a: { x: x1, y: y1 }, b: { x: x2, y: y2 }, thickness: kind ? 100 : 150, ...(kind ? { kind } : {}) });
+  const level = buildLevel({
+    walls: [w(0, 0, 6000, 0), w(6000, 0, 7100, 0), w(7100, 0, 7100, 1300), w(7100, 1300, 7100, 4500), w(7100, 4500, 0, 4500), w(0, 4500, 0, 0), w(6000, 0, 6000, 1300, 'divider'), w(6000, 1300, 7100, 1300, 'divider')],
+    openings: [{ at: { x: 7100, y: 650 }, kind: 'door', width: 900, height: 2100, sill: 0, hinge: 'a', swing: -1 }, win(3000, 4500, 1800)],
+    rooms: [
+      { at: { x: 6550, y: 650 }, name: 'Foyer', type: 'foyer' },
+      { at: { x: 3000, y: 2500 }, name: 'Living', type: 'living' },
+    ],
+  });
+  const foyer = roomNamed(level, 'Foyer');
+  const living = roomNamed(level, 'Living');
+  const res = applyPackage(level, ESSENTIALS_3BHK);
+  const racks = res.items.filter((i) => i.catalogId.startsWith('shoe.'));
+
+  it('puts it in the living room it opens onto, near the front door, and ticks the foyer line', () => {
+    expect(racks).toHaveLength(1);
+    expect(racks[0]!.roomId).toBe(living.id);
+    expect(vec.dist(racks[0]!, { x: 7100, y: 650 })).toBeLessThan(6000);
+    expect(res.report.lines.find((l) => l.key === 'shoe-rack' && l.roomId === foyer.id)?.status).toBe('placed');
+  });
+
+  it('keeps every placement rule in the living room', () => {
+    expectRules(level, res);
+  });
+});
+
 describe('sections without a room', () => {
   it('reports a section whose room the plan lacks', () => {
     const level = bedrooms(2);

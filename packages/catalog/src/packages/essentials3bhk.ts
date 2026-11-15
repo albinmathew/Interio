@@ -17,7 +17,7 @@ export const ESSENTIALS_3BHK: FurnishingPackage = {
       title: 'Foyer',
       room: { kind: 'type', type: 'foyer' },
       items: [
-        { key: 'shoe-rack', label: 'Shoe rack and ledges', catalogIds: ['shoe.rack.ledges', 'shoe.cabinet'] },
+        { key: 'shoe-rack', label: 'Shoe rack and ledges', catalogIds: ['shoe.rack.ledges', 'shoe.cabinet'], overflow: 'adjacentRoom', note: 'By the entrance; just past the foyer when it has no free wall' },
         { key: 'mirror-art', label: 'Brass finish mirror wall art', catalogIds: ['mirror.sunburst'] },
       ],
       surfaces: [{ key: 'cement', label: 'Cement texture', target: 'walls', finish: 'wall.microcement' }],

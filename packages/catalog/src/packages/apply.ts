@@ -28,8 +28,8 @@ import { RoomSeed } from '../autofurnish/seed';
 import { applyScheme } from '../autofurnish/styling';
 import { homeScheme } from '../autofurnish/schemes';
 import { slotOf, type Prefer } from '../autofurnish/templates';
-import { buildCheck, overflowBalconies, lineKey, matchSections, roomFaces, faceFinish, type PackageCheck, type PackageSection, type RoomFace } from './check';
-import { Placer, guaranteeLine, runBehind } from './place';
+import { buildCheck, overflowBalconies, overflowRooms, lineKey, matchSections, roomFaces, faceFinish, type PackageCheck, type PackageSection, type RoomFace } from './check';
+import { Placer, guaranteeLine, runBehind, type LineContext } from './place';
 import { bedroomRoles, missingBedroomRoles } from './roles';
 
 export interface ApplyPackageOptions {
@@ -153,6 +153,7 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
   };
   const sections = matchSections(work, pkg, roles, hasTable);
   const takenFaces = new Set<string>();
+  const later: (() => void)[] = [];
   for (const match of sections) {
     const section = pkg.rooms[match.index]!;
     for (const roomId of match.roomIds) {
@@ -170,7 +171,7 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
       const prefer = preferencesFor(own);
       section.items.forEach((line, i) => {
         if (!wanted(roomId, line.key)) return;
-        const out = guaranteeLine({
+        const ctx: LineContext = {
           placer: w.placer,
           line,
           sectionKind: kind,
@@ -183,6 +184,12 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
               .filter((b): b is RoomWork => !!b)
               .sort((a, b) => b.planner.area - a.planner.area)
               .map((b) => b.placer),
+          // The living, dining or passage spaces the room opens onto, nearest the entrance first.
+          nextRooms: () =>
+            overflowRooms(work, roomId).flatMap(({ roomId: id, at }) => {
+              const n = workFor(id);
+              return n ? [{ placer: n.placer, at }] : [];
+            }),
           replace: lineMode,
           keep,
           prefer,
@@ -192,8 +199,18 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
             return g?.roomId ? work.rooms[g.roomId]?.type : undefined;
           },
           removed: remove,
-        });
-        if (out.reason) reasons.set(lineKey(match.index, roomId, line.key), out.reason);
+        };
+        const key = lineKey(match.index, roomId, line.key);
+        // A piece that may go next door is placed there only once every room has its own lines.
+        const out = guaranteeLine(line.overflow === 'adjacentRoom' ? { ...ctx, nextRooms: () => [] } : ctx);
+        if (out.reason) reasons.set(key, out.reason);
+        if (out.reason && line.overflow === 'adjacentRoom') {
+          later.push(() => {
+            const again = guaranteeLine(ctx);
+            if (again.reason) reasons.set(key, again.reason);
+            else reasons.delete(key);
+          });
+        }
       });
       for (const surface of section.surfaces ?? []) {
         if (!wanted(roomId, surface.key)) continue;
@@ -202,6 +219,8 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
       }
     }
   }
+
+  for (const run of later) run();
 
   // 3. Styling around everything for rooms laid out from empty; the scheme's finishes for the rest.
   for (const w of works.values()) {
