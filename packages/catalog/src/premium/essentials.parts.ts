@@ -47,6 +47,13 @@ export const ESS_PRAYER_SLOTS: FinishSlot[] = [
   { id: 'brass', label: 'Brass details', kind: 'metal', default: 'metal.brass' },
 ];
 
+/** Christian prayer unit (altar wall): teak flutes, shelves and top; a backlit ivory niche; greige cabinet fronts. */
+export const ESS_ALTAR_SLOTS: FinishSlot[] = [
+  { id: 'wood', label: 'Fluted panels and shelves', kind: 'wood', default: 'wood.teak' },
+  { id: 'niche', label: 'Backlit niche', kind: 'lacquer', default: 'lacquer.cream' },
+  { id: 'fronts', label: 'Cabinet fronts', kind: 'lacquer', default: 'lacquer.greige' },
+];
+
 /** Every Roman blind width: linen shade, a contrast border, brass hardware. */
 export const ESS_BLIND_SLOTS: FinishSlot[] = [
   { id: 'fabric', label: 'Shade', kind: 'fabric', default: 'fabric.linen.sand' },
