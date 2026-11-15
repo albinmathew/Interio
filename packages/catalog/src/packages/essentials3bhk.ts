@@ -28,7 +28,7 @@ export const ESSENTIALS_3BHK: FurnishingPackage = {
       items: [
         { key: 'tv-unit', label: 'TV unit with black glass shutters', catalogIds: ['tv.unit.glass'] },
         { key: 'prayer', label: 'Prayer unit', catalogIds: ['prayer.unit'] },
-        { key: 'curtains', label: 'Curtain with lining', catalogIds: CURTAINS, note: 'Lined; on every window with wall space' },
+        { key: 'curtains', label: 'Curtain with lining', catalogIds: CURTAINS, note: 'Lined; on every window and sliding door with wall space' },
         { key: 'clock', label: 'Decorative roman clock', catalogIds: ['clock.roman'] },
         { key: 'sofa', label: 'Sofa Fiori L shape 3 seater + lounge', catalogIds: ['sofa.lshape', 'sofa.chaise'], note: 'Fiori' },
         { key: 'cushions', label: 'Additional cushions for sofa', catalogIds: ['sofa.lshape', 'sofa.chaise'], count: 1, note: '4 cushions on the sofa' },
@@ -71,7 +71,7 @@ export const ESSENTIALS_3BHK: FurnishingPackage = {
         { key: 'bookshelf', label: 'Bookshelf with open storage', catalogIds: ['bookcase.open', 'bookcase.low', 'bookcase.wide'] },
         { key: 'bed', label: 'King size bed with bottom drawer', catalogIds: ['bed.king.drawers'] },
         { key: 'bedside', label: 'Bed side table', catalogIds: ['nightstand.drawer', 'nightstand', 'nightstand.table'], count: 2 },
-        { key: 'blinds', label: 'Premium Roman Blinds', catalogIds: BLINDS, note: 'On every window' },
+        { key: 'blinds', label: 'Premium Roman Blinds', catalogIds: [...BLINDS, ...CURTAINS], note: 'On every window; curtains on sliding doors' },
         { key: 'chair', label: 'Single chair yellow', catalogIds: ['armchair'], finishes: { upholstery: 'fabric.cotton.mustard' } },
       ],
       surfaces: [{ key: 'wallpaper', label: 'Wall paper', target: 'feature', finish: 'wall.wallpaper.linen', note: '3 rolls, behind the bed' }],
@@ -101,7 +101,7 @@ export const ESSENTIALS_3BHK: FurnishingPackage = {
       items: [
         { key: 'bed', label: 'Queen size bed with bottom storage', catalogIds: ['bed.queen.storage'] },
         { key: 'bedside', label: 'Bed side table', catalogIds: ['nightstand.drawer', 'nightstand', 'nightstand.table'], count: 2 },
-        { key: 'blinds', label: 'Premium Roman Blinds', catalogIds: BLINDS, note: 'On every window' },
+        { key: 'blinds', label: 'Premium Roman Blinds', catalogIds: [...BLINDS, ...CURTAINS], note: 'On every window; curtains on sliding doors' },
         { key: 'wardrobe', label: 'Soft-close hinged wardrobe with mirror aluminium frame shutter', catalogIds: ['wardrobe.mirror'], note: 'Soft-close' },
       ],
       surfaces: [

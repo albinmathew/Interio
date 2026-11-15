@@ -110,6 +110,18 @@ export function openings(level: Level, roomId: string): Opening[] {
   return out;
 }
 
+/** Clear width a curtain leaves in a sliding door it stacks over (the planner's `CURTAIN_WALKWAY`). */
+const WALKWAY = 900;
+
+/** Whether a piece reaches into the walkway through the middle of a door from `a` to `b` (its jambs on the room face). */
+export function intrudes(rect: Pt[], a: Pt, b: Pt): boolean {
+  const width = vec.dist(a, b);
+  const dir = vec.scale(vec.sub(b, a), 1 / width);
+  const along = rect.map((p) => vec.dot(vec.sub(p, a), dir));
+  const half = Math.min(WALKWAY, width) / 2;
+  return Math.max(...along) > width / 2 - half + 2 && Math.min(...along) < width / 2 + half - 2;
+}
+
 export const shrink = (rect: Pt[], by: number): Pt[] => {
   const c = vec.scale(rect.reduce((s, p) => vec.add(s, p), { x: 0, y: 0 }), 1 / rect.length);
   return rect.map((p) => vec.add(p, vec.scale(vec.norm(vec.sub(c, p)), by)));
@@ -147,7 +159,9 @@ export function checkRules(level: Level, roomId: string, added: NewItem[], exist
           const blocks = hit && part.zMin < o.top && part.zMax > (o.sill >= 1700 ? o.sill + 300 : o.sill);
           expect(blocks, `${label} ${b.item.catalogId} stands in front of a window`).toBe(false);
         } else if (part.zMin < o.top) {
-          expect(hit, `${label} ${b.item.catalogId} blocks a ${o.kind}`).toBe(false);
+          // Curtain panels may stack over a sliding door's glass at an end, leaving a walkway through its middle.
+          const blocks = o.kind === 'sliding' && stackOf(b.item.catalogId) > 0 ? hit && intrudes(part.rect, o.span[0]!, o.span[1]!) : hit;
+          expect(blocks, `${label} ${b.item.catalogId} blocks a ${o.kind}`).toBe(false);
         }
       }
     }

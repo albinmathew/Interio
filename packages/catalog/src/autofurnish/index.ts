@@ -34,14 +34,18 @@ export interface LayoutOptions {
   styling: StylingLevel;
   /** A package's pieces, tried before the template's own. */
   prefer?: Prefer;
-  /** False when the windows get blinds instead of curtains. */
+  /** False when the windows get blinds instead of curtains (a package's blinds line hangs curtains on sliding doors). */
   curtained?: boolean;
 }
 
-/** The main pieces of a room: its template, with the wall beside the windows kept for curtains. */
+/**
+ * The main pieces of a room: its template, with the wall beside the windows kept for
+ * curtains, and in bedrooms beside the sliding doors too. Elsewhere sliding doors get
+ * curtains where the layout leaves room, since an open-plan living room needs that wall.
+ */
 export function layoutRoom(planner: Planner, seed: RoomSeed, opts: LayoutOptions): void {
   const curtained = opts.curtained ?? true;
-  const reserved = opts.styling === 'none' || !curtained ? [] : reserveCurtains(planner, opts.mounted);
+  const reserved = opts.styling === 'none' ? [] : reserveCurtains(planner, opts.mounted, { windows: curtained, doors: planner.room.type === 'bedroom' });
   TEMPLATES[planner.room.type](planner, { mounted: opts.mounted, styled: opts.styling !== 'none', seed, prefer: opts.prefer });
   releaseCurtains(planner, reserved);
 }

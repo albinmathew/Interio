@@ -22,6 +22,7 @@ const ENTRIES: Record<string, CatalogEntry> = {
   sofa: entry('sofa', 2200, 900, 800),
   rug: entry('rug', 2400, 1700, 20),
   ac: entry('ac', 900, 220, 300, { anchor: 'wall', mountHeight: 2300 }),
+  curtains: entry('curtains', 3900, 120, 2650, { anchor: 'wall', mountHeight: 20, model: { kind: 'parametric', generator: 'box', params: { stack: 300 } } }),
 };
 const furnished = (...items: Omit<Item, 'id'>[]): Level => ({
   ...level,
@@ -195,6 +196,20 @@ describe('furniture', () => {
     // Deflected along the slanted face rather than stopped dead or let through.
     expect(Math.abs(hit.pos.x - 6500)).toBeGreaterThan(100);
     expect(isFree(diagonal, { x: 6500, y: 2100 })).toBe(false);
+  });
+
+  it('lets the walker through curtains framing a sliding door, and stops them at its panels', () => {
+    // 3.9 m stacked curtains on the 3 m balcony door (south wall, inner face y = 100, centre x = 6000).
+    const y = 100 + 2 + 60;
+    const c = withItems({ catalogId: 'curtains', x: 6000, y, z: 20, rotationDeg: 0 });
+    expect(c.boxes).toHaveLength(2);
+    const through = moveCapsule(c, { x: 6000, y: 1500 }, { x: 0, y: -2500 });
+    expect(through.blocked).toBe(false);
+    expect(through.pos.y).toBeCloseTo(-1000, 0);
+    // The left panel, 300 mm wide at the end of the rod, stands in front of the wall.
+    const panel = moveCapsule(c, { x: 6000 - 1950 + 150, y: 1500 }, { x: 0, y: -2500 });
+    expect(panel.blocked).toBe(true);
+    expect(panel.pos.y).toBeCloseTo(y + 60 + R, 0);
   });
 
   it('lets the walker step over rugs and under wall-mounted items', () => {

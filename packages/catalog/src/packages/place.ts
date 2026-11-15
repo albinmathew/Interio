@@ -8,7 +8,7 @@ import { vec, type CatalogEntry, type Id, type PackageItem, type Pt } from '@int
 import { getEntry } from '../catalog';
 import { convexOverlap, rectCorners, rotationFacing } from '../autofurnish/geometry';
 import { gridPoses, longestRunAngle } from '../autofurnish/placeEntry';
-import { APPROACH, WALL_GAP, type PlaceOptions, type Placed, type Planner, type Pose, type Run, type WallCandidate, type Zone } from '../autofurnish/planner';
+import { APPROACH, stackWidth, WALL_GAP, type PlaceOptions, type Placed, type Planner, type Pose, type Run, type WallCandidate, type Zone } from '../autofurnish/planner';
 import { curtainPlans } from '../autofurnish/styling';
 import { deskSet, diningSet, slotOf, type Prefer, type PreferSlot } from '../autofurnish/templates';
 import { stillWalkable, walkState, type WalkState } from '../autofurnish/walk';
@@ -511,38 +511,44 @@ function aroundTable(placer: Placer, table: Placed, entry: CatalogEntry, bench: 
 
 /* ------------------------------------------------------------- windows */
 
-/** Blinds or curtains on every window that takes them. */
+/**
+ * Blinds or curtains on every window that takes them. A blind cannot hang across a sliding
+ * door, so a blinds line dresses sliding doors with the curtains it lists.
+ */
 function windows(ctx: LineContext, kind: 'blind' | 'curtain'): LineOutcome {
   const placer = ctx.placer;
   const p = placer.p;
   const ids = ctx.line.catalogIds;
   const spots = treatableWindows(p);
-  if (spots.length === 0) return { reason: noWindowReason(p) };
+  if (spots.length === 0) return { reason: noWindowReason() };
   let missed = 0;
-  const covered = (centreAt: Pt) => p.placed.some((q) => ids.includes(q.entry.id) && vec.dist(centre(q), centreAt) < q.entry.dims.d + 120);
-  if (kind === 'curtain') {
-    for (const plan of curtainPlans(p)) {
-      if (covered(plan.centre)) continue;
-      const entries = plan.entries.filter((e) => ids.includes(e.id));
-      let done = false;
-      for (const entry of entries) {
-        const placed = placer.tryPose(entry, plan.pose(entry));
-        if (placed) {
-          setFinishes(placed, ctx.line);
-          done = true;
-          break;
-        }
+  // A curtain's track may be shifted off the opening's centre, but it always spans it.
+  const covered = (centreAt: Pt) => p.placed.some((q) => ids.includes(q.entry.id) && vec.dist(centre(q), centreAt) < Math.max(q.entry.dims.d + 120, stackWidth(q.entry) > 0 ? q.entry.dims.w / 2 : 0));
+  const plans = curtainPlans(p);
+  for (const plan of plans) {
+    if (kind === 'blind' && !plan.door) continue;
+    if (covered(plan.centre)) continue;
+    let done = false;
+    for (const entry of plan.entries.filter((e) => ids.includes(e.id))) {
+      const placed = placer.tryPose(entry, plan.pose(entry));
+      if (placed) {
+        setFinishes(placed, ctx.line);
+        done = true;
+        break;
       }
-      if (!done) missed++;
     }
-    // Windows `curtainPlans` leaves out (none today) count as missed.
-    missed += Math.max(0, spots.length - curtainPlans(p).length);
-  } else {
+    if (!done) missed++;
+  }
+  // Glazing `curtainPlans` leaves out (none today) counts as missed.
+  if (kind === 'curtain') missed += Math.max(0, spots.length - plans.length);
+  else {
     for (const spot of spots) {
+      if (spot.opening.kind !== 'window') continue;
       const at = vec.add(spot.run.a, vec.scale(spot.run.dir, spot.t));
       if (covered(at)) continue;
       // The width closest to the window's, wider first on a tie; the next closest when it does not fit.
       const entries = ids
+        .filter((id) => id.startsWith('blind.'))
         .map((id) => E(id))
         .filter((e): e is CatalogEntry => !!e)
         .sort((a, b) => Math.abs(a.dims.w - spot.width) - Math.abs(b.dims.w - spot.width) || b.dims.w - a.dims.w);
@@ -564,13 +570,12 @@ function windows(ctx: LineContext, kind: 'blind' | 'curtain'): LineOutcome {
     }
   }
   if (missed === 0) return {};
-  return { reason: missed === 1 ? 'No wall space beside one window' : `No wall space beside ${missed} windows` };
+  return { reason: missed === 1 ? 'No wall space beside one window or sliding door' : `No wall space beside ${missed} windows or sliding doors` };
 }
 
 /** Why a room takes no blind or curtain. */
-export function noWindowReason(p: Planner): string {
-  const sliding = p.runs.some((r) => r.openings.some((o) => o.kind === 'sliding'));
-  return sliding ? 'No window here, only a sliding door, which is kept clear' : 'No window in this room takes one';
+export function noWindowReason(): string {
+  return 'No window or sliding door in this room takes one';
 }
 
 /* ------------------------------------------------------------- partition */

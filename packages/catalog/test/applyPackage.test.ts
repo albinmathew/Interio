@@ -381,6 +381,38 @@ describe('applyPackage on a home with a divider between living and dining', () =
   });
 });
 
+describe('a bedroom whose only glazing is a sliding door near a corner', () => {
+  // 3.66 x 4.5 m bedroom; its 1.8 m balcony door stands 300 mm from the east corner, as in the TPC plans.
+  const w = (x1: number, y1: number, x2: number, y2: number, kind?: 'railing') => ({ a: { x: x1, y: y1 }, b: { x: x2, y: y2 }, thickness: kind ? 100 : 150, ...(kind ? { kind } : {}) });
+  const level = buildLevel({
+    walls: [w(0, 0, 3660, 0), w(3660, 0, 3660, 4500), w(3660, 4500, 0, 4500), w(0, 4500, 0, 0), w(0, 0, 0, -1500, 'railing'), w(0, -1500, 3660, -1500, 'railing'), w(3660, -1500, 3660, 0, 'railing')],
+    openings: [{ at: { x: 3660 - 300 - 900, y: 0 }, kind: 'sliding', width: 1800, height: 2400, sill: 0 }, door(500, 4500)],
+    rooms: [
+      { at: { x: 1800, y: 2200 }, name: 'Bedroom', type: 'bedroom' },
+      { at: { x: 1800, y: -700 }, name: 'Balcony', type: 'balcony' },
+    ],
+  });
+  const room = roomNamed(level, 'Bedroom');
+  const res = applyPackage(level, ESSENTIALS_3BHK);
+  const curtains = itemsIn(res.items, room.id).filter((i) => i.catalogId.startsWith('curtain.'));
+
+  it('hangs curtains on the sliding door for the blinds line, with the track shifted off the corner', () => {
+    expect(res.rooms[room.id]?.role ?? room.role).toBe('master');
+    expect(curtains).toHaveLength(1);
+    const e = getEntry(curtains[0]!.catalogId)!;
+    // The track stays on the wall and spans the door.
+    expect(curtains[0]!.x + e.dims.w / 2).toBeLessThanOrEqual(3660 - 75 + 1);
+    expect(curtains[0]!.x - e.dims.w / 2).toBeLessThanOrEqual(3660 - 300 - 1800 - 75);
+    expect(res.report.lines.find((l) => l.key === 'blinds' && l.roomId === room.id)?.status).toBe('placed');
+  });
+
+  it('keeps the door walkable and every placement rule', () => {
+    expectRules(level, res);
+    const reach = walkability(level, room.id, itemsIn(res.items, room.id));
+    expect(new Set(reach.groups).size).toBe(1);
+  });
+});
+
 describe('sections without a room', () => {
   it('reports a section whose room the plan lacks', () => {
     const level = bedrooms(2);

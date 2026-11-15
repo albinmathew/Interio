@@ -1,6 +1,7 @@
 import { buildLevel, createSampleLevel, deriveRooms, newId, openingFrame, vec, type Item, type Level, type Pt, type RoomType } from '@interio/core';
 import { describe, expect, it } from 'vitest';
 import { autoFurnish, getEntry } from '../src/index';
+import { intrudes, stackOf } from './rules';
 
 type NewItem = Omit<Item, 'id'>;
 
@@ -166,7 +167,9 @@ function checkLayout(level: Level, roomId: string, added: NewItem[], existing: N
           const blocks = hit && part.zMin < o.top && part.zMax > (ventilator ? o.sill + 300 : o.sill);
           expect(blocks, `${label} ${b.item.catalogId} blocks a window`).toBe(false);
         } else if (part.zMin < o.top) {
-          expect(hit, `${label} ${b.item.catalogId} blocks a ${o.kind}`).toBe(false);
+          // Curtain panels may stack over a sliding door's glass at an end, leaving a walkway through its middle.
+          const blocks = o.kind === 'sliding' && stackOf(b.item.catalogId) > 0 ? hit && intrudes(part.rect, o.rect[0]!, o.rect[1]!) : hit;
+          expect(blocks, `${label} ${b.item.catalogId} blocks a ${o.kind}`).toBe(false);
         }
       }
     }

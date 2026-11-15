@@ -155,15 +155,21 @@ function addItemBoxes(soup: Soup, level: Level, resolveEntry: NonNullable<Collid
     if (z1 <= STEP_OVER_HEIGHT || z0 >= top) continue; // underfoot or overhead
     const ux = vec.rotate({ x: 1, y: 0 }, item.rotationDeg);
     const uy = vec.rotate({ x: 0, y: 1 }, item.rotationDeg);
-    const hw = (entry.dims.w * s) / 2;
+    const w = entry.dims.w * s;
     const hd = (entry.dims.d * s) / 2;
-    if (hw < 1 || hd < 1) continue;
-    const c = { x: item.x, y: item.y };
-    const corner = (sx: number, sy: number) => vec.add(c, vec.add(vec.scale(ux, sx * hw), vec.scale(uy, sy * hd)));
-    const p = [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)];
-    const normals = [vec.scale(uy, -1), ux, uy, vec.scale(ux, -1)];
-    for (let i = 0; i < 4; i++) soup.wall(p[i]!, p[(i + 1) % 4]!, z0, z1, normals[i]!);
-    boxes.push({ itemId: item.id, cx: c.x, cy: c.y, ux, uy, hw, hd });
+    if (w < 2 || hd < 1) continue;
+    const at = { x: item.x, y: item.y };
+    // Stacked curtains are two gathered panels at the ends of a rod: only the panels block,
+    // so curtains framing a sliding door leave it free to walk through.
+    const stack = entry.model.kind === 'parametric' ? Number(entry.model.params?.stack ?? 0) * s : 0;
+    const parts = stack > 0 && stack * 2 < w ? [-1, 1].map((side) => ({ c: vec.add(at, vec.scale(ux, side * (w / 2 - stack / 2))), hw: stack / 2 })) : [{ c: at, hw: w / 2 }];
+    for (const { c, hw } of parts) {
+      const corner = (sx: number, sy: number) => vec.add(c, vec.add(vec.scale(ux, sx * hw), vec.scale(uy, sy * hd)));
+      const p = [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)];
+      const normals = [vec.scale(uy, -1), ux, uy, vec.scale(ux, -1)];
+      for (let i = 0; i < 4; i++) soup.wall(p[i]!, p[(i + 1) % 4]!, z0, z1, normals[i]!);
+      boxes.push({ itemId: item.id, cx: c.x, cy: c.y, ux, uy, hw, hd });
+    }
   }
   return boxes;
 }

@@ -14,7 +14,8 @@ import { convexOverlap, distanceToBoundary, insidePolygon, localToPlan, normalis
 export const WALL_GAP = 10;
 /** Clear depth kept in front of doors that open away, sliding doors and passages, mm. */
 export const APPROACH = 650;
-const JAMB_MARGIN = 50;
+/** How far a door's clearance reaches past each jamb, mm. */
+export const JAMB_MARGIN = 50;
 const WINDOW_DEPTH = 320;
 const PERSON = 2000;
 
@@ -63,6 +64,8 @@ export interface Zone {
   zMax: number;
   kind: 'door' | 'window' | 'clearance';
   group?: number;
+  /** A door zone in front of a sliding door, which curtain panels may stack over (see `curtainClears`). */
+  sliding?: boolean;
 }
 
 /** A solid piece of an item for collision tests: a plan rectangle between two heights. */
@@ -128,6 +131,29 @@ export interface WallCandidate {
 }
 
 const isPassage = (o: RunOpening) => o.kind !== 'window';
+
+/** Clear width a curtain must leave in a sliding door that its panels stack over, mm. */
+export const CURTAIN_WALKWAY = 900;
+
+/**
+ * Whether stacked curtains whose rod runs from `lo` to `hi` along the wall leave opening `o`
+ * free to walk through. Panels stand clear of a door's jambs; on a sliding door one may
+ * instead stack over the glass at an end, the way a curtain covers the fixed leaf, as long
+ * as the rod spans the door and a walkway of `CURTAIN_WALKWAY` (or the whole door, if
+ * narrower) stays open around its middle.
+ */
+export function curtainClears(o: RunOpening, lo: number, hi: number, stack: number): boolean {
+  if (!isPassage(o) || o.s0 >= hi || o.s1 <= lo) return true;
+  const onPanel = o.s0 < lo + stack + JAMB_MARGIN || o.s1 > hi - stack - JAMB_MARGIN;
+  if (!onPanel) return true;
+  if (o.kind !== 'sliding' || lo > o.s0 || hi < o.s1) return false;
+  const width = o.s1 - o.s0;
+  const walk = Math.min(CURTAIN_WALKWAY, width);
+  const mid = (o.s0 + o.s1) / 2;
+  const g0 = Math.max(o.s0, lo + stack);
+  const g1 = Math.min(o.s1, hi - stack);
+  return g1 - g0 >= walk - 1 && g0 <= mid - walk / 2 + 1 && g1 >= mid + walk / 2 - 1;
+}
 
 /** Width of each gathered curtain panel (`params.stack`), or 0 for entries that are not stacked curtains. */
 export function stackWidth(entry: CatalogEntry): number {
@@ -297,7 +323,7 @@ export class Planner {
         }
         const width = o.s1 - o.s0;
         const depth = o.swingsIn ? width + 100 : APPROACH;
-        this.zones.push({ rect: this.stripRect(run, o.s0 - JAMB_MARGIN, o.s1 + JAMB_MARGIN, depth), zMin: 0, zMax: Math.max(o.top, PERSON), kind: 'door' });
+        this.zones.push({ rect: this.stripRect(run, o.s0 - JAMB_MARGIN, o.s1 + JAMB_MARGIN, depth), zMin: 0, zMax: Math.max(o.top, PERSON), kind: 'door', sliding: o.kind === 'sliding' || undefined });
         this.doorPoints.push(mid);
       }
     }
@@ -391,9 +417,12 @@ export class Planner {
     if (!insidePolygon(rect, this.polygon)) return false;
     if (entry.anchor === 'wall' && !this.wallBehind(entry, pose)) return false;
     const parts = partsOf(entry, pose, opts.pad ?? 0);
+    // Curtains on a wall: `wallBehind` has already checked that they leave its sliding doors walkable.
+    const curtains = entry.anchor === 'wall' && stackWidth(entry) > 0;
     for (const zone of this.zones) {
       if (opts.flat && zone.kind !== 'door') continue;
       if (zone.group !== undefined && zone.group === opts.group) continue;
+      if (curtains && zone.sliding) continue;
       for (const part of parts) {
         if (part.overWindow && zone.kind === 'window') continue;
         if (hits(part, zone)) return false;
@@ -436,11 +465,7 @@ export class Planner {
       if (stack <= 0) return !run.openings.some((o) => isPassage(o) && o.s0 < s + w / 2 && o.s1 > s - w / 2 && pose.z < o.top + 50);
       const lo = s - w / 2;
       const hi = s + w / 2;
-      return !run.openings.some((o) => {
-        if (!isPassage(o) || o.s0 >= hi || o.s1 <= lo) return false;
-        const onPanel = o.s0 < lo + stack + JAMB_MARGIN || o.s1 > hi - stack - JAMB_MARGIN;
-        return onPanel || pose.z + entry.dims.h - ROD_BAND < o.top + 50;
-      });
+      return run.openings.every((o) => !isPassage(o) || o.s0 >= hi || o.s1 <= lo || (curtainClears(o, lo, hi, stack) && pose.z + entry.dims.h - ROD_BAND >= o.top + 50));
     }
     return false;
   }

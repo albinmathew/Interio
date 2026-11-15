@@ -66,7 +66,7 @@ export const lineKey = (section: number, roomId: string | undefined, key: string
 
 /* ---------------------------------------------------------------- windows */
 
-/** Windows that take a blind or curtains: on a full wall, not a high ventilator. */
+/** Glazing that takes a blind or curtains: windows on a full wall (not high ventilators) and sliding doors. */
 export interface WindowSpot {
   run: Run;
   opening: RunOpening;
@@ -80,7 +80,7 @@ export function treatableWindows(p: Planner): WindowSpot[] {
   for (const run of p.runs) {
     if (run.kind !== 'wall') continue;
     for (const o of run.openings) {
-      if (o.kind !== 'window' || o.sill >= 1700) continue;
+      if (o.kind !== 'sliding' && (o.kind !== 'window' || o.sill >= 1700)) continue;
       out.push({ run, opening: o, t: (o.s0 + o.s1) / 2, width: o.s1 - o.s0 });
     }
   }
@@ -215,7 +215,7 @@ function itemLine(ctx: CheckContext, line: PackageItem, roomId: Id): Pick<Packag
   if (isWindowLine(line)) {
     const p = plannerIn(ctx, roomId);
     need = p ? treatableWindows(p).length : 0;
-    if (need === 0) return { status: 'noSpace', need: 0, have: found.length, itemIds: found.map((i) => i.id), reason: p ? noWindowReason(p) : 'No window in this room takes one' };
+    if (need === 0) return { status: 'noSpace', need: 0, have: found.length, itemIds: found.map((i) => i.id), reason: noWindowReason() };
   }
   return { status: statusOf(found.length, need), need, have: found.length, itemIds: found.map((i) => i.id) };
 }

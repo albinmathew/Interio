@@ -14,7 +14,7 @@ import { vec, type CatalogEntry, type Pt, type RoomType } from '@interio/core';
 import { getEntry } from '../catalog';
 import { CURTAIN_STACK, CURTAIN_WIDTHS } from '../entries/accessories';
 import { convexOverlap } from './geometry';
-import { partsOf, stackWidth, type PlaceOptions, type Placed, type Planner, type Pose, type Run, type WallCandidate, type Zone } from './planner';
+import { curtainClears, JAMB_MARGIN, partsOf, stackWidth, type PlaceOptions, type Placed, type Planner, type Pose, type Run, type WallCandidate, type Zone } from './planner';
 import { schemeFinishes, type Scheme } from './schemes';
 import type { RoomSeed } from './seed';
 import { stillWalkable, walkState, type WalkState } from './walk';
@@ -172,12 +172,12 @@ class Stylist {
     return done;
   }
 
-  /** Floor-length curtains centred on every window that has wall beside it. */
+  /** Floor-length curtains centred on every window and sliding door that has wall beside it. */
   curtains(): void {
     if (!this.mounted || !this.curtained || !CURTAINED.has(this.type)) return;
     const existing = this.p.placed.filter((q) => stackWidth(q.entry) > 0);
     for (const plan of curtainPlans(this.p)) {
-      if (existing.some((c) => vec.dist(plan.centre, c.pose) < c.entry.dims.d + 60)) continue;
+      if (existing.some((c) => vec.dist(plan.centre, c.pose) < Math.max(c.entry.dims.d + 60, c.entry.dims.w / 2))) continue;
       for (const entry of plan.entries) if (this.add(entry, plan.pose(entry))) break;
     }
   }
@@ -336,30 +336,61 @@ class Stylist {
 
 export interface CurtainPlan {
   centre: Pt;
-  /** Curtains that frame the opening, narrowest first. */
+  /** A sliding door rather than a window. */
+  door: boolean;
+  /** Curtains that frame the opening, in order of preference. */
   entries: CatalogEntry[];
   pose: (entry: CatalogEntry) => Pose;
 }
 
 /**
- * Windows on full walls (not high ventilators), with the curtain widths that frame them.
- * Glazed doors get none: walk mode collides with an item's whole box, so a rod across a
- * sliding door would close it to people walking through.
+ * Windows on full walls (not high ventilators) and sliding doors, with the curtain widths
+ * that frame them, narrowest first. On a sliding door only the rod crosses the opening,
+ * above its head. The track is centred on the door where the wall allows; next to a corner
+ * it shifts along the wall, and a panel may stack over the glass at that end as long as a
+ * walkway stays open (`curtainClears`).
  */
 export function curtainPlans(p: Planner): CurtainPlan[] {
   const out: CurtainPlan[] = [];
   for (const run of p.runs) {
     if (run.kind !== 'wall') continue;
     for (const o of run.openings) {
-      if (o.kind !== 'window' || o.sill >= 1700) continue;
+      const door = o.kind === 'sliding';
+      if (!door && (o.kind !== 'window' || o.sill >= 1700)) continue;
       const mid = (o.s0 + o.s1) / 2;
-      // The panels stack beside the opening, clear of its jambs.
-      const need = o.s1 - o.s0 + 2 * CURTAIN_STACK + 40;
-      const entries = CURTAIN_WIDTHS.filter((v) => v >= need)
-        .slice(0, 3)
-        .map((w) => E(`curtain.pair.${w}`))
-        .filter((e): e is CatalogEntry => !!e);
-      out.push({ centre: vec.add(run.a, vec.scale(run.dir, mid)), entries, pose: (entry) => p.against(run, mid, entry, entry.mountHeight ?? 20, 2) });
+      const centreAt = vec.add(run.a, vec.scale(run.dir, mid));
+      if (!door) {
+        // The panels stack beside the window, clear of its jambs.
+        const need = o.s1 - o.s0 + 2 * CURTAIN_STACK + 40;
+        const entries = CURTAIN_WIDTHS.filter((v) => v >= need)
+          .slice(0, 3)
+          .map((w) => E(`curtain.pair.${w}`))
+          .filter((e): e is CatalogEntry => !!e);
+        out.push({ centre: centreAt, door, entries, pose: (entry) => p.against(run, mid, entry, entry.mountHeight ?? 20, 2) });
+        continue;
+      }
+      // For each width, where along the wall its track goes: centred if it can be, else as near as the wall allows.
+      const at = new Map<string, number>();
+      const clear: CatalogEntry[] = [];
+      const over: { entry: CatalogEntry; cover: number }[] = [];
+      for (const w of CURTAIN_WIDTHS) {
+        const entry = E(`curtain.pair.${w}`);
+        if (!entry || w > run.len || w < o.s1 - o.s0) continue;
+        const t = Math.min(Math.max(mid, w / 2), run.len - w / 2);
+        const lo = t - w / 2;
+        const hi = t + w / 2;
+        // Every opening the track passes must stay walkable (windows only take the rod).
+        if (!run.openings.every((q) => curtainClears(q, lo, hi, CURTAIN_STACK))) continue;
+        at.set(entry.id, t);
+        // How much of the door the panels cover.
+        const cover = Math.max(0, lo + CURTAIN_STACK + JAMB_MARGIN - o.s0) + Math.max(0, o.s1 - (hi - CURTAIN_STACK - JAMB_MARGIN));
+        if (cover === 0) clear.push(entry);
+        else over.push({ entry, cover });
+      }
+      // Clear of the door first, narrowest first; then those covering least of it.
+      over.sort((a, b) => a.cover - b.cover || a.entry.dims.w - b.entry.dims.w);
+      const entries = [...clear.slice(0, 3), ...over.map((x) => x.entry)];
+      out.push({ centre: centreAt, door, entries, pose: (entry) => p.against(run, at.get(entry.id) ?? mid, entry, entry.mountHeight ?? 20, 2) });
     }
   }
   return out;
@@ -370,10 +401,11 @@ export function curtainPlans(p: Planner): CurtainPlan[] {
  * out, the way a designer plans the window treatment first. Returns the reservations, to
  * be lifted with `releaseCurtains` before the styling pass hangs the curtains.
  */
-export function reserveCurtains(p: Planner, mounted: boolean): Zone[] {
+export function reserveCurtains(p: Planner, mounted: boolean, which: { windows: boolean; doors: boolean }): Zone[] {
   if (!mounted || !CURTAINED.has(p.room.type)) return [];
   const zones: Zone[] = [];
   for (const plan of curtainPlans(p)) {
+    if (!(plan.door ? which.doors : which.windows)) continue;
     const entry = plan.entries.find((e) => p.can(e, plan.pose(e)));
     if (!entry) continue;
     for (const part of partsOf(entry, plan.pose(entry))) {
