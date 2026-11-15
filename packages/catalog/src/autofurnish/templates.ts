@@ -6,8 +6,9 @@
 import { vec, type CatalogEntry, type Pt, type RoomType } from '@interio/core';
 import { getEntry } from '../catalog';
 import { rectCorners, rotationFacing } from './geometry';
-import { WALL_GAP, type Placed, type Planner, type Pose, type Run, type WallCandidate } from './planner';
+import { WALL_GAP, type Placed, type Planner, type Pose, type Run, type WallCandidate, type Zone } from './planner';
 import type { RoomSeed } from './seed';
+import { stillWalkable, walkState, type WalkState } from './walk';
 
 /**
  * Pieces a furnishing package asks for, by the role they play in a room. A template that
@@ -28,7 +29,8 @@ export type PreferSlot =
   | 'diningChair'
   | 'bench'
   | 'shoe'
-  | 'mirror';
+  | 'mirror'
+  | 'crockery';
 export type Prefer = Partial<Record<PreferSlot, string>>;
 
 /** The role a catalog id plays in a room, for package preferences. */
@@ -48,6 +50,7 @@ export function slotOf(catalogId: string): PreferSlot | null {
     [/^bench\.dining/, 'bench'],
     [/^shoe\./, 'shoe'],
     [/^mirror\./, 'mirror'],
+    [/^crockery\./, 'crockery'],
   ];
   return rules.find(([re]) => re.test(catalogId))?.[1] ?? null;
 }
@@ -98,6 +101,113 @@ function cornerPlant(p: Planner, id = 'plant.potted'): void {
   if (!entry) return;
   const best = p.bestWall(entry, (c) => -c.cornerDist * 3 + Math.min(c.doorDist, 2500) * 0.4, { step: 100, gap: 120 });
   if (best && best.cornerDist < 400) p.place(entry, best.pose);
+}
+
+/**
+ * Slides the dining set (the table and the seats round it) a little at a time, across the
+ * table first and then along it, until `attempt` places its piece. Leaves the set where it
+ * was when no slide works. A set already in the home is never moved.
+ */
+export function slideDiningSet<T>(p: Planner, table: Placed, attempt: () => T | null): T | null {
+  const set = p.placed.filter((q) => q === table || (table.group !== undefined && q.group === table.group));
+  if (set.some((q) => q.existing)) return null;
+  const facing = p.facing(table.pose);
+  const along = vec.perp(facing);
+  const slides = [
+    ...[150, 300, 450, 600, 750, 900].flatMap((s) => [vec.scale(facing, s), vec.scale(facing, -s)]),
+    ...[300, 450, 600, 750, 900].flatMap((s) => [vec.scale(along, s), vec.scale(along, -s)]),
+  ];
+  // Zones the set keeps for itself (the walkway round the block) move with it.
+  const own = new Set(set.map((q) => q.zone));
+  const groupZones = p.zones.filter((z) => z.group !== undefined && z.group === table.group && !own.has(z));
+  const dropZones = (zones: Zone[]) => {
+    for (const z of zones) {
+      const i = p.zones.indexOf(z);
+      if (i >= 0) p.zones.splice(i, 1);
+    }
+  };
+  const putBack = () => {
+    for (const q of set) {
+      p.placed.push(q);
+      if (q.zone) p.zones.push(q.zone);
+    }
+    p.zones.push(...groupZones);
+  };
+  for (const d of slides) {
+    for (const q of set) p.remove(q);
+    dropZones(groupZones);
+    const shifted = groupZones.map((z) => ({ ...z, rect: z.rect.map((pt) => vec.add(pt, d)) }));
+    p.zones.push(...shifted);
+    const moved: Placed[] = [];
+    for (const q of set) {
+      const pose = { ...q.pose, x: q.pose.x + d.x, y: q.pose.y + d.y };
+      if (!p.can(q.entry, pose, { group: table.group, flat: q.flat })) break;
+      const n = p.place(q.entry, pose, { group: table.group });
+      Object.assign(n, { finishes: q.finishes, fixed: q.fixed });
+      if (q.zone) {
+        n.zone = { ...q.zone, rect: q.zone.rect.map((pt) => vec.add(pt, d)) };
+        p.zones.push(n.zone);
+      }
+      moved.push(n);
+    }
+    const placed = moved.length === set.length ? attempt() : null;
+    if (placed) return placed;
+    for (const n of moved) p.remove(n);
+    dropZones(shifted);
+    putBack();
+  }
+  return null;
+}
+
+/** Every doorway that could be reached in `before` still can, and the ones that were connected still are. */
+function doorsStillConnected(p: Planner, before: WalkState): boolean {
+  // Only the doors matter here: the reach check is for single pieces.
+  return stillWalkable(before, walkState(p), 1e5, 1e5);
+}
+
+/** Places a piece when it leaves the room's doorways reachable; null (nothing placed) otherwise. */
+function placeWalkable(p: Planner, entry: CatalogEntry, pose: Pose, opts: { clear?: number; group?: number }, before: WalkState): Placed | null {
+  const placed = p.place(entry, pose, opts);
+  if (doorsStillConnected(p, before)) return placed;
+  p.remove(placed);
+  return null;
+}
+
+/** How far from the table's centre a crockery unit still stands behind it, mm. */
+const BEHIND_TABLE = 3000;
+
+/**
+ * A package's crockery unit behind the dining table: on the wall nearest the table, square
+ * to it, with room in front to pull the chairs out; the dining set slides a little when that
+ * is what it takes. The narrower unit when the wide one does not fit.
+ */
+export function crockeryBehind(p: Planner, id: string, table: Placed, avoid?: Run, ids = first(id, ['crockery.unit', 'crockery.unit.compact']), slide = false): Placed | null {
+  const before = walkState(p);
+  // `square`: only the walls along the table's long sides, behind a row of seats.
+  const attempt = (square: boolean) => (): Placed | null => {
+    const now = p.placed.find((q) => q.entry.id === table.entry.id && q.group === table.group) ?? table;
+    const centre = { x: now.pose.x, y: now.pose.y };
+    const facing = p.facing(now.pose);
+    for (const one of ids) {
+      const entry = E(one);
+      if (!entry) continue;
+      const best = p.bestWall(
+        entry,
+        (c) =>
+          (square && Math.abs(vec.dot(c.run.normal, facing)) < 0.7 ? -Infinity : 0) -
+          vec.dist(c.pose, centre) -
+          (c.underWindow ? 3000 : 0) -
+          (c.run === avoid ? 3000 : 0),
+        { clear: 600 },
+      );
+      // Behind the table means close to it: not across the room.
+      const placed = best && vec.dist(best.pose, centre) < BEHIND_TABLE ? placeWalkable(p, entry, best.pose, { clear: 600 }, before) : null;
+      if (placed) return placed;
+    }
+    return null;
+  };
+  if (!slide) return attempt(true)() ?? attempt(false)();
+  return attempt(true)() ?? slideDiningSet(p, table, attempt(true)) ?? attempt(false)() ?? slideDiningSet(p, table, attempt(false));
 }
 
 /**
@@ -394,7 +504,10 @@ function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
   };
 
   const sizes = p.area >= 34 ? ['table.dining8', 'table.dining6', 'table.dining4'] : p.area >= 22 ? ['table.dining6', 'table.dining4'] : ['table.dining4'];
-  const diningNear = (away: Pt | null) => diningSet(p, opts, sizes, (c) => (away ? Math.min(vec.dist(c, away), 6000) : -vec.dist(c, p.centroid)) + Math.min(p.wallDistance(c), 1500) * 0.3);
+  const layDining = (away: Pt | null) => diningSet(p, opts, sizes, (c) => (away ? Math.min(vec.dist(c, away), 6000) : -vec.dist(c, p.centroid)) + Math.min(p.wallDistance(c), 1500) * 0.3);
+  // A package's crockery unit goes up first, so the dining set is laid out in front of it;
+  // it is left out when it would cost the package's table.
+  const diningNear = layDining;
   const start = p.mark();
   const seatCentre = seating(0);
   if (packageDining) {
@@ -447,9 +560,12 @@ function seatingRug(p: Planner, seed: RoomSeed, sofa: CatalogEntry, sofaPose: Po
 function dining(p: Planner, opts: TemplateOptions): void {
   const sizes = p.area >= 16 ? ['table.dining8', 'table.dining6', 'table.dining4'] : p.area >= 10 ? ['table.dining6', 'table.dining4'] : ['table.dining4', 'table.dining.round'];
   if (!p.has('table.dining')) diningSet(p, opts, sizes, (c) => -vec.dist(c, p.centroid));
-  const sideboard = E('sideboard');
-  const best = p.bestWall(sideboard, (c) => -c.centreOffset - (c.underWindow ? 200 : 0), { clear: 450 });
-  if (sideboard && best) p.place(sideboard, best.pose, { clear: 450 });
+  // A package's crockery unit (placed with its lines) does the sideboard's job.
+  if (!opts.prefer?.crockery && !p.has('crockery.')) {
+    const sideboard = E('sideboard');
+    const best = p.bestWall(sideboard, (c) => -c.centreOffset - (c.underWindow ? 200 : 0), { clear: 450 });
+    if (sideboard && best) p.place(sideboard, best.pose, { clear: 450 });
+  }
   cornerPlant(p);
 }
 

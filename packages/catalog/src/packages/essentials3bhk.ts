@@ -57,6 +57,7 @@ export const ESSENTIALS_3BHK: FurnishingPackage = {
         { key: 'bench', label: '3 Seater dining bench', catalogIds: ['bench.dining'] },
         { key: 'partition', label: 'Custom-made living-dining partition', catalogIds: ['partition.slatted'] },
         { key: 'wash', label: 'Common wash', catalogIds: ['basin.vanity'] },
+        { key: 'crockery', label: 'Crockery unit', catalogIds: ['crockery.unit', 'crockery.unit.compact'], note: 'Behind the dining table, against the wall; plants give way to it' },
         { key: 'planters', label: 'Planter box', catalogIds: ['outdoor.planter'], count: 6, overflow: 'adjacentBalcony' },
       ],
       surfaces: [{ key: 'cement', label: 'Cement texture', target: 'feature', finish: 'wall.microcement' }],

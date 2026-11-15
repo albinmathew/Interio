@@ -11,7 +11,7 @@ import { convexOverlap, rectCorners, rotationFacing } from '../autofurnish/geome
 import { gridPoses, longestRunAngle } from '../autofurnish/placeEntry';
 import { APPROACH, stackWidth, WALL_GAP, type PlaceOptions, type Placed, type Planner, type Pose, type Run, type WallCandidate, type Zone } from '../autofurnish/planner';
 import { curtainPlans } from '../autofurnish/styling';
-import { deskSet, deskStorage, diningSet, slotOf, type Prefer, type PreferSlot } from '../autofurnish/templates';
+import { crockeryBehind, deskSet, deskStorage, diningSet, slotOf, type Prefer, type PreferSlot } from '../autofurnish/templates';
 import { stillWalkable, walkState, type WalkState } from '../autofurnish/walk';
 import { treatableWindows } from './check';
 
@@ -524,16 +524,8 @@ function crockeryFor(ctx: LineContext, entry: CatalogEntry, table: Placed | unde
   if (!table) return placer.wall(entry, (c) => door(c) - c.cornerDist * 0.25 - (c.underWindow ? 3000 : 0) - (c.run === tvRun ? 1500 : 0), { clear: 600 });
   const sideboard = p.placed.find((q) => !q.existing && q.entry.id === 'sideboard');
   if (sideboard) p.remove(sideboard);
-  const at = centre(table);
-  // Square to the table's long side, and as close to the table as the chairs allow.
-  const along = p.facing(table.pose);
-  const score = (c: WallCandidate) =>
-    -vec.dist(c.pose, at) -
-    (Math.abs(vec.dot(c.run.normal, along)) > 0.7 ? 0 : 1200) -
-    (c.underWindow ? 3000 : 0) -
-    (besideGlazing(c, entry) ? 1500 : 0) -
-    (c.run === tvRun ? 3000 : 0);
-  const placed = placer.wall(entry, score, { clear: 600 }) ?? placer.wall(entry, score, { clear: 450 });
+  const placed = crockeryBehind(p, entry.id, table, tvRun, [entry.id]);
+  placer.reset();
   if (!placed && sideboard) {
     // Nothing fits: the sideboard goes back where it was.
     p.placed.push(sideboard);
