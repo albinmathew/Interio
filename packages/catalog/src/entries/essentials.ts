@@ -9,7 +9,7 @@
  */
 import type { CatalogEntry } from '@interio/core';
 import { BED_SLOTS } from '../premium/beds';
-import { ESS_BLIND_SLOTS } from '../premium/essentials.parts';
+import { ESS_BEDROOM_SLOTS, ESS_BLIND_SLOTS, ESS_DRESSING_SLOTS, ESS_SHOE_SLOTS, ESS_WARDROBE_SLOTS } from '../premium/essentials.parts';
 import { sofaSlots } from '../premium/seating';
 import { gen, wall } from './helpers';
 
@@ -17,7 +17,7 @@ const BLIND_WIDTHS = [900, 1200, 1500, 1800, 2100, 2400];
 
 export const ESSENTIALS_ENTRIES: CatalogEntry[] = [
   /* foyer */
-  gen('shoe.rack.ledges', 'Shoe rack with ledges', 'storage', ['foyer', 'corridor'], 'essentialsPlaceholder', [1000, 350, 1900], ['shoe rack', 'shoe cabinet', 'ledge', 'entryway', 'foyer']),
+  gen('shoe.rack.ledges', 'Shoe rack with ledges', 'storage', ['foyer', 'corridor'], 'essentialsShoeRack', [1000, 350, 1900], ['shoe rack', 'shoe cabinet', 'ledge', 'entryway', 'foyer'], { slots: ESS_SHOE_SLOTS }),
   gen('mirror.sunburst', 'Brass sunburst mirror', 'decor', ['foyer', 'living', 'dining', 'corridor'], 'essentialsPlaceholder', [800, 60, 800], ['mirror', 'wall art', 'brass', 'sunburst', 'decorative mirror'], wall(1350)),
 
   /* living */
@@ -35,10 +35,16 @@ export const ESSENTIALS_ENTRIES: CatalogEntry[] = [
   gen('bench.dining', 'Three-seater dining bench', 'seating', ['dining', 'living'], 'essentialsPlaceholder', [1500, 400, 460], ['bench', 'dining bench', 'three seater', 'upholstered']),
 
   /* bedrooms */
-  gen('wardrobe.ceiling', 'Ceiling-height hinged wardrobe', 'storage', ['bedroom'], 'essentialsPlaceholder', [1800, 600, 2850], ['wardrobe', 'almirah', 'closet', 'hinged', 'soft-close', 'loft', 'floor to ceiling']),
-  gen('wardrobe.mirror', 'Wardrobe with mirror shutters', 'storage', ['bedroom'], 'essentialsPlaceholder', [1500, 600, 2400], ['wardrobe', 'almirah', 'closet', 'hinged', 'soft-close', 'mirror', 'aluminium frame']),
-  gen('dressing.unit', 'Dressing unit', 'storage', ['bedroom'], 'essentialsPlaceholder', [900, 450, 1700], ['dressing table', 'vanity', 'dresser', 'mirror', 'makeup']),
-  gen('desk.writing', 'Writing table', 'office', ['bedroom', 'study'], 'essentialsPlaceholder', [1200, 550, 750], ['desk', 'study table', 'writing table', 'work table']),
+  gen('wardrobe.ceiling', 'Ceiling-height hinged wardrobe', 'storage', ['bedroom'], 'essentialsWardrobe', [1800, 600, 2850], ['wardrobe', 'almirah', 'closet', 'hinged', 'soft-close', 'loft', 'floor to ceiling'], {
+    slots: ESS_WARDROBE_SLOTS,
+    params: { doors: 4, loft: 0.25 },
+  }),
+  gen('wardrobe.mirror', 'Wardrobe with mirror shutters', 'storage', ['bedroom'], 'essentialsWardrobe', [1500, 600, 2400], ['wardrobe', 'almirah', 'closet', 'hinged', 'soft-close', 'mirror', 'aluminium frame'], {
+    slots: ESS_WARDROBE_SLOTS,
+    params: { doors: 3, loft: 0.17, mirror: true },
+  }),
+  gen('dressing.unit', 'Dressing unit', 'storage', ['bedroom'], 'essentialsDressing', [900, 450, 1700], ['dressing table', 'vanity', 'dresser', 'mirror', 'makeup'], { slots: ESS_DRESSING_SLOTS }),
+  gen('desk.writing', 'Writing table', 'office', ['bedroom', 'study'], 'essentialsWritingDesk', [1200, 550, 750], ['desk', 'study table', 'writing table', 'work table'], { slots: ESS_BEDROOM_SLOTS }),
   gen('bed.king.drawers', 'King bed with bottom drawers', 'beds', ['bedroom'], 'essentialsBedDrawers', [1950, 2150, 1150], ['bed', 'king', 'master', 'storage', 'drawers'], {
     slots: BED_SLOTS,
     params: { pillows: 3 },
