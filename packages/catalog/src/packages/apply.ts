@@ -22,6 +22,7 @@ import {
   type RoomPackage,
 } from '@interio/core';
 import { finishRoom, layoutRoom, plannerFor, type LayoutOptions, type StylingLevel } from '../autofurnish';
+import { rectCorners } from '../autofurnish/geometry';
 import type { Planner } from '../autofurnish/planner';
 import { RoomSeed } from '../autofurnish/seed';
 import { applyScheme } from '../autofurnish/styling';
@@ -118,6 +119,7 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
   const workFor = (roomId: Id): RoomWork | null => {
     if (!works.has(roomId)) {
       const planner = plannerFor(work, roomId, geoms);
+      if (planner) keepClearOfExisting(planner);
       works.set(roomId, planner ? { planner, seed: new RoomSeed(work, planner.room), placer: new Placer(planner), fresh: false, layout: { mounted, styling } } : null);
     }
     return works.get(roomId) ?? null;
@@ -230,6 +232,28 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
     if (line.status === 'missing') line.status = 'noSpace';
   }
   return { items, remove, rooms, walls, report };
+}
+
+/** Standing room in front of pieces already in a room, as the template keeps it for its own. */
+const FRONT: [RegExp, number][] = [
+  [/^bed\./, 550],
+  [/^wardrobe\./, 600],
+  [/^desk/, 600],
+  [/^(dresser|dressing\.)/, 500],
+  [/^sofa\./, 450],
+  [/^(kitchen\.(base|counter|sink)|fridge\.)/, 800],
+  [/^(bookcase|shoe\.|prayer\.|basin\.|sideboard)/, 450],
+];
+
+function keepClearOfExisting(p: Planner): void {
+  for (const q of p.placed) {
+    if (!q.existing || q.zMin > 0) continue;
+    const clear = FRONT.find(([re]) => re.test(q.entry.id))?.[1];
+    if (!clear) continue;
+    const c = p.offset(q.pose, 0, -(q.entry.dims.d / 2 + clear / 2), q.pose.rot);
+    q.zone = { rect: rectCorners(c.x, c.y, q.entry.dims.w, clear, q.pose.rot), zMin: 0, zMax: 2000, kind: 'clearance' };
+    p.zones.push(q.zone);
+  }
 }
 
 /* ---------------------------------------------------------------- surfaces */

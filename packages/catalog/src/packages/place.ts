@@ -245,9 +245,9 @@ function attempt(ctx: LineContext): LineOutcome {
     if (countOf(p, line.catalogIds) >= (line.count ?? 1)) return {};
     return { reason: `Comes with the ${parent.label.toLowerCase()}, which is not in the room` };
   }
-  if (/^blind\./.test(id0)) return windows(ctx, 'blind');
-  if (/^curtain\./.test(id0)) return windows(ctx, 'curtain');
-  if (/^partition\./.test(id0)) return partition(ctx);
+  if (id0.startsWith('blind.')) return windows(ctx, 'blind');
+  if (id0.startsWith('curtain.')) return windows(ctx, 'curtain');
+  if (id0.startsWith('partition.')) return partition(ctx);
   if (line.overflow === 'adjacentBalcony') return overflow(ctx);
   const need = line.count ?? 1;
   let reason: string | undefined;
@@ -341,7 +341,7 @@ function swap(ctx: LineContext, substitute: Placed): One {
     ctx.placer.reset();
   }
   // A wardrobe may stand on another wall: take the template's out and look again.
-  if (/^wardrobe\./.test(substitute.entry.id) && (!substitute.existing || ctx.replace)) {
+  if (substitute.entry.id.startsWith('wardrobe.') && (!substitute.existing || ctx.replace)) {
     const index = p.placed.indexOf(substitute);
     p.remove(substitute);
     const mark = p.mark();
@@ -550,7 +550,8 @@ function windows(ctx: LineContext, kind: 'blind' | 'curtain'): LineOutcome {
         // Over the glass: from just under the sill to a little above the head, under the ceiling.
         const z = Math.max(0, Math.min(Math.max(spot.opening.sill - 20, spot.opening.top + 100 - h), p.level.ceilingHeight - h - 20));
         const pose = p.against(spot.run, spot.t, entry, z, 2);
-        const placed = without(p, (zone) => zone.kind === 'window' && zone.zMin < z + h && zone.zMax > z, () => (p.can(entry, pose) ? placer.commit(entry, pose) : null));
+        // A blind hangs flat on the glass: the window's own strip and the standing room in front of furniture do not apply.
+        const placed = without(p, (zone) => zone.kind === 'clearance' || (zone.kind === 'window' && zone.zMin < z + h && zone.zMax > z), () => (p.can(entry, pose) ? placer.commit(entry, pose) : null));
         if (placed) {
           setFinishes(placed, ctx.line);
           done = true;
