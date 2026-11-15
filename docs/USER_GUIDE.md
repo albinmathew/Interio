@@ -101,7 +101,7 @@ Design mode shows the home as a dollhouse. Drag to orbit, scroll to zoom, and us
 - **Find things.** Search the catalog by name, or narrow it by category. Selecting a room narrows the catalog to what suits that room.
 - **Move and turn.** Click an item to select it, then drag it. Use the panel on the right for exact rotation and elevation, to swap it for a similar entry, to duplicate it or to remove it.
 - **Furnish a room for me.** Click a room's floor and press **Auto-furnish room** for a suggested layout. **Clear this room** removes its furniture.
-- **Furnish the whole home.** Press **Furnish home** in the Design toolbar to fill every empty room, or choose **Furnish it for me** after an import or on the sample home. **Clear furniture** removes everything after a confirmation.
+- **Furnish the whole home.** Press **Furnish home** in the Design toolbar to furnish every room to the furnishing package (see below), or choose **Furnish it for me** after an import or on the sample home. **Clear furniture** removes everything after a confirmation.
 - **Overlaps.** An item that overlaps a wall or another item is flagged in its panel.
 
 ### Design shortcuts
@@ -114,6 +114,15 @@ Design mode shows the home as a dollhouse. Drag to orbit, scroll to zoom, and us
 | `Delete` | Remove |
 | `Esc` | Cancel placing, or clear the selection |
 | `Cmd/Ctrl+Z`, `Shift+Cmd/Ctrl+Z` | Undo, redo |
+
+## Furnishing package
+
+A furnishing package is a minimum list per room, like an interior designer's quotation. The default, **Essentials, 3 BHK**, asks for a TV unit with black glass shutters, a prayer unit, an L-shaped sofa and panelling behind the TV in the living room, a king bed with drawers, a ceiling-height wardrobe, Roman blinds and wallpaper behind the bed in the master bedroom, a six-seat table with a bench, a partition and planters in the dining area, and so on for every room.
+
+- **Furnish home** lays out each room with the package's pieces first, adds every other line where it fits, and styles around them, as one undo step. Rooms that already have furniture are completed: only what their lines miss is added. The toast says how much was placed, for example "Furnished with Essentials, 3 BHK: 40 of 46 items placed".
+- **Bedrooms** are furnished as the master, kids' or guest bedroom. Before furnishing, the largest bedroom becomes the master, then the kids' bedroom, then the guest bedroom. Change it in the room panel under **Bedroom for**, then press **Refurnish to match**.
+- **Package** at the top right opens the checklist: every room's lines as written, with a tick, a count such as 4/6, or a warning that says why a line could not be placed. Brands and fittings (Hettich, Peps, Faber, soft-close) are listed as included. **Add** or **Retry** adds a missing line, **Apply missing for this room** adds all of a room's, and clicking a placed line shows the piece. **Copy checklist** copies the list as text with ticks.
+- Choose **No package** in the panel to furnish with the plain layout and styling instead.
 
 ## Finishes
 

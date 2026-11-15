@@ -184,7 +184,7 @@ export function PackagePanel({ level }: { level: Level }) {
             <span className="font-semibold text-ink tabular-nums">
               {check.placed} of {check.needed}
             </span>{' '}
-            items placed · Furnish home adds what is missing
+            items placed
           </p>
         ) : (
           <p className="text-xs text-ink-soft" data-testid="package-summary">
@@ -199,9 +199,8 @@ export function PackagePanel({ level }: { level: Level }) {
               <RoomGroup key={g.key} level={level} group={g} reasons={reasons} />
             ))}
           </div>
-          <div className="flex items-center justify-between gap-2 border-t border-line p-2">
-            <span className="pl-1 text-xs text-ink-faint">{pkg?.description ? 'Specs are listed as included' : ''}</span>
-            <Button size="sm" variant="ghost" icon={<ClipboardCopy className="h-4 w-4" />} data-testid="package-copy" onClick={() => void copy()}>
+          <div className="flex items-center justify-end border-t border-line p-2">
+            <Button size="sm" variant="ghost" className="whitespace-nowrap" icon={<ClipboardCopy className="h-4 w-4" />} data-testid="package-copy" onClick={() => void copy()}>
               Copy checklist
             </Button>
           </div>

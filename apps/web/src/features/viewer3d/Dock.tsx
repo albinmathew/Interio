@@ -32,8 +32,8 @@ function DockButton({ dock, label, title, icon, children, testId }: { dock: Dock
       )}
     >
       {icon}
-      {/* On a narrow window the label gives way to the toolbar beside it; the name stays for screen readers and the tooltip. */}
-      <span className="max-[1140px]:sr-only">{label}</span>
+      {/* Below 1440 px the labels give way to the toolbar beside them; the name stays for screen readers and the tooltip. */}
+      <span className="max-[1440px]:sr-only">{label}</span>
       {children}
     </button>
   );
