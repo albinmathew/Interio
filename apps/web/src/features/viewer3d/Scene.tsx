@@ -218,6 +218,7 @@ function CameraRig({ box }: { box: Box }) {
   const invalidate = useThree((s) => s.invalidate);
   const view = useViewer((s) => s.view);
   const fitRequest = useViewer((s) => s.fitRequest);
+  const focus = useViewer((s) => s.focus);
   const docked = useViewer((s) => s.dock !== null);
   const anim = useRef<{
     from: THREE.Spherical;
@@ -252,6 +253,24 @@ function CameraRig({ box }: { box: Box }) {
     invalidate();
     return () => lens.clearViewOffset();
   }, [lens, size, docked, invalidate]);
+
+  // Frame one item (the package checklist's "show me"): from the current heading, close in on its box.
+  useLayoutEffect(() => {
+    const c = controls.current;
+    if (!c || !focus) return;
+    const size = latest.current.size;
+    const free = freeView(size.width, size.height, FOV[view], insetsFor(size, useViewer.getState().dock !== null));
+    const dir = camera.position.clone().sub(c.target).normalize();
+    const pose = view === 'top' ? fitTop(focus.box, free.fov, free.aspect) : fitOrbit(focus.box, free.fov, free.aspect, [dir.x, Math.max(dir.y, 0.5), dir.z], 2.2);
+    const toTarget = new THREE.Vector3(...pose.target);
+    const to = new THREE.Spherical().setFromVector3(new THREE.Vector3(...pose.position).sub(toTarget));
+    const from = new THREE.Spherical().setFromVector3(camera.position.clone().sub(c.target));
+    if (from.phi < 0.02) from.theta = to.theta;
+    else to.theta = from.theta + (THREE.MathUtils.euclideanModulo(to.theta - from.theta + Math.PI, Math.PI * 2) - Math.PI);
+    anim.current = { from, to, fromTarget: c.target.clone(), toTarget, fromFov: lens.fov, toFov: lens.fov, t: 0 };
+    c.enabled = false;
+    invalidate();
+  }, [focus, camera, lens, invalidate, view]);
 
   useLayoutEffect(() => {
     const c = controls.current;

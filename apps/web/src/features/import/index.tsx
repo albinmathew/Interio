@@ -239,8 +239,12 @@ export default function ImportPage() {
       const project = await createFromDraft(draft, name.trim() || 'Imported plan', current.file);
       if (next === 'furnish') {
         const { added } = await furnishProject(project);
+        // Loaded with the furnishing above; it has the package's summary.
+        const { usePackageState } = await import('../../lib/furnish');
+        const last = usePackageState.getState().last;
         navigate(`/p/${project.id}/design`);
-        if (added > 0) toast.success(`Furnished your home with ${plural(added, 'item')}. Undo takes them all back.`);
+        const pkg = last?.packageName && last.needed ? ` ${last.packageName}: ${last.placed} of ${last.needed} items placed.` : '';
+        if (added > 0) toast.success(`Furnished your home with ${plural(added, 'item')}.${pkg} Undo takes them all back.`);
         else toast.info('Nothing could be placed automatically. Pick furniture from the catalog.');
       } else {
         navigate(`/p/${project.id}/plan`);
@@ -425,7 +429,7 @@ function NextStep({ creating, onPick, onClose }: { creating: Next | null; onPick
           'furnish',
           <Sparkles className="h-4 w-4" />,
           'Furnish it for me',
-          'Puts a suggested layout in every room and opens the 3D view. One undo takes it back, and everything can be moved or swapped.',
+          'Furnishes every room to the furnishing package (each room’s minimum list) and opens the 3D view. One undo takes it back, and everything can be moved or swapped.',
           true,
         )}
         {option(

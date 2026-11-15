@@ -149,7 +149,7 @@ function Overlay({ level }: { level: Level }) {
     <>
       <CatalogPanel level={level} className="absolute top-3 bottom-3 left-3 w-72" />
       <Toolbar level={level} />
-      <DockButtons />
+      <DockButtons level={level} />
       <SidePanel level={level} items={items} overlaps={overlaps} className="absolute w-64" style={side} />
       <DockPanel level={level} />
       {Object.keys(level.rooms).length === 0 ? <NoRooms /> : <Hint level={level} />}
