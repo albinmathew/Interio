@@ -43,6 +43,7 @@ describe('markdown reader', () => {
       'Import a floor plan',
       'Edit the plan',
       'Furnish in 3D',
+      'Furnishing package',
       'Finishes',
       'Customise furniture and walls',
       'Lighting and pictures',

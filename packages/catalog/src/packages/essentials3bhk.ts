@@ -4,6 +4,8 @@
  */
 import type { FurnishingPackage } from '@interio/core';
 
+/** Stacked curtains of every width (the styling pass hangs these), and the older flat pair. */
+const CURTAINS = [...[1200, 1500, 1800, 2100, 2400, 2700, 3000, 3300, 3600, 3900].map((w) => `curtain.pair.${w}`), 'curtain.pair'];
 const BLINDS = ['blind.roman.1800', 'blind.roman.1500', 'blind.roman.2100', 'blind.roman.1200', 'blind.roman.2400', 'blind.roman.900'];
 
 export const ESSENTIALS_3BHK: FurnishingPackage = {
@@ -26,10 +28,10 @@ export const ESSENTIALS_3BHK: FurnishingPackage = {
       items: [
         { key: 'tv-unit', label: 'TV unit with black glass shutters', catalogIds: ['tv.unit.glass'] },
         { key: 'prayer', label: 'Prayer unit', catalogIds: ['prayer.unit'] },
-        { key: 'curtains', label: 'Curtain with lining', catalogIds: ['curtain.pair'], note: 'Lined; on every window with wall space' },
+        { key: 'curtains', label: 'Curtain with lining', catalogIds: CURTAINS, note: 'Lined; on every window with wall space' },
         { key: 'clock', label: 'Decorative roman clock', catalogIds: ['clock.roman'] },
         { key: 'sofa', label: 'Sofa Fiori L shape 3 seater + lounge', catalogIds: ['sofa.lshape', 'sofa.chaise'], note: 'Fiori' },
-        { key: 'cushions', label: 'Additional cushions for sofa', catalogIds: ['sofa.lshape'], count: 1, note: '4 cushions on the sofa' },
+        { key: 'cushions', label: 'Additional cushions for sofa', catalogIds: ['sofa.lshape', 'sofa.chaise'], count: 1, note: '4 cushions on the sofa' },
         { key: 'carpet', label: 'Carpet', catalogIds: ['rug.large', 'rug.rectangle'] },
         { key: 'centre-table', label: 'Centre table (Large)', catalogIds: ['table.coffee.large'] },
       ],

@@ -3,9 +3,9 @@
  * Used when an item is asked for by name ("put a sink in the utility") rather
  * than dragged into place.
  */
-import { deriveRooms, vec, type Item, type ItemPlacement, type Level, type Pt } from '@interio/core';
+import { deriveRooms, vec, type CatalogEntry, type Item, type ItemPlacement, type Level, type Pt } from '@interio/core';
 import { getEntry } from '../catalog';
-import { Planner, type Pose, type WallCandidate } from './planner';
+import { Planner, type Placed, type Pose, type WallCandidate } from './planner';
 
 export interface PlaceEntryOptions {
   /**
@@ -36,15 +36,20 @@ export function placeEntry(level: Level, roomId: string, catalogId: string, opti
   if (!room || !geom || !entry || geom.interior.length < 3) return null;
   const p = new Planner(level, room, geom);
   if (p.runs.length < 3) return null;
-  const done = (pose: Pose): Omit<Item, 'id'> => {
-    p.place(entry, pose);
-    return p.result()[p.result().length - 1]!;
-  };
+  return placeOn(p, entry, options) ? p.result()[p.result().length - 1]! : null;
+}
+
+/**
+ * `placeEntry` on a planner that is already set up (and may hold pieces placed in this
+ * run): places the entry at the first free pose and returns it, or null.
+ */
+export function placeOn(p: Planner, entry: CatalogEntry, options: PlaceEntryOptions = {}): Placed | null {
+  const done = (pose: Pose): Placed => p.place(entry, pose);
   const flat = entry.dims.h <= 30;
 
   // Ceiling pieces hang from the ceiling, as close to the middle of the room (or the asked spot) as they fit.
   if (entry.anchor === 'ceiling') {
-    const z = level.ceilingHeight - entry.dims.h;
+    const z = p.level.ceilingHeight - entry.dims.h;
     const target = options.near ?? p.centroid;
     for (const pose of gridPoses(p, target, [0])) if (p.can(entry, { ...pose, z })) return done({ ...pose, z });
     return null;
@@ -92,13 +97,13 @@ export function placeEntry(level: Level, roomId: string, catalogId: string, opti
   return null;
 }
 
-function longestRunAngle(p: Planner): number {
+export function longestRunAngle(p: Planner): number {
   const run = p.runs.reduce((best, r) => (r.len > best.len ? r : best));
   return (Math.atan2(run.dir.y, run.dir.x) * 180) / Math.PI;
 }
 
 /** Candidate poses on a 100 mm grid over the room, nearest to `target` first. */
-function gridPoses(p: Planner, target: Pt, rotations: number[]): Pose[] {
+export function gridPoses(p: Planner, target: Pt, rotations: number[]): Pose[] {
   const xs = p.polygon.map((q) => q.x);
   const ys = p.polygon.map((q) => q.y);
   const step = 100;

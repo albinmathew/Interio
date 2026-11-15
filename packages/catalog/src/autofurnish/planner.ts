@@ -44,6 +44,8 @@ export interface Run {
   /** Lowest wall height along the run. */
   height: number;
   openings: RunOpening[];
+  /** The wall edges the run is made of, in order along it (`s0`..`s1` along the run). */
+  edges: { wallId?: Id; s0: number; s1: number }[];
 }
 
 export interface Pose {
@@ -92,6 +94,12 @@ export interface Placed {
   group?: number;
   /** Already in the level before autoFurnish ran. */
   existing: boolean;
+  /** Id of the level item, for pieces that were already there. */
+  itemId?: Id;
+  /** The clearance kept in front of it, if any. */
+  zone?: Zone;
+  /** Finishes that must survive the colour scheme (a package's yellow chair). */
+  fixed?: Record<string, string>;
 }
 
 export interface PlaceOptions {
@@ -230,6 +238,10 @@ export class Planner {
               : 'wall',
         height: Math.min(...current.map((e) => e.wall?.height ?? this.level.ceilingHeight)),
         openings: [],
+        edges: current.map((e) => {
+          const s0 = vec.dot(vec.sub(e.a, a), dir);
+          return { wallId: e.wall?.id, s0, s1: s0 + e.len };
+        }),
       };
       const seen = new Set<Id>();
       for (const e of current) {
@@ -316,6 +328,7 @@ export class Planner {
         zMax: pose.z + entry.dims.h * scale,
         flat: entry.dims.h <= 30,
         existing: true,
+        itemId: item.id,
         ...(stackWidth(entry) > 0 && scale === 1 ? { parts: partsOf(entry, pose) } : {}),
       });
     }
@@ -445,8 +458,19 @@ export class Planner {
       ...(stackWidth(entry) > 0 ? { parts: partsOf(entry, pose) } : {}),
     };
     this.placed.push(placed);
-    if (opts.clear) this.zones.push({ rect: this.clearance(entry, pose, opts.clear), zMin: 0, zMax: PERSON, kind: 'clearance', group: opts.group });
+    if (opts.clear) {
+      placed.zone = { rect: this.clearance(entry, pose, opts.clear), zMin: 0, zMax: PERSON, kind: 'clearance', group: opts.group };
+      this.zones.push(placed.zone);
+    }
     return placed;
+  }
+
+  /** Takes a piece out again, with the clearance kept in front of it. */
+  remove(placed: Placed): void {
+    const i = this.placed.indexOf(placed);
+    if (i >= 0) this.placed.splice(i, 1);
+    const z = placed.zone ? this.zones.indexOf(placed.zone) : -1;
+    if (z >= 0) this.zones.splice(z, 1);
   }
 
   /** Snapshot to return to with `rollback` when a group of pieces does not work out. */

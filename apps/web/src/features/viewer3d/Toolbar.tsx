@@ -5,10 +5,11 @@ import { planStore, selectLevel, usePlanStore, type Level } from '@interio/core'
 import { LIGHTING_LABELS, LIGHTING_PRESETS, LIGHTING_SETTING, OUTSIDE_LABELS, OUTSIDE_SETTING, OUTSIDE_VIEWS, outsideFromSettings, type LightingPreset, type OutsideView } from '@interio/scene3d';
 import { Aperture, Box, Building2, Camera, Cloud, Eraser, Layers, Maximize, Moon, ScanLine, Sparkles, Sun, Sunset, Trees } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { clearFurniture, furnishHome } from '../../lib/furnish';
+import { clearFurniture, furnishHome, furnishSummaryText, usePackageState } from '../../lib/furnish';
 import { Button, Dialog, IconButton, Panel, Segmented, toast } from '../../ui';
 import { captureBridge, captureFileName, downloadDataUrl, exportScale } from './capture';
 import { saveFirstLayout } from './firstLayout';
+import { usePackageGaps } from './packageView';
 import { useLightingPreset, useViewer, type ViewMode } from './state';
 
 const Divider = () => <span className="mx-1 h-5 w-px shrink-0 bg-line" aria-hidden="true" />;
@@ -49,13 +50,16 @@ function exportPicture(): void {
 function furnishWholeHome(): void {
   const before = furnishedRooms(selectLevel(planStore.getState()));
   const added = furnishHome();
+  const summary = usePackageState.getState().last;
+  const pkg = summary?.packageName ? furnishSummaryText(summary) : null;
   if (added === 0) {
-    toast.info('Nothing to suggest for the rooms that are still empty');
+    toast.info(pkg ? `Nothing to suggest for the rooms that are still empty. ${pkg.replace(/^Furnished with /, '')}` : 'Nothing to suggest for the rooms that are still empty');
     return;
   }
   const after = furnishedRooms(selectLevel(planStore.getState()));
   const filled = [...after].filter((id) => !before.has(id)).length;
-  toast.success(`Added ${itemCount(added)} to ${roomCount(filled)}`);
+  const added_ = `Added ${itemCount(added)} to ${roomCount(filled)}`;
+  toast.success(pkg ? `${pkg}. ${added_}` : added_);
   // The first furnished look of a home is kept as a variant to come back to.
   void saveFirstLayout();
 }
@@ -71,6 +75,9 @@ export function Toolbar({ level }: { level: Level }) {
   const rooms = Object.values(level.rooms);
   const furnished = furnishedRooms(level);
   const empty = rooms.filter((r) => !furnished.has(r.id)).length;
+  // With a package, rooms that are furnished can still be completed with lines not yet tried.
+  const gaps = usePackageGaps(level);
+  const canFurnish = empty > 0 || gaps > 0;
 
   return (
     <>
@@ -134,13 +141,15 @@ export function Toolbar({ level }: { level: Level }) {
           className="shrink-0 px-2 whitespace-nowrap"
           icon={<Sparkles className="h-4 w-4" />}
           data-testid="furnish-home"
-          disabled={empty === 0}
+          disabled={!canFurnish}
           title={
             rooms.length === 0
               ? 'There are no rooms to furnish yet'
-              : empty === 0
+              : !canFurnish
                 ? 'Every room already has furniture'
-                : 'Adds a suggested layout to every room that is still empty. Undo removes it in one step.'
+                : empty === 0
+                  ? 'Adds what the furnishing package still misses. Undo removes it in one step.'
+                  : 'Adds a suggested layout to every room that is still empty, with the furnishing package. Undo removes it in one step.'
           }
           onClick={furnishWholeHome}
         >

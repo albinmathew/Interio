@@ -1,7 +1,8 @@
-import { entriesFor } from '@interio/catalog';
-import { planStore, selectRooms, usePlanStore, type Item, type Level, type Room } from '@interio/core';
+import { ROLE_LABELS, bedroomRoles, entriesFor } from '@interio/catalog';
+import { BEDROOM_ROLES, planStore, selectRooms, usePlanStore, type BedroomRole, type Item, type Level, type Room } from '@interio/core';
 import { Copy, RotateCcw, RotateCw, Sparkles, Trash2, X } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
+import { refurnishRoom, setBedroomRole } from '../../lib/furnish';
 import { dims, squareMetres } from '../../lib/format';
 import { Badge, Button, Field, IconButton, NumberInput, Panel, PanelHeader, Segmented, Select, cn, toast } from '../../ui';
 import { autoFurnishRoom, clearRoom, duplicateSelection, removeSelection, replaceEntry, rotateSelection, setElevation, setRotation } from './actions';
@@ -102,6 +103,46 @@ function ItemPanel({ level, item, overlap }: { level: Level; item: Item; overlap
   );
 }
 
+/** "Bedroom for: Master / Kids / Guest". After a change it offers to refurnish the room for its new role. */
+function BedroomRoleField({ level, room }: { level: Level; room: Room }) {
+  const [changedFor, setChangedFor] = useState<string | null>(null);
+  const role = room.role ?? bedroomRoles(level)[room.id] ?? 'master';
+  const changed = changedFor === room.id;
+  return (
+    <div className="flex flex-col gap-2 border-t border-line p-3" data-testid="room-role" data-role={role} data-set={room.role ? 'true' : 'false'}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-ink-soft">Bedroom for</span>
+        <Segmented<BedroomRole>
+          size="sm"
+          value={role}
+          onChange={(next) => {
+            if (next === role && room.role) return;
+            setBedroomRole(room.id, next);
+            setChangedFor(room.id);
+          }}
+          options={BEDROOM_ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r], title: `Furnish as the ${ROLE_LABELS[r].toLowerCase()} bedroom` }))}
+        />
+      </div>
+      {!room.role && <p className="text-xs text-ink-faint">Set from its size; furnishing writes it down.</p>}
+      {changed && (
+        <Button
+          size="sm"
+          icon={<Sparkles className="h-4 w-4" />}
+          data-testid="room-refurnish"
+          title="Clears this room and furnishes it for its role. Undo brings the previous furniture back."
+          onClick={() => {
+            const added = refurnishRoom(room.id);
+            setChangedFor(null);
+            toast.success(`Refurnished ${room.name} as the ${ROLE_LABELS[role].toLowerCase()} bedroom (${added === 1 ? '1 item' : `${added} items`})`);
+          }}
+        >
+          Refurnish to match
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function RoomPanel({ level, room }: { level: Level; room: Room }) {
   const tab = useViewer((s) => s.roomTab);
   const geom = selectRooms(level).find((r) => r.roomId === room.id);
@@ -142,6 +183,7 @@ function RoomPanel({ level, room }: { level: Level; room: Room }) {
               {row('Walls', finishName(currentFinish(room, 'wall')))}
               {row('Furniture', count === 1 ? '1 item' : `${count} items`)}
             </dl>
+            {room.type === 'bedroom' && <BedroomRoleField level={level} room={room} />}
             <div className="flex flex-col gap-2 border-t border-line p-3">
               <Button
                 variant="primary"

@@ -149,7 +149,7 @@ function Overlay({ level }: { level: Level }) {
     <>
       <CatalogPanel level={level} className="absolute top-3 bottom-3 left-3 w-72" />
       <Toolbar level={level} />
-      <DockButtons />
+      <DockButtons level={level} />
       <SidePanel level={level} items={items} overlaps={overlaps} className="absolute w-64" style={side} />
       <DockPanel level={level} />
       {Object.keys(level.rooms).length === 0 ? <NoRooms /> : <Hint level={level} />}
@@ -165,7 +165,7 @@ export default function Viewer3D() {
   const view = useViewer((s) => s.view);
   useKeyboard();
   // Leaving the view drops any half-finished placement.
-  useEffect(() => () => useViewer.setState({ placing: null, ghost: null, drag: null }), []);
+  useEffect(() => () => useViewer.setState({ placing: null, ghost: null, drag: null, focus: null }), []);
   if (!level) return null;
   if (Object.keys(level.walls).length === 0)
     return (

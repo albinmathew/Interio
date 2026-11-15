@@ -11,8 +11,8 @@ import { normalizeDeg, type Placement } from './placement';
 /** `showcase`: a steep three-quarter view from above, drawn at the best quality, for pictures. */
 export type ViewMode = 'orbit' | 'top' | 'showcase';
 
-/** Panels that dock on the right: the design assistant and the saved variants. One at a time. */
-export type Dock = 'assistant' | 'variants';
+/** Panels that dock on the right: the design assistant, the saved variants and the furnishing package's checklist. One at a time. */
+export type Dock = 'assistant' | 'variants' | 'package';
 
 /** Width of the docked panel, in CSS pixels. */
 export const DOCK_WIDTH = 304;
@@ -48,6 +48,8 @@ export interface ViewerState {
   cutaway: boolean;
   /** Bumped to ask the camera to frame the whole plan again. */
   fitRequest: number;
+  /** A box (world metres) the camera was asked to close in on; a new object each time. */
+  focus: { box: { min: [number, number, number]; max: [number, number, number] } } | null;
   placing: Placing | null;
   /** Where the entry being placed would land; null while the cursor is off the plan. */
   ghost: Placement | null;
@@ -71,6 +73,7 @@ export interface ViewerState {
   setView(view: ViewMode): void;
   toggleCutaway(): void;
   requestFit(): void;
+  focusOn(box: { min: [number, number, number]; max: [number, number, number] }): void;
   startPlacing(catalogId: string, fromDrag?: boolean): void;
   stopPlacing(): void;
   rotatePlacing(delta: number): void;
@@ -92,6 +95,7 @@ export const useViewer = create<ViewerState>((set) => ({
   view: 'orbit',
   cutaway: true,
   fitRequest: 0,
+  focus: null,
   placing: null,
   ghost: null,
   drag: null,
@@ -107,6 +111,7 @@ export const useViewer = create<ViewerState>((set) => ({
   setView: (view) => set({ view }),
   toggleCutaway: () => set((s) => ({ cutaway: !s.cutaway })),
   requestFit: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
+  focusOn: (box) => set({ focus: { box } }),
   startPlacing: (catalogId, fromDrag = false) =>
     set((s) => ({ placing: { catalogId, rotationDeg: s.placing?.rotationDeg ?? 0, fromDrag }, ghost: null, drag: null })),
   stopPlacing: () => set({ placing: null, ghost: null }),

@@ -50,6 +50,8 @@ class Stylist {
     readonly seed: RoomSeed,
     level: Exclude<StylingLevel, 'none'>,
     readonly mounted: boolean,
+    /** False where the windows get something else (a package's blinds). */
+    readonly curtained = true,
   ) {
     this.cap = stylingCap(p.area, level);
     this.full = level === 'full';
@@ -172,7 +174,7 @@ class Stylist {
 
   /** Floor-length curtains centred on every window that has wall beside it. */
   curtains(): void {
-    if (!this.mounted || !CURTAINED.has(this.type)) return;
+    if (!this.mounted || !this.curtained || !CURTAINED.has(this.type)) return;
     const existing = this.p.placed.filter((q) => stackWidth(q.entry) > 0);
     for (const plan of curtainPlans(this.p)) {
       if (existing.some((c) => vec.dist(plan.centre, c.pose) < c.entry.dims.d + 60)) continue;
@@ -332,7 +334,7 @@ class Stylist {
 
 /* ---------------------------------------------------------- curtains */
 
-interface CurtainPlan {
+export interface CurtainPlan {
   centre: Pt;
   /** Curtains that frame the opening, narrowest first. */
   entries: CatalogEntry[];
@@ -344,7 +346,7 @@ interface CurtainPlan {
  * Glazed doors get none: walk mode collides with an item's whole box, so a rod across a
  * sliding door would close it to people walking through.
  */
-function curtainPlans(p: Planner): CurtainPlan[] {
+export function curtainPlans(p: Planner): CurtainPlan[] {
   const out: CurtainPlan[] = [];
   for (const run of p.runs) {
     if (run.kind !== 'wall') continue;
@@ -601,9 +603,9 @@ const ROOMS: Partial<Record<RoomType, (s: Stylist) => void>> = {
 };
 
 /** Runs the styling pass for the planner's room. */
-export function stylePass(p: Planner, seed: RoomSeed, level: Exclude<StylingLevel, 'none'>, mounted: boolean): void {
+export function stylePass(p: Planner, seed: RoomSeed, level: Exclude<StylingLevel, 'none'>, mounted: boolean, curtained = true): void {
   const fn = ROOMS[p.room.type];
-  if (fn) fn(new Stylist(p, seed, level, mounted));
+  if (fn) fn(new Stylist(p, seed, level, mounted, curtained));
 }
 
 /** Gives every piece added by this run the room's scheme finishes. */
@@ -611,6 +613,6 @@ export function applyScheme(p: Planner, scheme: Scheme, seed: RoomSeed): void {
   for (const q of p.placed) {
     if (q.existing) continue;
     const finishes = schemeFinishes(q.entry, scheme, seed);
-    if (finishes) q.finishes = finishes;
+    if (finishes || q.fixed) q.finishes = { ...finishes, ...q.fixed };
   }
 }
