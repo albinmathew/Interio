@@ -10,6 +10,7 @@
 import type { CatalogEntry } from '@interio/core';
 import { BED_SLOTS } from '../premium/beds';
 import {
+  ESS_ALTAR_SLOTS,
   ESS_BEDROOM_SLOTS,
   ESS_BLIND_SLOTS,
   ESS_CLOCK_SLOTS,
@@ -36,6 +37,7 @@ export const ESSENTIALS_ENTRIES: CatalogEntry[] = [
   /* living */
   gen('tv.unit.glass', 'TV unit with black glass shutters', 'storage', ['living', 'bedroom'], 'essentialsTvGlass', [1800, 420, 500], ['tv unit', 'media unit', 'glass shutters', 'black glass', 'entertainment unit'], { slots: ESS_TV_SLOTS }),
   gen('prayer.unit', 'Prayer unit', 'storage', ['living', 'dining', 'foyer', 'other'], 'essentialsPrayer', [900, 450, 1800], ['pooja unit', 'mandir', 'temple', 'prayer', 'puja'], { slots: ESS_PRAYER_SLOTS }),
+  gen('prayer.unit.christian', 'Christian prayer unit', 'storage', ['living', 'dining', 'foyer', 'other'], 'essentialsAltar', [1500, 450, 2400], ['prayer', 'altar', 'christian', 'church', 'cross', 'pooja', 'pooja unit', 'prayer unit', 'home altar', 'catholic'], { slots: ESS_ALTAR_SLOTS }),
   gen('clock.roman', 'Roman-numeral wall clock', 'decor', ['living', 'dining', 'foyer', 'study'], 'essentialsClock', [600, 60, 600], ['clock', 'wall clock', 'roman', 'decorative clock'], { ...wall(1800), slots: ESS_CLOCK_SLOTS }),
   gen('sofa.lshape', 'L-shaped sofa, 3 seater + lounge', 'seating', ['living'], 'essentialsSofaL', [2700, 1650, 820], ['sofa', 'couch', 'l-shaped', 'lounger', 'chaise', 'sectional', 'fiori'], {
     slots: sofaSlots('fabric.linen.sand', 'fabric.velvet.mocha', 'wood.walnut'),
