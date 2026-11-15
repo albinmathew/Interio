@@ -2,9 +2,20 @@
  * Who each bedroom is for. A bedroom keeps the role it was given; the others get one by
  * size before the home is furnished: the largest is the master bedroom, then the kids'
  * bedroom, then the guest bedroom. A fourth bedroom or more is a guest bedroom again,
- * and a home with two bedrooms has a master and a guest bedroom.
+ * and a home with two bedrooms has a master and a guest bedroom. A bedroom too small for
+ * a bed and a wardrobe (a service room) takes no role: the package makes it a work space.
  */
-import { deriveRooms, type BedroomRole, type Level, type RoomGeom } from '@interio/core';
+import { deriveRooms, type BedroomRole, type Id, type Level, type RoomGeom } from '@interio/core';
+
+/** Floor area under which a bedroom without a role is a service room, not a bedroom, m². */
+export const MIN_BEDROOM_AREA = 6;
+
+/** Bedrooms without a role that are too small to be furnished as one. */
+export function tinyBedrooms(level: Level, geoms: RoomGeom[] = deriveRooms(level)): Id[] {
+  return Object.values(level.rooms)
+    .filter((r) => r.type === 'bedroom' && !r.role && (geoms.find((g) => g.roomId === r.id)?.interiorArea ?? 0) < MIN_BEDROOM_AREA * 1e6)
+    .map((r) => r.id);
+}
 
 /** The roles bedrooms take in order of size, for a home with `n` bedrooms. */
 export function roleSequence(n: number): BedroomRole[] {
@@ -18,7 +29,8 @@ export function roleSequence(n: number): BedroomRole[] {
  * roles the set ones leave. Deterministic for a plan.
  */
 export function bedroomRoles(level: Level, geoms: RoomGeom[] = deriveRooms(level)): Record<string, BedroomRole> {
-  const bedrooms = Object.values(level.rooms).filter((r) => r.type === 'bedroom');
+  const tiny = new Set(tinyBedrooms(level, geoms));
+  const bedrooms = Object.values(level.rooms).filter((r) => r.type === 'bedroom' && !tiny.has(r.id));
   const out: Record<string, BedroomRole> = {};
   const free = roleSequence(bedrooms.length);
   for (const room of bedrooms) {

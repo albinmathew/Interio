@@ -30,7 +30,7 @@ import { homeScheme } from '../autofurnish/schemes';
 import { slotOf, type Prefer } from '../autofurnish/templates';
 import { buildCheck, overflowBalconies, overflowRooms, lineKey, matchSections, roomFaces, faceFinish, type PackageCheck, type PackageSection, type RoomFace } from './check';
 import { Placer, guaranteeLine, runBehind, type LineContext } from './place';
-import { bedroomRoles, missingBedroomRoles } from './roles';
+import { bedroomRoles, missingBedroomRoles, tinyBedrooms } from './roles';
 
 export interface ApplyPackageOptions {
   /** Rooms to furnish or complete. Default: every room. */
@@ -47,7 +47,7 @@ export interface ApplyPackageOptions {
   styling?: StylingLevel;
 }
 
-export type RoomPatch = Partial<Pick<Room, 'role' | 'wallMaterial' | 'floorMaterial' | 'ceilingMaterial'>>;
+export type RoomPatch = Partial<Pick<Room, 'type' | 'role' | 'wallMaterial' | 'floorMaterial' | 'ceilingMaterial'>>;
 export type WallPatch = { finishLeft?: string; finishRight?: string };
 
 export interface ApplyPackageResult {
@@ -99,9 +99,14 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
   const remove: Id[] = [];
   const reasons = new Map<string, string>();
 
-  // Bedrooms without a role get one by size, written with the furnishing.
+  // Bedrooms without a role get one by size, written with the furnishing; one too small for
+  // a bed and a wardrobe (a service room) becomes a work space.
   const work: Level = structuredClone(level);
   let geoms = deriveRooms(work);
+  for (const id of tinyBedrooms(work, geoms)) {
+    rooms[id] = { type: 'study' };
+    work.rooms[id]!.type = 'study';
+  }
   for (const [id, role] of Object.entries(missingBedroomRoles(work, geoms))) {
     rooms[id] = { role };
     work.rooms[id]!.role = role;

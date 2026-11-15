@@ -515,7 +515,8 @@ function bedroom(s: Stylist): void {
 function study(s: Stylist): void {
   s.curtains();
   const desk = s.find(/^desk/)[0];
-  if (desk && s.onTop(desk).length === 0) s.dressEnds(desk, ['lamp.table.square', s.full ? 'books.stack' : undefined], 90);
+  // A desk lamp at one end; books too on a bare desk.
+  if (desk && !s.onTop(desk).some((q) => q.entry.id.startsWith('lamp'))) s.dressEnds(desk, ['lamp.table.square', s.full && s.onTop(desk).length === 0 ? 'books.stack' : undefined], 90);
   if (s.find(/^art\./).length === 0) s.artOnWall(s.seed.order('study-art', ['art.landscape', 'pair:art.portrait', 'art.large']));
   if (s.floorPlants().length === 0) s.plant(s.seed.order('study-plant', PLANTS));
 }

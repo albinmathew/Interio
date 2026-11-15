@@ -413,6 +413,52 @@ describe('a bedroom whose only glazing is a sliding door near a corner', () => {
   });
 });
 
+describe('a bedroom too small to be one (a service room)', () => {
+  // A 3.7 x 4 m bedroom and a 1.9 x 1.9 m "bedroom" off a lobby with the entrance; its door is by a corner, as in the TPC plans.
+  const w = (x1: number, y1: number, x2: number, y2: number) => ({ a: { x: x1, y: y1 }, b: { x: x2, y: y2 }, thickness: 150 });
+  const level = buildLevel({
+    walls: [w(0, 0, 3700, 0), w(3700, 0, 5600, 0), w(5600, 0, 5600, 1900), w(5600, 1900, 5600, 4000), w(5600, 4000, 3700, 4000), w(3700, 4000, 0, 4000), w(0, 4000, 0, 0), w(3700, 0, 3700, 1900), w(3700, 1900, 3700, 4000), w(3700, 1900, 5600, 1900)],
+    openings: [door(3700, 3000), door(5150, 1900, 800), door(5600, 3000), win(1800, 0, 1500), win(4650, 0, 900)],
+    rooms: [
+      { at: { x: 1800, y: 2000 }, name: 'Bedroom', type: 'bedroom' },
+      { at: { x: 4650, y: 950 }, name: 'Service Room', type: 'bedroom' },
+      { at: { x: 4650, y: 3000 }, name: 'Lobby', type: 'corridor' },
+    ],
+  });
+  const service = roomNamed(level, 'Service Room');
+  const res = applyPackage(level, ESSENTIALS_3BHK);
+  const items = itemsIn(res.items, service.id);
+  const ids = items.map((i) => i.catalogId);
+
+  it('takes no bedroom role and becomes a work space; the other bedroom is the master', () => {
+    expect(bedroomRoles(level)[service.id]).toBeUndefined();
+    expect(res.rooms[service.id]).toMatchObject({ type: 'study' });
+    expect(res.rooms[service.id]?.role).toBeUndefined();
+    expect(res.rooms[roomNamed(level, 'Bedroom').id]?.role).toBe('master');
+    expect(res.report.lines.some((l) => l.roomId === service.id)).toBe(false);
+  });
+
+  it('gets a work-from-home desk: desk, office chair, laptop and overhead cupboards above the desk', () => {
+    const desk = items.find((i) => i.catalogId.startsWith('desk'));
+    expect(desk).toBeDefined();
+    expect(ids).toContain('chair.office');
+    expect(ids).toContain('laptop');
+    const cupboard = items.find((i) => i.catalogId.startsWith('storage.overhead.'));
+    expect(cupboard).toBeDefined();
+    // Over the desk, on the same wall, above its top.
+    expect(cupboard!.rotationDeg).toBe(desk!.rotationDeg);
+    expect(vec.dist(cupboard!, desk!)).toBeLessThan(getEntry(desk!.catalogId)!.dims.d);
+    expect(cupboard!.z).toBeGreaterThanOrEqual(getEntry(desk!.catalogId)!.dims.h + 600);
+    expect(items.find((i) => i.catalogId === 'laptop')!.z).toBe(getEntry(desk!.catalogId)!.dims.h);
+  });
+
+  it('keeps every placement rule', () => {
+    const roomed = structuredClone(level);
+    roomed.rooms[service.id]!.type = 'study';
+    checkRules(roomed, service.id, items);
+  });
+});
+
 describe('a foyer too small for the shoe rack', () => {
   // A 1.1 x 1.3 m foyer in the corner of the living room, open to it on two sides; the
   // entrance door's swing takes its only solid wall.
