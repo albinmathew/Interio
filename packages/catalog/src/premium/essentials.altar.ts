@@ -36,7 +36,7 @@ const PLUME = 'wood';
  * its surface colour is dimmed and the glow carries it. It stays under the walk
  * view's bloom threshold; the dove and the LED strips are well above it.
  */
-interface Glow {
+export interface Glow {
   tint: THREE.Color;
   intensity: number;
   /** Scales the surface colour. */
@@ -52,7 +52,7 @@ const glowCopies = new WeakMap<THREE.Material, THREE.Material>();
  * source is the catalog's shared material for that finish: never touch it, or
  * every cream item in the home would glow.
  */
-function glowOf(source: THREE.Material, glow: Glow): THREE.Material {
+export function glowOf(source: THREE.Material, glow: Glow): THREE.Material {
   let m = glowCopies.get(source);
   if (!m) {
     // A standard material, not a physical clone: the renderer's lite mode swaps physical
@@ -622,7 +622,7 @@ function pampas(m: Model, vase: G, vaseMat: string, vaseH: number, x: number, y:
  * whole panel costs a few hundred triangles. Centred on x = 0, from y = 0, its
  * back at z = 0 and its front at z = depth.
  */
-function flutes(w: number, h: number, depth: number, slat: number, gap: number): G {
+export function flutes(w: number, h: number, depth: number, slat: number, gap: number): G {
   const n = Math.max(3, Math.round((w + gap) / (slat + gap)));
   const pitch = (w - slat) / (n - 1);
   const r = Math.min(slat / 2 - 1e-4, depth * 0.45, slat * 0.32);

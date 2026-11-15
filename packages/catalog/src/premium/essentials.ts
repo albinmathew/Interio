@@ -10,6 +10,7 @@ import type * as THREE from 'three';
 import { buildBed } from './beds';
 import { ALTAR_GENERATORS } from './essentials.altar';
 import { BLIND_GENERATORS } from './essentials.blinds';
+import { CROCKERY_GENERATORS } from './essentials.crockery';
 import { BEDROOM_GENERATORS } from './essentials.bedroom';
 import { LIVING_GENERATORS } from './essentials.living';
 import { absorb, variant } from './essentials.parts';
@@ -95,4 +96,5 @@ export const ESSENTIALS_GENERATORS: Record<string, (entry: CatalogEntry, ctx?: B
   ...BEDROOM_GENERATORS,
   ...BLIND_GENERATORS,
   ...ALTAR_GENERATORS,
+  ...CROCKERY_GENERATORS,
 };
