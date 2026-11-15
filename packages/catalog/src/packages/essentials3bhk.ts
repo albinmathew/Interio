@@ -6,6 +6,12 @@ import type { FurnishingPackage } from '@interio/core';
 
 /** Stacked curtains of every width (the styling pass hangs these), and the older flat pair. */
 const CURTAINS = [...[1200, 1500, 1800, 2100, 2400, 2700, 3000, 3300, 3600, 3900].map((w) => `curtain.pair.${w}`), 'curtain.pair'];
+/**
+ * A kids' room may be done as twin single beds with a basket unit between them and a study
+ * and storage wall: two singles count as the bed, the unit as both bedside tables, and the
+ * wall (a wardrobe, a writing table and a lit shelf) as the wardrobe, desk and bookshelf.
+ */
+const KIDS_STUDY_WALLS: Record<string, number> = Object.fromEntries(['study.storage.kids.2100', 'study.storage.kids.2400', 'study.storage.kids.2100.r', 'study.storage.kids.2400.r'].map((id) => [id, 1]));
 const BLINDS = ['blind.roman.1800', 'blind.roman.1500', 'blind.roman.2100', 'blind.roman.1200', 'blind.roman.2400', 'blind.roman.900'];
 
 export const ESSENTIALS_3BHK: FurnishingPackage = {
@@ -85,11 +91,11 @@ export const ESSENTIALS_3BHK: FurnishingPackage = {
       title: 'Kids bedroom',
       room: { kind: 'bedroom', role: 'kids' },
       items: [
-        { key: 'bed', label: 'Queen size bed without bottom storage', catalogIds: ['bed.queen'] },
-        { key: 'bedside', label: 'Bed side table', catalogIds: ['nightstand.drawer', 'nightstand', 'nightstand.table'], count: 2 },
-        { key: 'wardrobe', label: 'Soft-close hinged wardrobe with mirror aluminium frame shutter', catalogIds: ['wardrobe.mirror'], note: 'Soft-close' },
-        { key: 'desk', label: 'Custom-made writing table', catalogIds: ['desk.writing', 'desk'] },
-        { key: 'bookshelf', label: 'Bookshelf with open storage', catalogIds: ['bookcase.open', 'bookcase.low', 'bookcase.wide'] },
+        { key: 'bed', label: 'Queen size bed without bottom storage', catalogIds: ['bed.queen'], alsoCounts: { 'bed.single.kids': 1 } },
+        { key: 'bedside', label: 'Bed side table', catalogIds: ['nightstand.drawer', 'nightstand', 'nightstand.table'], count: 2, alsoCounts: { 'nightstand.baskets': 2 } },
+        { key: 'wardrobe', label: 'Soft-close hinged wardrobe with mirror aluminium frame shutter', catalogIds: ['wardrobe.mirror'], note: 'Soft-close', alsoCounts: KIDS_STUDY_WALLS },
+        { key: 'desk', label: 'Custom-made writing table', catalogIds: ['desk.writing', 'desk'], alsoCounts: KIDS_STUDY_WALLS },
+        { key: 'bookshelf', label: 'Bookshelf with open storage', catalogIds: ['bookcase.open', 'bookcase.low', 'bookcase.wide'], alsoCounts: KIDS_STUDY_WALLS },
       ],
       specs: [
         { key: 'mattress', label: 'Mattress', note: 'Peps' },

@@ -94,6 +94,10 @@ export class Placer {
 /* ----------------------------------------------------------------- helpers */
 
 export const countOf = (p: Planner, ids: readonly string[]): number => p.placed.filter((q) => ids.includes(q.entry.id)).length;
+
+/** How much of a line the room has: its own pieces, and the pieces it also counts (`alsoCounts`) by their weight. */
+export const lineCount = (p: Planner, line: PackageItem): number =>
+  p.placed.reduce((n, q) => n + (line.catalogIds.includes(q.entry.id) ? 1 : (line.alsoCounts?.[q.entry.id] ?? 0)), 0);
 const find = (p: Planner, re: RegExp): Placed[] => p.placed.filter((q) => re.test(q.entry.id));
 const centre = (q: Placed): Pt => ({ x: q.pose.x, y: q.pose.y });
 
@@ -216,14 +220,13 @@ export function guaranteeLine(ctx: LineContext): LineOutcome {
 
 function guaranteeHere(ctx: LineContext): LineOutcome {
   const p = ctx.placer.p;
-  const ids = ctx.line.catalogIds;
   const snap = snapshot(p);
   const removed = ctx.removed.length;
   const first = attempt(ctx);
   if (!first.reason || ctx.line.overflow === 'adjacentBalcony') return first;
   const extras = p.placed.filter((q) => !q.existing && OPTIONAL.test(q.entry.id) && !ctx.keep.has(q.entry.id));
   if (extras.length === 0) return first;
-  const got = countOf(p, ids);
+  const got = lineCount(p, ctx.line);
   // Start again from before the attempt, without the optional pieces.
   restore(p, snap);
   ctx.removed.length = removed;
@@ -231,7 +234,7 @@ function guaranteeHere(ctx: LineContext): LineOutcome {
   const bare = snapshot(p);
   ctx.placer.reset();
   const second = attempt(ctx);
-  if (second.reason && countOf(p, ids) <= got) {
+  if (second.reason && lineCount(p, ctx.line) <= got) {
     // No better: put everything back as the first attempt had it.
     restore(p, bare);
     ctx.removed.length = removed;
@@ -254,7 +257,7 @@ function attempt(ctx: LineContext): LineOutcome {
   // A line that only lists pieces an earlier line already asks for (cushions that come with the sofa) follows that line.
   const parent = ctx.earlier.find((l) => line.catalogIds.every((id) => l.catalogIds.includes(id)));
   if (parent) {
-    if (countOf(p, line.catalogIds) >= (line.count ?? 1)) return {};
+    if (lineCount(p, line) >= (line.count ?? 1)) return {};
     return { reason: `Comes with the ${parent.label.toLowerCase()}, which is not in the room` };
   }
   if (id0.startsWith('blind.')) return windows(ctx, 'blind');
@@ -264,7 +267,7 @@ function attempt(ctx: LineContext): LineOutcome {
   const need = line.count ?? 1;
   if (line.overflow === 'adjacentRoom') return nextRoom(ctx, need);
   let reason: string | undefined;
-  while (countOf(p, line.catalogIds) < need) {
+  while (lineCount(p, line) < need) {
     const out = placeOne(ctx);
     if ('reason' in out) {
       reason = out.reason;
@@ -643,7 +646,7 @@ function partition(ctx: LineContext): LineOutcome {
   const placer = ctx.placer;
   const p = placer.p;
   const need = ctx.line.count ?? 1;
-  if (countOf(p, ctx.line.catalogIds) >= need) return {};
+  if (lineCount(p, ctx.line) >= need) return {};
   const entry = E(ctx.line.catalogIds[0]!);
   if (!entry) return { reason: 'Not in the catalog' };
   const done = (q: Placed | null): LineOutcome | null => {

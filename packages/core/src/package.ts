@@ -27,6 +27,12 @@ export interface PackageItem {
   catalogIds: string[];
   /** How many are needed. Default 1. */
   count?: number;
+  /**
+   * Other pieces that meet the line when they are in the room, and how many each counts
+   * for: a bedside unit between twin beds for both bedside tables, a study wall with a
+   * wardrobe for the wardrobe. They are never placed for the line; `catalogIds` are.
+   */
+  alsoCounts?: Record<string, number>;
   /** Finishes to give the placed item, by slot id (e.g. a yellow chair). */
   finishes?: Record<string, string>;
   /** Brand or detail that the model cannot show, e.g. "Faber", "soft-close". */

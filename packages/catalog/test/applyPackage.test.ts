@@ -518,6 +518,29 @@ describe('a foyer too small for the shoe rack', () => {
   });
 });
 
+describe('a kids room done as twin beds and a study wall', () => {
+  it('meets the kids lines with the twin set: the basket unit counts as both bedside tables', () => {
+    const w = (x1: number, y1: number, x2: number, y2: number) => ({ a: { x: x1, y: y1 }, b: { x: x2, y: y2 }, thickness: 150 });
+    const level = buildLevel({
+      walls: [w(0, 0, 3400, 0), w(3400, 0, 3400, 3400), w(3400, 3400, 0, 3400), w(0, 3400, 0, 0)],
+      openings: [door(600, 0)],
+      rooms: [{ at: { x: 1700, y: 1700 }, name: 'Kids', type: 'bedroom' }],
+    });
+    const room = roomNamed(level, 'Kids');
+    room.role = 'kids';
+    const put = (id: string, catalogId: string, x: number, y: number) => {
+      level.items[id] = { id, catalogId, x, y, z: 0, rotationDeg: 0, roomId: room.id } as Item;
+    };
+    put('a', 'bed.single.kids', 630, 2300);
+    put('b', 'bed.single.kids', 2770, 2300);
+    put('c', 'nightstand.baskets', 1700, 3150);
+    put('d', 'study.storage.kids.2400.r', 1900, 400);
+    const lines = checkPackage(level, ESSENTIALS_3BHK).lines.filter((l) => l.roomId === room.id && l.kind === 'item');
+    const status = Object.fromEntries(lines.map((l) => [l.key, `${l.status} ${l.have}/${l.need}`]));
+    expect(status).toEqual({ bed: 'placed 1/1', bedside: 'placed 2/2', wardrobe: 'placed 1/1', desk: 'placed 1/1', bookshelf: 'placed 1/1' });
+  });
+});
+
 describe('sections without a room', () => {
   it('reports a section whose room the plan lacks', () => {
     const level = bedrooms(2);

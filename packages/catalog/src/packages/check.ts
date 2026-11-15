@@ -243,8 +243,10 @@ export function plannerIn(ctx: CheckContext, roomId: Id): Planner | null {
 
 function itemLine(ctx: CheckContext, line: PackageItem, roomId: Id): Pick<PackageLine, 'status' | 'need' | 'have' | 'itemIds' | 'reason'> {
   const level = ctx.level;
-  const ids = new Set(line.catalogIds);
+  const ids = new Set([...line.catalogIds, ...Object.keys(line.alsoCounts ?? {})]);
   const inRoom = (rid: Id) => Object.values(level.items).filter((i) => i.roomId === rid && ids.has(i.catalogId));
+  // A piece the line also counts may stand for more than one (a bedside unit between twin beds).
+  const weight = (i: { catalogId: string }) => line.alsoCounts?.[i.catalogId] ?? 0;
   let found = inRoom(roomId);
   if (line.overflow === 'adjacentBalcony') found = [...found, ...overflowBalconies(level, roomId).flatMap(inRoom)];
   if (line.overflow === 'adjacentRoom') found = [...found, ...overflowRooms(level, roomId).flatMap((r) => inRoom(r.roomId))];
@@ -254,7 +256,11 @@ function itemLine(ctx: CheckContext, line: PackageItem, roomId: Id): Pick<Packag
     need = p ? treatableWindows(p).length : 0;
     if (need === 0) return { status: 'noSpace', need: 0, have: found.length, itemIds: found.map((i) => i.id), reason: noWindowReason() };
   }
-  return { status: statusOf(found.length, need), need, have: found.length, itemIds: found.map((i) => i.id) };
+  // The line's own pieces count as they are; the others only up to what is still needed.
+  const own = found.filter((i) => line.catalogIds.includes(i.catalogId)).length;
+  const also = found.reduce((n, i) => n + (line.catalogIds.includes(i.catalogId) ? 0 : weight(i)), 0);
+  const have = own + Math.min(also, Math.max(0, need - own));
+  return { status: statusOf(have, need), need, have, itemIds: found.map((i) => i.id) };
 }
 
 function surfaceLine(ctx: CheckContext, surface: PackageSurface, room: Room): Pick<PackageLine, 'status' | 'need' | 'have' | 'itemIds'> {
