@@ -16,18 +16,50 @@ const pending = new Map<string, Promise<string | null>>();
 function muralSwatch(id: string): Promise<string | null> {
   const mural = parseMuralFinish(id);
   if (mural?.source.kind !== 'builtin') return Promise.resolve(null);
+  const { dado } = mural;
   const art = mural.source.art;
   return new Promise((resolve) => {
     // Painting takes a few milliseconds: let the panel draw first.
     setTimeout(() => {
       try {
-        const url = muralThumbnail(art, SIZE * 2, SIZE);
-        ready.set(id, url);
-        resolve(url);
+        // Painted at the shape it is shown at (the area above the panelling, or the whole square), at twice the size for sharp screens.
+        const painted = dado ? muralThumbnail(art, SIZE * 2, Math.round(SIZE * 1.2)) : muralThumbnail(art, SIZE * 2, SIZE * 2);
+        const url = dado ? withPanelling(painted) : Promise.resolve(painted);
+        void url.then((u) => {
+          ready.set(id, u);
+          resolve(u);
+        });
       } catch {
         resolve(null);
       }
     }, 0);
+  });
+}
+
+/** The mural swatch with cream beadboard across its lower part, as on the wall. */
+function withPanelling(painted: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      const ctx = canvas.getContext('2d')!;
+      // The painting above, the panelling below.
+      const top = Math.round(SIZE * 0.6);
+      ctx.drawImage(img, 0, 0, SIZE, top);
+      ctx.fillStyle = '#efe6d4';
+      ctx.fillRect(0, top, SIZE, SIZE - top);
+      ctx.fillStyle = '#d6c9b0';
+      for (let x = 4; x < SIZE; x += 8) ctx.fillRect(x, top, 1, SIZE - top);
+      ctx.fillStyle = '#f7f1e6';
+      ctx.fillRect(0, top, SIZE, 3);
+      ctx.fillStyle = '#cbbda2';
+      ctx.fillRect(0, top + 3, SIZE, 1);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => resolve(painted);
+    img.src = painted;
   });
 }
 

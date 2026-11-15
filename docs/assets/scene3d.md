@@ -104,7 +104,10 @@ The furniture sets reuse other materials' sets where that holds up: white quartz
 
 Paint finishes (`wall.paint.*`) and `ceiling.white` are flat colours and use no texture, as are
 custom wall and ceiling colours. `floor.oak.smoked` and `floor.oak.grey` tint the oak planks;
-`wall.tile.zellige` uses `tile-small` at 10 cm tiles; `wall.panel.wainscot` is drawn in code.
+`wall.tile.zellige` uses `tile-small` at 10 cm tiles; `wall.panel.wainscot` and `wall.panel.beadboard` are drawn in code.
+The murals (`wall.mural.meadow`, `wall.mural.meadow.dado`) are original art painted in code at runtime
+(`packages/scene3d/src/muralArt.ts`): no image file, nothing to license. A user's own mural picture is
+their file, stored with their project in the browser.
 Furniture lacquers, glass, polished chrome, white enamel and glazed ceramic are deliberately flat.
 A finish whose texture cannot be loaded falls back to its flat colour from core's `MATERIALS`.
 

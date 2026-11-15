@@ -141,6 +141,8 @@ Every room has a floor finish, a wall finish and a ceiling colour. The 3D view a
 - **Furniture.** Select an item and scroll to **Finishes** in its panel. Each part you can change (frame, upholstery, top, bedding) has a row of swatches of the materials that suit it; **More** opens every other material, the pipette picks any colour, and **Default** puts the part back. Every pick is one undo step.
 - **Apply to all.** **Apply to all ... in this home** gives every item of the same kind these finishes, in one undo step.
 - **One wall.** Click a wall, open the room's **Finishes** tab and press **Finish this wall only**, or `Alt`-click the wall to go straight there. Pick a finish or a colour for that face of the wall; **Use the room's finish** hands it back to the room. Outside faces of the home work the same way.
+- **Murals.** The wall panel has a **Murals** section: **Spring meadow mural** paints one picture across the whole face, and **Meadow mural over beadboard** puts cream beadboard panelling with a cap rail up to 1.1 m and the mural above it. The picture is spread over that one face, not repeated, and doors and windows cut through it. **Cream beadboard** in **Panelling and paper** panels a whole wall.
+- **Your own image as a mural.** On the same panel press **Use my image as a mural** and choose a picture (JPEG, PNG or WebP). It covers the face, cropped to fit rather than stretched. Tick **Beadboard panelling below** first for panelling under it; the tick also switches the panelling on or off for a mural the wall already shows. The picture stays on your computer: it is saved with the project in this browser and travels in an exported project file. Nothing is uploaded.
 - Older catalog models that have no parts to change show no Finishes section.
 
 ## Lighting and pictures
@@ -211,7 +213,7 @@ The **Photo** button (an aperture, next to the picture button) turns on photo mo
 ## Save, export and share
 
 - **Saving.** Projects are saved automatically in this browser. The header shows **Saved** once a change is stored. Clearing the browser's site data removes them.
-- **Export.** In a project, press **Export project file** in the header. You get one `.interio` file holding the plan, the furniture, the drawing underneath it and the source PDF.
+- **Export.** In a project, press **Export project file** in the header. You get one `.interio` file holding the plan, the furniture, the drawing underneath it, the source PDF and the pictures you used as murals.
 - **Open on another computer.** On the dashboard press **Open file**, or drop the `.interio` file on the page. The project opens as a copy with everything intact. Plain `.json` project files from earlier versions still open.
 - **Rename, duplicate, delete.** Hover a project card on the dashboard and use the buttons at its top right. The card also shows the number of rooms, the floor area and how many items the home holds.
 - **Undo.** `Cmd/Ctrl+Z` works in every mode, and the header has undo and redo buttons.
