@@ -6,7 +6,6 @@
 import type { CatalogEntry } from '@interio/core';
 import * as THREE from 'three';
 import { Fit, panel, type G } from './decor.parts';
-import { archShape } from './essentials.bedroom';
 import { Model, cyl, lathe, param, rbox, roundedRect, slab, type BuildContext } from './kit';
 import { beam, rod, softBox, taperRod } from './seating.parts';
 

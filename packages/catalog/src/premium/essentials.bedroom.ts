@@ -202,7 +202,7 @@ function upright(shape: THREE.Shape, depth: number, bevel = 0): G {
 }
 
 /** An arch in the XY plane: `w` wide, `h` tall from y = `y0`, a semicircular top. */
-export function archShape(w: number, h: number, y0 = 0): THREE.Shape {
+function archShape(w: number, h: number, y0 = 0): THREE.Shape {
   const r = w / 2;
   const s = new THREE.Shape();
   s.moveTo(-r, y0);
@@ -274,7 +274,7 @@ export function buildWritingDesk(entry: CatalogEntry, ctx?: BuildContext): THREE
  * Params: `ledges` (default 3), `cabinet` (its height in mm, default 47% of the height).
  */
 export function buildShoeRackLedges(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3D {
-  const { w, h } = entry.dims;
+  const { h } = entry.dims;
   const cabH = Math.round(param(entry, 'cabinet', h * 0.474));
   const cabinet = buildCase(
     variant(entry, { rows: [{ h: 1, cols: 2, kind: 'flap' }, { h: 1, cols: 2, kind: 'flap' }], legs: Math.round(cabH * 0.11), handle: 'ledge', style: 'fluted', fronts: 'inset' }, { h: cabH }),
