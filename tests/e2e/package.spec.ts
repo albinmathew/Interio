@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { designReady, openSample, toastMessage } from './helpers';
+import { designReady, openSample } from './helpers';
 
 /**
  * The furnishing package in Design mode: "Furnish home" furnishes the sample home to the
@@ -35,17 +35,20 @@ const roomNamed = async (page: Page, name: string) => Object.values((await level
 const undoSteps = (page: Page) => page.evaluate(() => (window as unknown as DevWindow).__interio.store.getState().past.length);
 const line = (page: Page, key: string, roomId?: string) => page.locator(`[data-testid="package-line"][data-key="${key}"]${roomId ? `[data-room="${roomId}"]` : ''}`);
 
+/** The furnishing toast (the first layout's "saved" toast may follow it). */
+const furnishToast = (page: Page) => page.getByTestId('toast').filter({ hasText: /Furnished with Essentials, 3 BHK: \d+ of \d+ items placed/ });
+
 async function furnishSample(page: Page): Promise<void> {
   await openSample(page);
   await designReady(page);
   await page.getByTestId('furnish-home').click();
-  await expect(toastMessage(page)).toContainText(/Furnished with Essentials, 3 BHK: \d+ of \d+ items placed/);
+  await expect(furnishToast(page)).toBeVisible();
 }
 
 test.describe('furnishing package', () => {
   test('Furnish home furnishes to the package and the panel ticks every placed line', async ({ page }) => {
     await furnishSample(page);
-    const [, placed, needed] = (await toastMessage(page).textContent())!.match(/(\d+) of (\d+) items placed/)!.map(Number);
+    const [, placed, needed] = (await furnishToast(page).textContent())!.match(/(\d+) of (\d+) items placed/)!.map(Number);
     expect(placed).toBeGreaterThan(needed! * 0.8);
     // One undo step for the whole home, roles and finishes included.
     expect(await undoSteps(page)).toBe(1);
@@ -106,7 +109,7 @@ test.describe('furnishing package', () => {
     expect((await roomNamed(page, 'Bedroom 2')).role).toBe('guest');
     const steps = await undoSteps(page);
     await page.getByTestId('room-refurnish').click();
-    await expect(toastMessage(page)).toContainText('Refurnished Bedroom 2 as the guest bedroom');
+    await expect(page.getByTestId('toast').filter({ hasText: 'Refurnished Bedroom 2 as the guest bedroom' })).toBeVisible();
     const after = (await items(page)).filter((i) => i.roomId === kids.id).map((i) => i.catalogId);
     expect(after).toContain('bed.queen.storage');
     expect(after).not.toContain('bed.queen');
@@ -122,7 +125,7 @@ test.describe('furnishing package', () => {
     await furnishSample(page);
     await page.getByTestId('open-package').click();
     await page.getByTestId('package-copy').click();
-    await expect(toastMessage(page)).toHaveText('Checklist copied');
+    await expect(page.getByTestId('toast').filter({ hasText: 'Checklist copied' })).toBeVisible();
     const text = await page.evaluate(() => navigator.clipboard.readText());
     expect(text).toMatch(/^Essentials, 3 BHK: \d+ of \d+ items placed/);
     expect(text).toContain('Master bedroom (Bedroom 1)');
@@ -138,7 +141,7 @@ test.describe('furnishing package', () => {
     await page.getByTestId('package-select').selectOption('none');
     await expect(page.getByTestId('package-count')).toHaveCount(0);
     await page.getByTestId('furnish-home').click();
-    await expect(toastMessage(page)).toContainText(/^Added \d+ items to \d+ rooms/);
+    await expect(page.getByTestId('toast').filter({ hasText: /^Added \d+ items to \d+ rooms/ })).toBeVisible();
     expect((await items(page)).some((i) => i.catalogId === 'prayer.unit')).toBe(false);
   });
 });
