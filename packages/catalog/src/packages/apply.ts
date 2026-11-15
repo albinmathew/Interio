@@ -28,7 +28,7 @@ import { RoomSeed } from '../autofurnish/seed';
 import { applyScheme } from '../autofurnish/styling';
 import { homeScheme } from '../autofurnish/schemes';
 import { slotOf, type Prefer } from '../autofurnish/templates';
-import { buildCheck, overflowBalconies, overflowRooms, lineKey, matchSections, roomFaces, faceFinish, type PackageCheck, type PackageSection, type RoomFace } from './check';
+import { buildCheck, isWindowLine, overflowBalconies, overflowRooms, lineKey, matchSections, roomFaces, faceFinish, type PackageCheck, type PackageSection, type RoomFace } from './check';
 import { Placer, guaranteeLine, runBehind, type LineContext } from './place';
 import { bedroomRoles, missingBedroomRoles, tinyBedrooms } from './roles';
 
@@ -174,7 +174,10 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
       const own = sectionsOf(sections, roomId);
       const keep = new Set(own.flatMap((x) => x.items.flatMap((l) => l.catalogIds)));
       const prefer = preferencesFor(own);
-      section.items.forEach((line, i) => {
+      // Curtains and blinds go up first: the wall beside the glazing is theirs, and the other
+      // lines are laid out around them.
+      const order = section.items.map((line, i) => ({ line, i })).sort((a, b) => Number(isWindowLine(b.line)) - Number(isWindowLine(a.line)));
+      order.forEach(({ line, i }) => {
         if (!wanted(roomId, line.key)) return;
         const ctx: LineContext = {
           placer: w.placer,
