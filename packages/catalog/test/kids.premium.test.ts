@@ -51,10 +51,18 @@ describe('kids bedroom set', () => {
     expect(KIDS_ENTRIES.find((e) => e.id === 'toy.teddy')!.category).toBe('decor');
   });
 
-  it.each(KIDS_ENTRIES.map((e) => [e.id, e] as const))('%s stays within 8 meshes and 30k triangles', (_id, entry) => {
-    const s = stats(buildParametric(entry));
+  it.each(KIDS_ENTRIES.map((e) => [e.id, e] as const))('%s stays within 8 meshes and 30k triangles, with no degenerate normals', (_id, entry) => {
+    const object = buildParametric(entry);
+    const s = stats(object);
     expect(s.meshes).toBeLessThanOrEqual(8);
     expect(s.triangles).toBeLessThanOrEqual(30_000);
+    // A zero-length normal shades as NaN, which the walk view's bloom spreads over the screen.
+    for (const mesh of meshesOf(object)) {
+      const n = mesh.geometry.getAttribute('normal');
+      let zero = 0;
+      for (let i = 0; i < n.count; i++) if (n.getX(i) ** 2 + n.getY(i) ** 2 + n.getZ(i) ** 2 < 0.25) zero++;
+      expect(zero, `${entry.id} ${mesh.name}`).toBe(0);
+    }
   });
 
   it.each(KIDS_ENTRIES.map((e) => [e.id, e] as const))('%s fits narrower, wider, shallower and taller boxes', (_id, entry) => {

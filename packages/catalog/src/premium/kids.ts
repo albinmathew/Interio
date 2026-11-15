@@ -88,17 +88,34 @@ export function quiltedDuvet(w: number, z0: number, z1: number, top: number, hem
   // Pull the stitches in, whichever way the grid's winding made the normals face.
   const centre = Math.round(nv / 2) * (nu + 1) + Math.round(nu / 2);
   const outward = n.getY(centre) >= 0 ? 1 : -1;
+  const shoulder = top - roll;
   for (let j = 0; j <= nv; j++) {
     for (let i = 0; i <= nu; i++) {
       const k = j * (nu + 1) + i;
       const fu = Math.sin((Math.PI * (i % per)) / per) ** 0.6;
       const fv = Math.sin((Math.PI * (j % per)) / per) ** 0.6;
       // The hem and the head edge keep their line: no stitch pulls them.
-      const d = j === 0 || j === nv || i === 0 || i === nu ? 0 : outward * depth * (1 - fu * fv);
+      const stitch = j === 0 || j === nv || i === 0 || i === nu ? 0 : depth * (1 - fu * fv);
+      // Soft folds in the drop, growing towards the hem; always inwards, so the cover keeps its size.
+      const fall = Math.min(1, Math.max(0, (shoulder - p.getY(k)) / Math.max(0.01, shoulder - hem)));
+      const fold = 0.007 * fall ** 1.3 * (1 - Math.cos(((p.getX(k) + p.getZ(k)) * 2 * Math.PI) / 0.31 + 0.8));
+      const d = outward * (stitch + fold);
       p.setXYZ(k, p.getX(k) - n.getX(k) * d, p.getY(k) - n.getY(k) * d, p.getZ(k) - n.getZ(k) * d);
     }
   }
   g.computeVertexNormals();
+  // Where the side and the foot both hang, the corner folds flat into the hem: its
+  // triangles have no area and its normals no length, which shade as NaN (and bloom
+  // white). Those vertices take the normal of the cloth just above them.
+  for (let i = 0; i <= nu; i++) {
+    for (let j = 1; j <= nv; j++) {
+      const k = j * (nu + 1) + i;
+      if (n.getX(k) ** 2 + n.getY(k) ** 2 + n.getZ(k) ** 2 > 1e-8) continue;
+      const a = k - (nu + 1);
+      n.setXYZ(k, n.getX(a), n.getY(a), n.getZ(a));
+    }
+  }
+  for (let k = 0; k < n.count; k++) if (n.getX(k) ** 2 + n.getY(k) ** 2 + n.getZ(k) ** 2 < 1e-8) n.setXYZ(k, 0, outward, 0);
   return twoSided(g);
 }
 
@@ -206,7 +223,7 @@ function limb(a: [number, number, number], b: [number, number, number], r: numbe
 export function buildTeddy(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3D {
   const m = new Model(entry, ctx);
   const f = new Fit();
-  // Body, pear-shaped and leaning back a little; a paler tummy.
+  // Body, pear-shaped and leaning back a little.
   const body = ell(0.074, 0.088, 0.066, 0, 0, 0, 26, 18);
   const bp = body.getAttribute('position') as THREE.BufferAttribute;
   for (let i = 0; i < bp.count; i++) {
@@ -215,7 +232,6 @@ export function buildTeddy(entry: CatalogEntry, ctx?: BuildContext): THREE.Objec
   }
   body.computeVertexNormals();
   f.part(FUR, turn(body.translate(0, 0.09, -0.012), -0.14, 0, 0, 0, 0.05, -0.012));
-  f.fixed(MUZZLE, turn(ell(0.028, 0.032, 0.012, 0, 0.074, 0.05), -0.14, 0, 0, 0, 0.05, -0.012));
   // Head and muzzle.
   f.part(FUR, ell(0.068, 0.062, 0.06, 0, 0.212, 0.002, 26, 18));
   f.fixed(MUZZLE, ell(0.032, 0.025, 0.027, 0, 0.196, 0.05));
