@@ -7,6 +7,7 @@ import { APPLIANCES_GENERATORS } from './appliances';
 import { BATHROOM_GENERATORS } from './bathroom';
 import { BED_GENERATORS } from './beds';
 import { DECOR_GENERATORS } from './decor';
+import { ESSENTIALS_GENERATORS } from './essentials';
 import { KITCHEN_GENERATORS } from './kitchen';
 import { LIGHTING_GENERATORS } from './lighting';
 import { OFFICE_GENERATORS } from './office';
@@ -28,6 +29,7 @@ const FAMILIES = {
   office: OFFICE_GENERATORS,
   outdoor: OUTDOOR_GENERATORS,
   accessories: ACCESSORY_GENERATORS,
+  essentials: ESSENTIALS_GENERATORS,
 };
 
 /** Every premium generator by name. Two families may never use the same name: one would silently replace the other. */

@@ -8,6 +8,7 @@ export * from './store';
 export * from './sample';
 export * from './validate';
 export * from './design';
+export * from './package';
 export * as vec from './geometry/vec';
 export * from './geometry/frames';
 export { deriveFaces, insetPolygon, type Face } from './geometry/faces';

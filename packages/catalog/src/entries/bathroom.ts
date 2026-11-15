@@ -26,7 +26,7 @@ export const BATHROOM_ENTRIES: CatalogEntry[] = [
     slots: WALL_TOILET_SLOTS,
     params: { mount: 'wall' },
   }),
-  gen('basin.vanity', 'Basin with vanity', 'bathroom', ['bathroom'], 'bathVanity', [800, 520, BASIN_H], ['washbasin', 'sink', 'vanity unit', 'wash basin'], {
+  gen('basin.vanity', 'Basin with vanity', 'bathroom', ['bathroom', 'dining'], 'bathVanity', [800, 520, BASIN_H], ['washbasin', 'sink', 'vanity unit', 'wash basin'], {
     slots: VANITY_SLOTS,
   }),
   gen('basin.vanity.double', 'Double vanity', 'bathroom', ['bathroom'], 'bathVanity', [1200, 520, BASIN_H], ['washbasin', 'sink', 'vanity unit', 'wash basin', 'double'], {

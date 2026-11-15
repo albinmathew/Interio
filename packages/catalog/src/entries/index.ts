@@ -15,6 +15,7 @@ import { DECOR_ENTRIES } from './decor';
 import { OFFICE_ENTRIES } from './office';
 import { OUTDOOR_ENTRIES } from './outdoor';
 import { ACCESSORY_ENTRIES } from './accessories';
+import { ESSENTIALS_ENTRIES } from './essentials';
 
 export const ENTRIES: CatalogEntry[] = [
   ...SEATING_ENTRIES,
@@ -29,4 +30,5 @@ export const ENTRIES: CatalogEntry[] = [
   ...OFFICE_ENTRIES,
   ...OUTDOOR_ENTRIES,
   ...ACCESSORY_ENTRIES,
+  ...ESSENTIALS_ENTRIES,
 ];

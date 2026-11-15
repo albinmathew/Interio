@@ -17,3 +17,4 @@ export { furnitureMaterial, setFurnitureTextureResolver, type BuildContext, type
 export { fitToDims } from './fit';
 export { autoFurnish, styleRoom, type AutoFurnishOptions, type StyleRoomOptions, type StylingLevel } from './autofurnish';
 export { placeEntry, type PlaceEntryOptions } from './autofurnish/placeEntry';
+export { DEFAULT_PACKAGE_ID, ESSENTIALS_3BHK, PACKAGES, getPackage } from './packages';

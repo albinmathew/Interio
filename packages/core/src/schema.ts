@@ -102,8 +102,15 @@ export const RoomSchema = z.object({
   floorMaterial: z.string().default('floor.oak'),
   wallMaterial: z.string().optional(),
   ceilingMaterial: z.string().optional(),
+  /**
+   * Who a bedroom is for. Furnishing packages furnish a master bedroom, a kids' bedroom and
+   * a guest bedroom differently. Unset bedrooms get a role from their size when furnished.
+   */
+  role: z.enum(['master', 'kids', 'guest']).optional(),
 });
 export type Room = z.infer<typeof RoomSchema>;
+export const BEDROOM_ROLES = ['master', 'kids', 'guest'] as const;
+export type BedroomRole = (typeof BEDROOM_ROLES)[number];
 
 export const ItemSchema = z.object({
   id: z.string(),
