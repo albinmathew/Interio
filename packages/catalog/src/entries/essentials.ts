@@ -15,6 +15,7 @@ import {
   ESS_BLIND_SLOTS,
   ESS_CLOCK_SLOTS,
   ESS_COFFEE_SLOTS,
+  ESS_CROCKERY_SLOTS,
   ESS_DRESSING_SLOTS,
   ESS_PARTITION_SLOTS,
   ESS_PRAYER_SLOTS,
@@ -49,6 +50,9 @@ export const ESSENTIALS_ENTRIES: CatalogEntry[] = [
   gen('partition.slatted', 'Living-dining partition', 'decor', ['living', 'dining'], 'essentialsPartition', [1200, 60, 2400], ['partition', 'divider', 'screen', 'slatted', 'room divider', 'jaali'], { slots: ESS_PARTITION_SLOTS }),
 
   /* dining */
+  gen('crockery.unit', 'Crockery unit', 'storage', ['dining', 'living', 'kitchen'], 'essentialsCrockery', [1500, 450, 2100], ['crockery', 'crockery unit', 'display', 'display cabinet', 'cabinet', 'dining', 'glass', 'bar', 'cutlery', 'buffet'], { slots: ESS_CROCKERY_SLOTS }),
+  // The same unit for a shorter wall: two glass doors, no open niches.
+  gen('crockery.unit.compact', 'Crockery unit, compact', 'storage', ['dining', 'living', 'kitchen'], 'essentialsCrockery', [1000, 450, 2100], ['crockery', 'crockery unit', 'display', 'display cabinet', 'cabinet', 'dining', 'glass', 'bar', 'cutlery', 'compact', 'small'], { slots: ESS_CROCKERY_SLOTS }),
   gen('bench.dining', 'Three-seater dining bench', 'seating', ['dining', 'living'], 'essentialsBench', [1500, 400, 460], ['bench', 'dining bench', 'three seater', 'upholstered'], { slots: CHAIR_UPHOLSTERED_SLOTS }),
 
   /* bedrooms */
