@@ -36,6 +36,8 @@ export interface LayoutOptions {
   prefer?: Prefer;
   /** False when the windows get blinds instead of curtains (a package's blinds line hangs curtains on sliding doors). */
   curtained?: boolean;
+  /** Plan the package's prayer unit and crockery unit with the dining set (see the living template). */
+  jointDining?: boolean;
 }
 
 /**
@@ -46,7 +48,7 @@ export interface LayoutOptions {
 export function layoutRoom(planner: Planner, seed: RoomSeed, opts: LayoutOptions): void {
   const curtained = opts.curtained ?? true;
   const reserved = opts.styling === 'none' ? [] : reserveCurtains(planner, opts.mounted, { windows: curtained, doors: planner.room.type === 'bedroom' });
-  TEMPLATES[planner.room.type](planner, { mounted: opts.mounted, styled: opts.styling !== 'none', seed, prefer: opts.prefer });
+  TEMPLATES[planner.room.type](planner, { mounted: opts.mounted, styled: opts.styling !== 'none', seed, prefer: opts.prefer, jointDining: opts.jointDining });
   releaseCurtains(planner, reserved);
 }
 

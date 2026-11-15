@@ -414,6 +414,35 @@ describe('a bedroom whose only glazing is a sliding door near a corner', () => {
   });
 });
 
+describe('the crockery unit', () => {
+  // A 4.2 x 4.6 m dining room with a door and a window.
+  const w = (x1: number, y1: number, x2: number, y2: number) => ({ a: { x: x1, y: y1 }, b: { x: x2, y: y2 }, thickness: 150 });
+  const level = buildLevel({
+    walls: [w(0, 0, 4200, 0), w(4200, 0, 4200, 4600), w(4200, 4600, 0, 4600), w(0, 4600, 0, 0)],
+    openings: [door(600, 0), win(2100, 4600, 1500)],
+    rooms: [{ at: { x: 2100, y: 2300 }, name: 'Dining', type: 'dining' }],
+  });
+  const dining = roomNamed(level, 'Dining');
+  const res = applyPackage(level, ESSENTIALS_3BHK);
+  const items = itemsIn(res.items, dining.id);
+
+  it('stands behind the dining table, against a wall along its long side, in place of a sideboard', () => {
+    const table = items.find((i) => i.catalogId.startsWith('table.dining'))!;
+    const unit = items.find((i) => i.catalogId.startsWith('crockery.'));
+    expect(unit).toBeDefined();
+    expect(Math.hypot(unit!.x - table.x, unit!.y - table.y)).toBeLessThan(3000);
+    // Parallel to the table: the same facing, or the opposite one.
+    expect(((unit!.rotationDeg - table.rotationDeg) % 180 + 180) % 180).toBe(0);
+    expect(items.some((i) => i.catalogId === 'sideboard')).toBe(false);
+    expect(res.report.lines.find((l) => l.key === 'crockery' && l.roomId === dining.id)?.status).toBe('placed');
+  });
+
+  it('keeps every placement rule and every doorway reachable', () => {
+    expectRules(level, res);
+    expect(new Set(walkability(level, dining.id, items).groups).size).toBe(1);
+  });
+});
+
 describe('a bedroom too small to be one (a service room)', () => {
   // A 3.7 x 4 m bedroom and a 1.9 x 1.9 m "bedroom" off a lobby with the entrance; its door is by a corner, as in the TPC plans.
   const w = (x1: number, y1: number, x2: number, y2: number) => ({ a: { x: x1, y: y1 }, b: { x: x2, y: y2 }, thickness: 150 });

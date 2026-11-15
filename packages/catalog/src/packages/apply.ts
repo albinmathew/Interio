@@ -45,6 +45,8 @@ export interface ApplyPackageOptions {
   mounted?: boolean;
   /** Styling of rooms furnished from empty. Default `full`. */
   styling?: StylingLevel;
+  /** Rooms laid out with the joint dining plan (see `TemplateOptions.jointDining`). Internal: set by the retry. */
+  jointDining?: Id[];
 }
 
 export type RoomPatch = Partial<Pick<Room, 'type' | 'role' | 'wallMaterial' | 'floorMaterial' | 'ceilingMaterial'>>;
@@ -92,6 +94,25 @@ const hasBlinds = (sections: RoomPackage[]) => sections.some((s) => s.items.some
  * never mutates the level. Deterministic for a plan.
  */
 export function applyPackage(level: Level, pkg: FurnishingPackage, options: ApplyPackageOptions = {}): ApplyPackageResult {
+  const first = applyOnce(level, pkg, options);
+  if (options.lines || options.jointDining) return first;
+  // A living room with a dining area that ends without its crockery unit, and asks for a
+  // prayer unit too, is laid out again with both planned round the dining set; the second
+  // result is kept only when it places more.
+  const joint = [
+    ...new Set(
+      first.report.lines
+        .filter((l) => l.key === 'crockery' && l.status !== 'placed' && l.roomId && level.rooms[l.roomId]?.type === 'living')
+        .filter((l) => first.report.lines.some((m) => m.key === 'prayer' && m.roomId === l.roomId))
+        .map((l) => l.roomId!),
+    ),
+  ];
+  if (joint.length === 0) return first;
+  const second = applyOnce(level, pkg, { ...options, jointDining: joint });
+  return second.report.placed > first.report.placed ? second : first;
+}
+
+function applyOnce(level: Level, pkg: FurnishingPackage, options: ApplyPackageOptions): ApplyPackageResult {
   const mounted = options.mounted ?? true;
   const styling = options.styling ?? 'full';
   const rooms: Record<Id, RoomPatch> = {};
@@ -144,7 +165,7 @@ export function applyPackage(level: Level, pkg: FurnishingPackage, options: Appl
       if (!w) continue;
       const own = sectionsOf(early, room.id);
       w.fresh = true;
-      w.layout = { mounted, styling, prefer: preferencesFor(own), curtained: !hasBlinds(own) };
+      w.layout = { mounted, styling, prefer: preferencesFor(own), curtained: !hasBlinds(own), jointDining: options.jointDining?.includes(room.id) };
       layoutRoom(w.planner, w.seed, w.layout);
       w.placer.reset();
     }

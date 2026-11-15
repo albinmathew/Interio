@@ -30,7 +30,8 @@ export type PreferSlot =
   | 'bench'
   | 'shoe'
   | 'mirror'
-  | 'crockery';
+  | 'crockery'
+  | 'prayer';
 export type Prefer = Partial<Record<PreferSlot, string>>;
 
 /** The role a catalog id plays in a room, for package preferences. */
@@ -51,6 +52,7 @@ export function slotOf(catalogId: string): PreferSlot | null {
     [/^shoe\./, 'shoe'],
     [/^mirror\./, 'mirror'],
     [/^crockery\./, 'crockery'],
+    [/^prayer\./, 'prayer'],
   ];
   return rules.find(([re]) => re.test(catalogId))?.[1] ?? null;
 }
@@ -69,6 +71,13 @@ export interface TemplateOptions {
   seed?: RoomSeed;
   /** A furnishing package's pieces, tried before the template's own. */
   prefer?: Prefer;
+  /**
+   * In a living room with a dining area, plan the package's prayer unit and crockery unit
+   * with the dining set: the prayer unit first, then the set, then the crockery unit behind
+   * the table, moving the set a little when that makes room. A second try, for rooms where
+   * the package's lines one by one leave the crockery unit out.
+   */
+  jointDining?: boolean;
 }
 
 const E = (id: string): CatalogEntry | undefined => getEntry(id);
@@ -170,6 +179,32 @@ function placeWalkable(p: Planner, entry: CatalogEntry, pose: Pose, opts: { clea
   const placed = p.place(entry, pose, opts);
   if (doorsStillConnected(p, before)) return placed;
   p.remove(placed);
+  return null;
+}
+
+/**
+ * A package's prayer unit before the dining set: on a solid wall away from the seating, off
+ * the windows and the walls with glazing, with room to stand in front of it; the narrower
+ * one when the wide one does not fit.
+ */
+function prayerWall(p: Planner, id: string, away: Pt | null): Placed | null {
+  const before = walkState(p);
+  for (const one of first(id, ['prayer.unit.christian', 'prayer.unit.christian.compact'])) {
+    const entry = E(one);
+    if (!entry) continue;
+    const best = p.bestWall(
+      entry,
+      (c) =>
+        (away ? Math.min(vec.dist(c.pose, away), 4000) * 0.3 : 0) +
+        Math.min(c.doorDist, 2500) * 0.3 -
+        c.cornerDist * 0.2 -
+        (c.underWindow ? 3000 : 0) -
+        (c.run.openings.some((o) => o.kind === 'sliding' || o.kind === 'window') ? 1500 : 0),
+      { clear: 550 },
+    );
+    const placed = best ? placeWalkable(p, entry, best.pose, { clear: 550 }, before) : null;
+    if (placed) return placed;
+  }
   return null;
 }
 
@@ -507,7 +542,17 @@ function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
   const layDining = (away: Pt | null) => diningSet(p, opts, sizes, (c) => (away ? Math.min(vec.dist(c, away), 6000) : -vec.dist(c, p.centroid)) + Math.min(p.wallDistance(c), 1500) * 0.3);
   // A package's crockery unit goes up first, so the dining set is laid out in front of it;
   // it is left out when it would cost the package's table.
-  const diningNear = layDining;
+  // The joint plan: the prayer unit, the set, then the crockery unit behind the table (sliding
+  // the set when that makes room); the set alone when that does not give the package's table.
+  const diningNear = (away: Pt | null): Placed | null => {
+    if (!opts.jointDining || !prefer.crockery || p.has('crockery.')) return layDining(away);
+    const mark = p.mark();
+    if (prefer.prayer && !p.has('prayer.')) prayerWall(p, prefer.prayer, away);
+    const table = layDining(away);
+    if (table && (!prefer.diningTable || table.entry.id === prefer.diningTable) && crockeryBehind(p, prefer.crockery, table, undefined, undefined, true)) return table;
+    p.rollback(mark);
+    return layDining(away);
+  };
   const start = p.mark();
   const seatCentre = seating(0);
   if (packageDining) {

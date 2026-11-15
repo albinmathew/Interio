@@ -471,7 +471,8 @@ function dining(s: Stylist, table = s.find(/^table\.dining/)[0]): void {
   if (!table) return;
   s.pendants(table);
   let board = s.find(/^sideboard/)[0];
-  if (!board && s.full && s.p.area >= (s.type === 'dining' ? 9 : 24)) {
+  // A crockery unit does the sideboard's job.
+  if (!board && s.find(/^crockery\./).length === 0 && s.full && s.p.area >= (s.type === 'dining' ? 9 : 24)) {
     const entry = E('sideboard');
     board =
       s.addBest(entry, (c) => -c.centreOffset * 0.3 - (c.underWindow ? 400 : 0) - vec.dist({ x: c.pose.x, y: c.pose.y }, table.pose) * 0.4 + Math.min(c.doorDist, 2000) * 0.3, {
