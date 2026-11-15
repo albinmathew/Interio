@@ -3,8 +3,8 @@
  * the way the 3D view tints it. Finishes without a texture have no image (the caller
  * shows their flat colour).
  */
-import { MATERIALS } from '@interio/core';
-import { textureSpecFor, tintToward } from '@interio/scene3d';
+import { MATERIALS, parseMuralFinish } from '@interio/core';
+import { muralThumbnail, textureSpecFor, tintToward } from '@interio/scene3d';
 import { useEffect, useState } from 'react';
 import { tintPixels } from './finishes';
 
@@ -12,7 +12,29 @@ const SIZE = 96;
 const ready = new Map<string, string>();
 const pending = new Map<string, Promise<string | null>>();
 
+/** A built-in mural's swatch: the painting itself, small. */
+function muralSwatch(id: string): Promise<string | null> {
+  const mural = parseMuralFinish(id);
+  if (mural?.source.kind !== 'builtin') return Promise.resolve(null);
+  const art = mural.source.art;
+  return new Promise((resolve) => {
+    // Painting takes a few milliseconds: let the panel draw first.
+    setTimeout(() => {
+      try {
+        const url = muralThumbnail(art, SIZE * 2, SIZE);
+        ready.set(id, url);
+        resolve(url);
+      } catch {
+        resolve(null);
+      }
+    }, 0);
+  });
+}
+
+const hasSwatch = (id: string): boolean => !!textureSpecFor(id) || parseMuralFinish(id)?.source.kind === 'builtin';
+
 function build(id: string): Promise<string | null> {
+  if (parseMuralFinish(id)) return muralSwatch(id);
   const spec = textureSpecFor(id);
   const def = MATERIALS[id];
   if (!spec || !def) return Promise.resolve(null);
@@ -46,7 +68,7 @@ export function useSwatch(id: string): string | null {
   useEffect(() => {
     let alive = true;
     setUrl(ready.get(id) ?? null);
-    if (ready.has(id) || !textureSpecFor(id)) return;
+    if (ready.has(id) || !hasSwatch(id)) return;
     let p = pending.get(id);
     if (!p) {
       p = build(id);

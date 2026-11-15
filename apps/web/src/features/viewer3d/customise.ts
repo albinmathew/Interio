@@ -9,6 +9,8 @@ import {
   MATERIALS,
   finishOf,
   isHexColor,
+  isMuralFinish,
+  resolveSurfaceFinish,
   type FinishKind,
   type FinishSlot,
   type FurnitureMaterial,
@@ -139,6 +141,7 @@ const SECTION_RULES: Record<MaterialDef['surface'], { label: string; test: (id: 
   wall: [
     { label: 'Paint', test: (id) => id.startsWith('wall.paint.') },
     { label: 'Panelling and paper', test: (id) => /^wall\.(wood|panel|wallpaper)/.test(id) },
+    { label: 'Murals', test: (id) => isMuralFinish(id) },
     { label: 'Stone, tile and plaster', test: () => true },
   ],
   ceiling: [
@@ -158,5 +161,6 @@ export function finishSections(surface: MaterialDef['surface'], options: readonl
 /** Name of a surface finish: palette name, "Custom #rrggbb", or "Custom" for ids the palette no longer has. */
 export function surfaceFinishName(value: string | undefined): string {
   if (value && isHexColor(value)) return `Custom ${value.toLowerCase()}`;
+  if (value && !MATERIALS[value] && isMuralFinish(value)) return resolveSurfaceFinish(value, 'wall')!.name;
   return (value && MATERIALS[value]?.name) ?? 'Custom';
 }

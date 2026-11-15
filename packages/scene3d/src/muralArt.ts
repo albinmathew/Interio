@@ -167,7 +167,6 @@ function dab(p: Painter, x: number, y: number, radius: number, color: string, al
 /* ------------------------------------------------------------------ pieces */
 
 const PINKS = ['#f6c9d3', '#f1b3c3', '#eba2b6', '#f8dbe2', '#fbe9ec', '#e48fa8'] as const;
-const GREENS = ['#a9c58a', '#94b77a', '#b8cf95', '#87aa72', '#c4d7a0'] as const;
 const FLOWERS = ['#fffaf1', '#f6c4cf', '#f4de95', '#d8cce9', '#ffffff'] as const;
 
 /** Paper, sky and the first warm glaze. */
@@ -530,7 +529,7 @@ function lamb(p: Painter, cx: number, cy: number, s: number, facing: 1 | -1, lyi
   for (const side of [-1, 1]) {
     const ex = hx + facing * s * 0.03 + side * s * 0.048;
     ctx.beginPath();
-    ctx.arc(ex, hy + s * 0.0, s * 0.022, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.arc(ex, hy, s * 0.022, 0.15 * Math.PI, 0.85 * Math.PI);
     ctx.stroke();
   }
   ctx.restore();

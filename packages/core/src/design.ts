@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import { deriveRooms } from './geometry/rooms';
 import { FURNITURE_MATERIAL_LIST } from './furnitureMaterials';
-import { MATERIAL_LIST } from './materials';
+import { MATERIAL_LIST, isMuralFinish } from './materials';
 import { RoomTypeSchema, type Level } from './schema';
 
 export const ITEM_PLACEMENTS = ['auto', 'wall', 'center'] as const;
@@ -155,5 +155,6 @@ export function furnitureFinishBriefs(): NonNullable<DesignEditRequest['furnitur
 
 /** The finishes palette in the shape the request carries. */
 export function finishBriefs(): DesignEditRequest['finishes'] {
-  return MATERIAL_LIST.map((m) => ({ id: m.id, name: m.name, surface: m.surface }));
+  // Murals go on one wall face, not across a room, so they are not offered for room finishes.
+  return MATERIAL_LIST.filter((m) => !isMuralFinish(m.id)).map((m) => ({ id: m.id, name: m.name, surface: m.surface }));
 }
