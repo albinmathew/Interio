@@ -45,7 +45,13 @@ async function patternSet(spec: TextureSpec): Promise<TextureSet> {
   const pattern = spec.pattern!;
   const n = 1024;
   const field =
-    pattern.kind === 'flutes' ? PATTERNS.flutes(pattern.count) : pattern.kind === 'slats' ? PATTERNS.slats(pattern.count) : PATTERNS.wainscot(pattern.count, pattern.top ?? 0.3);
+    pattern.kind === 'flutes'
+      ? PATTERNS.flutes(pattern.count)
+      : pattern.kind === 'slats'
+        ? PATTERNS.slats(pattern.count)
+        : pattern.kind === 'beadboard'
+          ? PATTERNS.beadboard(pattern.count)
+          : PATTERNS.wainscot(pattern.count, pattern.top ?? 0.3);
   const { normal, shade } = relief(field, n, pattern.depth ?? 1);
   const canvas = (data: Uint8ClampedArray) => {
     const c = document.createElement('canvas');

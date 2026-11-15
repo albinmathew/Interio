@@ -70,6 +70,9 @@ export const MATERIAL_LIST: MaterialDef[] = [
   m('wall.marble', 'Marble cladding', 'wall', '#efece6', 0.2),
   m('wall.microcement', 'Microcement', 'wall', '#b3afa8', 0.6),
   m('wall.tile.zellige', 'Zellige tile', 'wall', '#dfe5dc', 0.25),
+  m('wall.panel.beadboard', 'Cream beadboard', 'wall', '#efe6d4', 0.7),
+  m('wall.mural.meadow', 'Spring meadow mural', 'wall', '#dfe3cf', 0.9),
+  m('wall.mural.meadow.dado', 'Meadow mural over beadboard', 'wall', '#e7e3cf', 0.9),
   m('ceiling.white', 'White ceiling', 'ceiling', '#fafaf8', 0.95),
   m('ceiling.wood', 'Wood slat ceiling', 'ceiling', '#b08a5f', 0.65),
 ];
@@ -84,6 +87,8 @@ export function resolveSurfaceFinish(value: string | undefined, surface: Materia
   if (!value) return null;
   const known = MATERIALS[value];
   if (known) return known;
+  const mural = parseMuralFinish(value);
+  if (mural) return { id: value, name: mural.dado ? 'Your mural over beadboard' : 'Your mural', surface: 'wall', color: '#e6e1d6', roughness: 0.9 };
   if (!/^#[0-9a-fA-F]{6}$/.test(value)) return null;
   const color = value.toLowerCase();
   return { id: color, name: `Custom ${color}`, surface, color, roughness: surface === 'floor' ? 0.5 : 0.9 };
@@ -93,6 +98,82 @@ export function resolveSurfaceFinish(value: string | undefined, surface: Materia
 export function wallFaceFinish(wall: { finishLeft?: string; finishRight?: string } | undefined, side: 'left' | 'right', roomWall: string | undefined): string {
   const own = side === 'left' ? wall?.finishLeft : wall?.finishRight;
   return own ?? roomWall ?? DEFAULT_WALL_MATERIAL;
+}
+
+/* ------------------------------------------------------------------ murals */
+
+/**
+ * Murals: one picture mapped across a whole wall face (not tiled). The built-in ones are
+ * palette ids (`wall.mural.<art>`, `wall.mural.<art>.dado`); a picture of the user's own is
+ * `mural:<assetId>` or `mural:<assetId>:dado`, where the asset is an image stored with the
+ * project. `.dado` / `:dado` puts beadboard panelling under the mural, up to
+ * `MURAL_DADO_HEIGHT`.
+ */
+export type MuralSource = { kind: 'builtin'; art: string } | { kind: 'asset'; assetId: string };
+
+export interface MuralFinish {
+  source: MuralSource;
+  /** Beadboard panelling from the floor to `MURAL_DADO_HEIGHT`, the mural above it. */
+  dado: boolean;
+}
+
+/** Top of the panelling under a mural, in millimetres (cap rail included). */
+export const MURAL_DADO_HEIGHT = 1100;
+
+/** The built-in murals, painted in code (see `muralArt.ts` in scene3d). */
+export const BUILTIN_MURALS = ['meadow'] as const;
+
+const ASSET_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** True for an id a user's mural asset can have: letters, digits, `_` and `-`. */
+export function isMuralAssetId(value: string): boolean {
+  return ASSET_ID.test(value);
+}
+
+/** What a mural finish id stands for; null for any other value. */
+export function parseMuralFinish(value: string | undefined): MuralFinish | null {
+  if (!value) return null;
+  const builtin = /^wall\.mural\.([a-z]+)(\.dado)?$/.exec(value);
+  if (builtin) {
+    if (!(BUILTIN_MURALS as readonly string[]).includes(builtin[1]!)) return null;
+    return { source: { kind: 'builtin', art: builtin[1]! }, dado: !!builtin[2] };
+  }
+  const own = /^mural:([^:]+)(:dado)?$/.exec(value);
+  if (own && isMuralAssetId(own[1]!)) return { source: { kind: 'asset', assetId: own[1]! }, dado: !!own[2] };
+  return null;
+}
+
+/** The finish id of a user's mural. */
+export function muralFinishId(assetId: string, dado: boolean): string {
+  if (!isMuralAssetId(assetId)) throw new Error(`Not a mural asset id: ${assetId}`);
+  return `mural:${assetId}${dado ? ':dado' : ''}`;
+}
+
+/** The same mural with or without panelling under it; null when `value` is not a mural. */
+export function withMuralDado(value: string, dado: boolean): string | null {
+  const mural = parseMuralFinish(value);
+  if (!mural) return null;
+  if (mural.source.kind === 'asset') return muralFinishId(mural.source.assetId, dado);
+  return `wall.mural.${mural.source.art}${dado ? '.dado' : ''}`;
+}
+
+/** True for any mural finish. Murals belong on one wall face, not on a whole room. */
+export function isMuralFinish(value: string | undefined): boolean {
+  return parseMuralFinish(value) !== null;
+}
+
+/** Asset ids of the user's murals a project's walls show (every level, both faces). */
+export function muralAssetIds(project: { levels: readonly { walls: Record<string, { finishLeft?: string; finishRight?: string }> }[] }): string[] {
+  const ids = new Set<string>();
+  for (const level of project.levels) {
+    for (const wall of Object.values(level.walls)) {
+      for (const f of [wall.finishLeft, wall.finishRight]) {
+        const mural = parseMuralFinish(f);
+        if (mural?.source.kind === 'asset') ids.add(mural.source.assetId);
+      }
+    }
+  }
+  return [...ids];
 }
 
 export const DEFAULT_WALL_MATERIAL = 'wall.paint.white';

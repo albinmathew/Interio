@@ -5,7 +5,11 @@
 import { openingFrame, selectRooms, type Id, type Level, type LevelMesh, type Opening, type Wall } from '@interio/core';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { mergeBoxes } from './boxes';
+import { dadoParts, type PanelSpec } from './dado';
+import { createSurfaceMaterial } from './materials';
+import { DADO_FINISH } from './materialSpecs';
 import { openingParts, railingParts, skirtingBoxes, stubBoxes, type BoxSpec } from './parts';
 import { contactShading, shadeBuffers, type ShadeQuad } from './shading';
 import type { WallFadeController } from './wallFade';
@@ -214,6 +218,69 @@ export function SkirtingLayer({ level, mesh }: { level: Level; mesh: LevelMesh }
   );
   if (!built) return null;
   return <mesh name="skirting" geometry={built.geometry} material={built.material} castShadow receiveShadow />;
+}
+
+/** Boards under a mural, with UVs in metres (u along the wall, v up) so the beadboard tiles at its real size. */
+function panelGeometry(panels: PanelSpec[]): THREE.BufferGeometry {
+  const m = new THREE.Matrix4();
+  const parts = panels.map((p) => {
+    const g = new THREE.BoxGeometry(p.size[0], p.size[1], p.size[2]);
+    const pos = g.getAttribute('position');
+    const uv = g.getAttribute('uv');
+    for (let i = 0; i < pos.count; i++) uv.setXY(i, p.u0 + pos.getX(i) + p.size[0] / 2, pos.getY(i) + p.size[1] / 2);
+    m.makeRotationY(p.rotationY ?? 0).setPosition(p.position[0], p.position[1], p.position[2]);
+    g.applyMatrix4(m);
+    return g;
+  });
+  const merged = parts.length ? (mergeGeometries(parts, false) ?? new THREE.BufferGeometry()) : new THREE.BufferGeometry();
+  parts.forEach((p) => p.dispose());
+  return merged;
+}
+
+const CAP_RAIL: Look = { color: '#f1e9d8', roughness: 0.55 };
+
+/**
+ * Beadboard panelling with a cap rail under every mural that has a dado
+ * (`wall.mural.*.dado`, `mural:<id>:dado`). One mesh pair per wall, faded with it.
+ */
+export function DadoLayer({ level, mesh, fade }: { level: Level; mesh: LevelMesh; fade?: WallFadeController }) {
+  const { walls, vertices, openings, rooms } = level;
+  const built = useMemo(
+    () =>
+      dadoParts({ walls, vertices, openings, rooms }, mesh).map((d) => ({
+        wallId: d.wallId,
+        boards: { geometry: panelGeometry(d.panels), material: createSurfaceMaterial(DADO_FINISH, { color: '#efe6d4', roughness: 0.7 }, { surface: 'wall' }) },
+        caps: d.caps.length ? { geometry: mergeBoxes(d.caps), material: solid(CAP_RAIL) } : null,
+      })),
+    [mesh, walls, vertices, openings, rooms],
+  );
+  useEffect(
+    () => () => {
+      for (const b of built) {
+        for (const part of [b.boards, b.caps]) {
+          part?.geometry.dispose();
+          part?.material.dispose();
+        }
+      }
+    },
+    [built],
+  );
+  useEffect(() => {
+    if (!fade) return;
+    const off = built.flatMap((b) => [b.boards, b.caps].filter((x) => !!x).map((x) => fade.register(b.wallId, x.material)));
+    return () => off.forEach((f) => f());
+  }, [built, fade]);
+  if (built.length === 0) return null;
+  return (
+    <group name="dado">
+      {built.map((b) => (
+        <group key={b.wallId} name={`dado:${b.wallId}`}>
+          <mesh geometry={b.boards.geometry} material={b.boards.material} castShadow receiveShadow />
+          {b.caps && <mesh geometry={b.caps.geometry} material={b.caps.material} castShadow receiveShadow />}
+        </group>
+      ))}
+    </group>
+  );
 }
 
 /**
