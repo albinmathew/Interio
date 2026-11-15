@@ -263,6 +263,20 @@ export function turn(g: THREE.BufferGeometry, rx: number, ry: number, rz: number
  * Collects the parts of one model and merges them into one mesh per slot or
  * fixed material.
  */
+/**
+ * Gives zero-length or NaN normals a valid direction. They come from zero-area triangles
+ * (a lathe's pole, a cloth folded flat into its hem), so nothing visible changes; left as
+ * they are, they shade as NaN, which the walk view's bloom spreads into a white screen.
+ */
+export function sanitizeNormals(g: THREE.BufferGeometry): void {
+  const n = g.getAttribute('normal') as THREE.BufferAttribute | undefined;
+  if (!n) return;
+  for (let k = 0; k < n.count; k++) {
+    const len = n.getX(k) ** 2 + n.getY(k) ** 2 + n.getZ(k) ** 2;
+    if (!(len > 1e-8)) n.setXYZ(k, 0, 1, 0);
+  }
+}
+
 export class Model {
   readonly W: number;
   readonly D: number;
@@ -306,6 +320,7 @@ export class Model {
     for (const [key, geometries] of this.parts) {
       const merged = mergeGeometries(geometries, false);
       if (!merged) continue;
+      sanitizeNormals(merged);
       merged.computeBoundingBox();
       merged.computeBoundingSphere();
       const isSlot = key.startsWith('slot:');

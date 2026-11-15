@@ -93,6 +93,24 @@ export function surface(nu: number, nv: number, at: (u: number, v: number) => [n
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(index);
   g.computeVertexNormals();
+  // Where the surface folds flat (a duvet's corner folded into its hem) the triangles have
+  // no area and the normals no length, which shade as NaN and bloom white. Those vertices
+  // take the normal of the row before them (or after, on the first row).
+  const n = g.getAttribute('normal') as THREE.BufferAttribute;
+  const flat = (k: number) => n.getX(k) ** 2 + n.getY(k) ** 2 + n.getZ(k) ** 2 < 1e-8;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let j = 0; j <= nv; j++) {
+      for (let i = 0; i <= nu; i++) {
+        const k = j * (nu + 1) + i;
+        if (!flat(k)) continue;
+        for (const from of [k - (nu + 1), k + (nu + 1), k - 1, k + 1]) {
+          if (from < 0 || from >= n.count || flat(from)) continue;
+          n.setXYZ(k, n.getX(from), n.getY(from), n.getZ(from));
+          break;
+        }
+      }
+    }
+  }
   return g.toNonIndexed();
 }
 
