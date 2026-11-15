@@ -54,7 +54,7 @@ test.describe('furnishing package', () => {
     expect(await undoSteps(page)).toBe(1);
     const all = await items(page);
     expect(all.some((i) => i.catalogId === 'bed.king.drawers')).toBe(true);
-    expect(all.some((i) => i.catalogId === 'prayer.unit')).toBe(true);
+    expect(all.some((i) => i.catalogId.startsWith('prayer.unit.christian'))).toBe(true);
     expect((await roomNamed(page, 'Bedroom 1')).role).toBe('master');
 
     await expect(page.getByTestId('package-count')).toHaveAttribute('data-placed', String(placed));
@@ -78,13 +78,13 @@ test.describe('furnishing package', () => {
     await line(page, 'prayer').getByTestId('package-line-label').click();
     const selected = await page.evaluate(() => (window as unknown as DevWindow).__interio.store.getState().selection);
     expect(selected?.kind).toBe('item');
-    expect((await level(page)).items[selected!.id]!.catalogId).toBe('prayer.unit');
+    expect((await level(page)).items[selected!.id]!.catalogId).toMatch(/^prayer\.unit\.christian/);
   });
 
   test('a removed piece shows as missing, and Add brings it back', async ({ page }) => {
     await furnishSample(page);
     await page.getByTestId('open-package').click();
-    const prayer = (await items(page)).find((i) => i.catalogId === 'prayer.unit')!;
+    const prayer = (await items(page)).find((i) => i.catalogId.startsWith('prayer.unit'))!;
     await page.evaluate((id) => (window as unknown as DevWindow).__interio.store.getState().removeItem(id), prayer.id);
     await expect(line(page, 'prayer')).toHaveAttribute('data-status', 'missing');
     await expect(line(page, 'prayer').getByTestId('package-line-add')).toHaveText('Add');
@@ -92,7 +92,7 @@ test.describe('furnishing package', () => {
     const steps = await undoSteps(page);
     await line(page, 'prayer').getByTestId('package-line-add').click();
     await expect(line(page, 'prayer')).toHaveAttribute('data-status', 'placed');
-    expect((await items(page)).filter((i) => i.catalogId === 'prayer.unit')).toHaveLength(1);
+    expect((await items(page)).filter((i) => i.catalogId.startsWith('prayer.unit'))).toHaveLength(1);
     expect(await undoSteps(page)).toBe(steps + 1);
   });
 
@@ -142,6 +142,6 @@ test.describe('furnishing package', () => {
     await expect(page.getByTestId('package-count')).toHaveCount(0);
     await page.getByTestId('furnish-home').click();
     await expect(page.getByTestId('toast').filter({ hasText: /^Added \d+ items to \d+ rooms/ })).toBeVisible();
-    expect((await items(page)).some((i) => i.catalogId === 'prayer.unit')).toBe(false);
+    expect((await items(page)).some((i) => i.catalogId.startsWith('prayer.unit'))).toBe(false);
   });
 });

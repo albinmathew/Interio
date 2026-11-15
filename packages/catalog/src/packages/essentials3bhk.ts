@@ -27,7 +27,7 @@ export const ESSENTIALS_3BHK: FurnishingPackage = {
       room: { kind: 'type', type: 'living' },
       items: [
         { key: 'tv-unit', label: 'TV unit with black glass shutters', catalogIds: ['tv.unit.glass'] },
-        { key: 'prayer', label: 'Prayer unit', catalogIds: ['prayer.unit'] },
+        { key: 'prayer', label: 'Prayer unit', catalogIds: ['prayer.unit.christian', 'prayer.unit.christian.compact'], note: 'Christian altar: backlit niche with the dove, Sacred Heart, St Joseph, Mother Mary, the St Thomas cross and the Bible' },
         { key: 'curtains', label: 'Curtain with lining', catalogIds: CURTAINS, note: 'Lined; on every window and sliding door with wall space' },
         { key: 'clock', label: 'Decorative roman clock', catalogIds: ['clock.roman'] },
         { key: 'sofa', label: 'Sofa Fiori L shape 3 seater + lounge', catalogIds: ['sofa.lshape', 'sofa.chaise'], note: 'Fiori' },

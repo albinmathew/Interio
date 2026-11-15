@@ -198,7 +198,7 @@ describe('applyPackage on the sample home', () => {
     expect(ids(master.id)).not.toContain('bed.king');
     expect(ids(living.id)).toContain('tv.unit.glass');
     expect(ids(living.id)).toContain('table.coffee.large');
-    expect(ids(living.id)).toContain('prayer.unit');
+    expect(ids(living.id).some((id) => id.startsWith('prayer.unit.christian'))).toBe(true);
     expect(ids(living.id)).toContain('clock.roman');
     expect(ids(living.id)).toContain('table.dining6');
     expect(ids(living.id)).toContain('bench.dining');
@@ -295,22 +295,23 @@ describe('completing a furnished home', () => {
 
   it('adds only the missing lines to rooms that have furniture', () => {
     const missing = structuredClone(home);
-    const prayer = Object.values(missing.items).find((i) => i.catalogId === 'prayer.unit')!;
+    const prayer = Object.values(missing.items).find((i) => i.catalogId.startsWith('prayer.unit'))!;
     const clock = Object.values(missing.items).find((i) => i.catalogId === 'clock.roman')!;
     delete missing.items[prayer.id];
     delete missing.items[clock.id];
     expect(checkPackage(missing, ESSENTIALS_3BHK).lines.find((l) => l.key === 'prayer')!.status).toBe('missing');
     const res = applyPackage(missing, ESSENTIALS_3BHK);
-    expect(res.items.map((i) => i.catalogId).sort()).toEqual(['clock.roman', 'prayer.unit']);
+    expect(res.items.map((i) => i.catalogId.replace(/^prayer\.unit\.christian.*/, 'prayer')).sort()).toEqual(['clock.roman', 'prayer']);
     expect(res.items.every((i) => i.roomId === living.id)).toBe(true);
     expectRules(missing, res);
   });
 
   it('adds one line on its own (the checklist’s Add)', () => {
     const missing = structuredClone(home);
-    for (const i of Object.values(missing.items)) if (i.catalogId === 'prayer.unit' || i.catalogId === 'clock.roman') delete missing.items[i.id];
+    for (const i of Object.values(missing.items)) if (i.catalogId.startsWith('prayer.unit') || i.catalogId === 'clock.roman') delete missing.items[i.id];
     const res = applyPackage(missing, ESSENTIALS_3BHK, { lines: [{ roomId: living.id, key: 'prayer' }] });
-    expect(res.items.map((i) => i.catalogId)).toEqual(['prayer.unit']);
+    expect(res.items.map((i) => i.catalogId)).toHaveLength(1);
+    expect(res.items[0]!.catalogId).toMatch(/^prayer\.unit\.christian/);
   });
 
   it('swaps a piece of the same kind for the package’s only when asked to', () => {
