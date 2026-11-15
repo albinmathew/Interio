@@ -230,7 +230,7 @@ export function buildWritingDesk(entry: CatalogEntry, ctx?: BuildContext): THREE
   const lz = D / 2 - inset - leg / 2;
   const under = H - topT;
   const boxH = Math.min(0.12, H * 0.16);
-  m.part('carcass', slab(roundedRect(W, D, 0.03), topT, 0, under, 0, 0.005));
+  m.part('carcass', slab(roundedRect(W - 0.01, D - 0.01, 0.025), topT, 0, under, 0, 0.005));
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
       m.part('carcass', beam([sx * lx, 0.02, sz * lz], [sx * lx, under, sz * lz], leg, leg, 0.007, 1, 0.68));
