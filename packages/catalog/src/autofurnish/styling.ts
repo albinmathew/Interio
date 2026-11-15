@@ -387,8 +387,10 @@ export function curtainPlans(p: Planner): CurtainPlan[] {
         if (cover === 0) clear.push(entry);
         else over.push({ entry, cover });
       }
-      // Clear of the door first, narrowest first; then those covering least of it.
-      over.sort((a, b) => a.cover - b.cover || a.entry.dims.w - b.entry.dims.w);
+      // Clear of the door first, narrowest first; then those covering least of it (to the nearest
+      // 150 mm, a panel's edge on the frame), narrowest first, so the track ends just past the door.
+      const band = (cover: number) => Math.ceil(cover / 150);
+      over.sort((a, b) => band(a.cover) - band(b.cover) || a.entry.dims.w - b.entry.dims.w);
       const entries = [...clear.slice(0, 3), ...over.map((x) => x.entry)];
       out.push({ centre: centreAt, door, entries, pose: (entry) => p.against(run, at.get(entry.id) ?? mid, entry, entry.mountHeight ?? 20, 2) });
     }
