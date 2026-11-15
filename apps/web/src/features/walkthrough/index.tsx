@@ -41,6 +41,7 @@ import { loadPose, savePose, useWalkUi, walkUi } from './store';
 import { declineTier, initialTier, tierOverride, walkLook, type TierState, type WalkTier } from './tier';
 import { usePhotoUi } from './photo/store';
 import { useWalkInput } from './useWalkInput';
+import { installMuralLoader } from '../../lib/murals';
 
 /** Dev and test hook: drive the walker without pointer lock. Dev builds only. */
 export interface WalkDebugHook {
@@ -78,6 +79,7 @@ function download(dataUrl: string, name: string): void {
 
 export default function Walkthrough() {
   installFurnitureTextures();
+  installMuralLoader();
   const level = useLevel();
   const projectId = usePlanStore((s) => s.project?.id);
   // The lighting preset is picked in Design mode and saved with the project.

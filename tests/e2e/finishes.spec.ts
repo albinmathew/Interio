@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { autoFurnish } from '../../packages/catalog/src';
-import { MATERIAL_LIST } from '../../packages/core/src/materials';
+import { MATERIAL_LIST, isMuralFinish } from '../../packages/core/src/materials';
 import type { Level } from '../../packages/core/src/schema';
 import { CANVAS_POLL, expectCanvasRendered, expectSaved, expectWalkRendered, gotoMode, openSample } from './helpers';
 
@@ -124,8 +124,9 @@ test.describe('finishes and styling', () => {
     await expect(page.getByTestId('room-autofurnish')).toHaveCount(0);
 
     // Every finish of the palette is offered under its surface, named, with the current one marked.
+    // Murals are offered per wall face instead (see murals.spec.ts).
     for (const surface of ['floor', 'wall'] as const) {
-      const ids = MATERIAL_LIST.filter((m) => m.surface === surface).map((m) => m.id);
+      const ids = MATERIAL_LIST.filter((m) => m.surface === surface && !isMuralFinish(m.id)).map((m) => m.id);
       await expect(page.locator(`[data-testid="finish-swatch"][data-surface="${surface}"]`)).toHaveCount(ids.length);
       for (const id of ids) await expect(swatch(page, surface, id)).toHaveCount(1);
     }

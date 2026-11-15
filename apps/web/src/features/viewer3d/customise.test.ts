@@ -114,6 +114,11 @@ describe('surface sections', () => {
     expect(walls[0]!.options.every((o) => o.id.startsWith('wall.paint.'))).toBe(true);
     expect(walls.find((s) => s.label === 'Panelling and paper')!.options.map((o) => o.id)).toContain('wall.panel.fluted');
     expect(finishSections('floor', finishOptions('floor'))[0]!.options.map((o) => o.id)).toContain('floor.chevron');
+    // A wall face gets its own Murals section; a room's walls do not.
+    const face = finishSections('wall', finishOptions('wall', undefined, { murals: true }));
+    expect(face.find((s) => s.label === 'Murals')!.options.map((o) => o.id)).toEqual(['wall.mural.meadow', 'wall.mural.meadow.dado']);
+    expect(walls.some((s) => s.label === 'Murals')).toBe(false);
+    expect(walls.find((s) => s.label === 'Panelling and paper')!.options.map((o) => o.id)).toContain('wall.panel.beadboard');
     expect(MATERIAL_LIST.length).toBeGreaterThan(40);
   });
 
@@ -121,6 +126,9 @@ describe('surface sections', () => {
     expect(surfaceFinishName('#ABCDEF')).toBe('Custom #abcdef');
     expect(surfaceFinishName('wall.marble')).toBe('Marble cladding');
     expect(surfaceFinishName('gone')).toBe('Custom');
+    expect(surfaceFinishName('wall.mural.meadow')).toBe('Spring meadow mural');
+    expect(surfaceFinishName('mural:abc')).toBe('Your mural');
+    expect(surfaceFinishName('mural:abc:dado')).toBe('Your mural over beadboard');
   });
 });
 

@@ -1,5 +1,6 @@
 import {
   EXTERIOR_WALL_COLOR,
+  parseMuralFinish,
   selectLevelMesh,
   type Id,
   type Level,
@@ -9,9 +10,10 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { geometryFromMesh } from './geometry';
-import { ContactShade, OpeningsLayer, RailingsLayer, SkirtingLayer, WallStubs } from './Joinery';
+import { ContactShade, DadoLayer, OpeningsLayer, RailingsLayer, SkirtingLayer, WallStubs } from './Joinery';
 import { hideFromMirror, makeReflective } from './FloorMirror';
 import { createSurfaceMaterial } from './materials';
+import { createMuralMaterial } from './murals';
 import { floorReflection } from './reflectance';
 import { surfaceFinish } from './surfaces';
 import { fadeWalls, WallFadeController } from './wallFade';
@@ -52,6 +54,8 @@ function material(level: Level, g: MeshGroup, textures: boolean): THREE.MeshStan
       return createSurfaceMaterial(finish, { color: '#fafaf8', roughness: 0.95 }, { textures, surface });
     case 'wallSide':
       if (!finish) return createSurfaceMaterial(undefined, { color: EXTERIOR_WALL_COLOR, roughness: 0.9 });
+      // A mural is the picture itself, not a detail: it shows whatever the texture setting.
+      if (parseMuralFinish(finish)) return createMuralMaterial(finish, g.geometry)!;
       return createSurfaceMaterial(finish, TRIM, { textures, surface });
     case 'wallTop':
       return createSurfaceMaterial(undefined, g.wallKind === 'wall' ? { color: WALL_CUT_COLOR, roughness: 0.9 } : TRIM);
@@ -148,6 +152,8 @@ export function LevelMeshes({ level, showCeilings = false, cutaway = false, door
           <ContactShade level={level} ceilings={showCeilings} fade={fade} />
         </>
       )}
+      {/* Panelling under murals belongs to the finish, so it stays when details are off. */}
+      <DadoLayer level={level} mesh={mesh} fade={fade} />
       {cutaway && <WallStubs level={level} />}
     </group>
   );

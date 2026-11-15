@@ -21,11 +21,15 @@ export {
   type LightingRig,
   type PointLightSpec,
 } from './lighting';
-export { ContactShade, OpeningsLayer, RailingsLayer, SkirtingLayer, type OpeningsLayerProps } from './Joinery';
+export { ContactShade, DadoLayer, OpeningsLayer, RailingsLayer, SkirtingLayer, type OpeningsLayerProps } from './Joinery';
+export { DADO_CAP, DADO_DEPTH, dadoParts, type DadoWall, type PanelSpec } from './dado';
+export { createMuralMaterial, provideMuralImage, setMuralImageLoader, type MuralFace, type MuralImageLoader } from './murals';
+export { muralThumbnail, paintMural } from './muralArt';
+export { applyMuralTransform, faceExtent, faceRunsLeftward, muralRegion, muralTransform, paintAspect, type FaceExtent, type MuralTransform } from './muralSpecs';
 export { contactShading, type ContactShading, type ShadeQuad } from './shading';
 export { applyFit, fitModel, rotateBoundsY, type Bounds, type ModelFit } from './fit';
 export { createSurfaceMaterial, setTextureBaseUrl, type SurfaceFallback, type SurfaceMaterialOptions } from './materials';
-export { CUSTOM_FLOOR_TEXTURE, SURFACE_TEXTURES, isFlatFinish, textureSpecFor, tintToward, type PatternSpec, type TextureSpec } from './materialSpecs';
+export { CUSTOM_FLOOR_TEXTURE, DADO_FINISH, SURFACE_TEXTURES, isFlatFinish, textureSpecFor, tintToward, type PatternSpec, type TextureSpec } from './materialSpecs';
 export { CUSTOM_TEXTURES, FURNITURE_SETS, FURNITURE_TEXTURES, furnitureSets, furnitureTextureSpec, type FurnitureTextureSpec } from './furnitureSpecs';
 export { furnitureSwatch, furnitureTexturesInstalled, installFurnitureTextures, type FurnitureTextureOptions } from './furnitureTextures';
 export { WALL_CUT_COLOR } from './LevelMeshes';

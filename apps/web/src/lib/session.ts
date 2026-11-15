@@ -13,6 +13,7 @@ import {
   type Underlay,
 } from '@interio/core';
 import { create } from 'zustand';
+import { importableAssets, portableAssets } from './portableAssets';
 import { PROJECT_FILE_EXTENSION, ProjectFileError, decodeProjectFile, encodeProjectFile } from './projectFile';
 import { storage } from './storage';
 
@@ -75,7 +76,7 @@ export function copyName(name: string, taken: Iterable<string>): string {
   return candidate;
 }
 
-/** Copies a project and its assets (underlay, source PDF) under a new id. */
+/** Copies a project and its assets (underlay, source PDF, mural pictures) under a new id. */
 export async function duplicateProject(id: string): Promise<Project | null> {
   const project = await storage.getProject(id);
   if (!project) return null;
@@ -140,48 +141,14 @@ export function startAutosave(delayMs = 400): () => void {
 
 /* ------------------------------------------------------------ project files */
 
-/** Assets that travel with an exported project. */
-const PORTABLE_ASSETS = ['underlay', 'pdf'] as const;
-/** A source PDF larger than this stays behind: the plan and its underlay are what the project needs. */
-export const MAX_EMBEDDED_PDF_BYTES = 25_000_000;
-
-const isFloat32 = (v: unknown): v is Float32Array => v instanceof Float32Array;
-
-/** A stored or imported underlay is only used when it has the shape the editor expects. */
-function asUnderlay(value: unknown): Underlay | null {
-  if (!value || typeof value !== 'object') return null;
-  const u = value as Partial<Underlay>;
-  if (!isFloat32(u.segments) || !isFloat32(u.snapPoints)) return null;
-  const underlay: Underlay = { segments: u.segments, snapPoints: u.snapPoints };
-  const image = u.image;
-  if (
-    image &&
-    image.blob instanceof Blob &&
-    Number.isFinite(image.widthPx) &&
-    Number.isFinite(image.heightPx) &&
-    Array.isArray(image.planFromImage) &&
-    image.planFromImage.length === 6 &&
-    image.planFromImage.every((n) => Number.isFinite(n))
-  ) {
-    underlay.image = { blob: image.blob, widthPx: image.widthPx, heightPx: image.heightPx, planFromImage: image.planFromImage };
-  }
-  return underlay;
-}
+export { MAX_EMBEDDED_PDF_BYTES } from './portableAssets';
 
 export const projectFileName = (name: string): string =>
   `${name.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'plan'}${PROJECT_FILE_EXTENSION}`;
 
-/** The bytes of a project file: the project plus its underlay and source PDF when it has them. */
+/** The bytes of a project file: the project plus its underlay, source PDF and mural pictures when it has them. */
 export async function buildProjectFile(project: Project): Promise<{ bytes: Uint8Array; assets: string[]; skipped: string[] }> {
-  const stored = await storage.getAssets(project.id);
-  const assets: Record<string, unknown> = {};
-  const skipped: string[] = [];
-  for (const name of PORTABLE_ASSETS) {
-    const value = stored[name];
-    if (value === undefined || value === null) continue;
-    if (name === 'pdf' && value instanceof Blob && value.size > MAX_EMBEDDED_PDF_BYTES) skipped.push(name);
-    else assets[name] = value;
-  }
+  const { assets, skipped } = portableAssets(project, await storage.getAssets(project.id));
   // The JSON round trip drops anything that is not plain data, exactly like the stored record.
   const bytes = await encodeProjectFile({ project: JSON.parse(serializeProject(project)), assets });
   return { bytes, assets: Object.keys(assets), skipped };
@@ -219,10 +186,6 @@ export async function importProjectFile(file: Blob): Promise<Project> {
   }
   const parsed = migrate(contents.project);
   const project: Project = { ...parsed, id: createProject('').id, updatedAt: Date.now() };
-  const assets: Record<string, unknown> = {};
-  const underlay = asUnderlay(contents.assets.underlay);
-  if (underlay) assets.underlay = underlay;
-  if (contents.assets.pdf instanceof Blob) assets.pdf = contents.assets.pdf;
-  await storage.saveProjectWithAssets(project, assets);
+  await storage.saveProjectWithAssets(project, importableAssets(contents.assets));
   return project;
 }

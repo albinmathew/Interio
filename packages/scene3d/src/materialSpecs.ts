@@ -7,7 +7,7 @@
 
 /** A relief drawn in code over one repeat (see `PATTERNS` in `texturePixels.ts`). */
 export interface PatternSpec {
-  kind: 'flutes' | 'slats' | 'wainscot';
+  kind: 'flutes' | 'slats' | 'wainscot' | 'beadboard';
   /** Flutes, boards or panels across one repeat. */
   count: number;
   /** Wainscot: height of the panelling as a share of the repeat. */
@@ -66,6 +66,8 @@ const SETS = {
   wainscot: { set: null, size: 3.2, avg: '#ffffff', pattern: { kind: 'wainscot', count: 6, top: 0.3, depth: 4 } },
   // 10 cm boards with a shadow gap.
   slats: { set: 'wood-oak', size: 1.2, avg: '#a07d56', pattern: { kind: 'slats', count: 12, depth: 3 } },
+  // Painted tongue-and-groove boards, 10 cm wide, each with a bead beside its groove.
+  beadboard: { set: null, size: 1.2, avg: '#ffffff', pattern: { kind: 'beadboard', count: 12, depth: 3 } },
 } satisfies Record<string, TextureSpec>;
 
 /** Finish id -> texture set. Finishes that are not listed (paints, ceilings) render as flat colour. */
@@ -104,6 +106,7 @@ export const SURFACE_TEXTURES: Record<string, TextureSpec> = {
   'wall.microcement': SETS.microcement,
   // Hand-made 10 cm square tiles.
   'wall.tile.zellige': { ...SETS.tileSmall, size: 1.2 },
+  'wall.panel.beadboard': SETS.beadboard,
   'ceiling.wood': SETS.slats,
 };
 
@@ -114,6 +117,9 @@ export const SURFACE_TEXTURES: Record<string, TextureSpec> = {
 export function isFlatFinish(finishId: string): boolean {
   return finishId.startsWith('wall.paint.') || finishId === 'ceiling.white';
 }
+
+/** The tiling beadboard under a mural with a dado (see `DadoLayer`). */
+export const DADO_FINISH = 'wall.panel.beadboard';
 
 /** A custom floor colour gets the trowelled finish; custom wall and ceiling colours are matte paint. */
 export const CUSTOM_FLOOR_TEXTURE: TextureSpec = SETS.microcement;

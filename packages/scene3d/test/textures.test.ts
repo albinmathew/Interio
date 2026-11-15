@@ -5,6 +5,7 @@ import {
   FURNITURE_MATERIAL_LIST,
   MATERIAL_LIST,
   createSampleLevel,
+  isMuralFinish,
   resolveFurnitureMaterial,
   selectLevelMesh,
   type Level,
@@ -76,9 +77,13 @@ describe('furniture textures', () => {
 });
 
 describe('surface textures', () => {
-  it('every palette finish has a texture set or is a deliberate flat paint', () => {
+  it('every palette finish has a texture set or is a deliberate flat paint (murals are mapped per face instead)', () => {
     for (const m of MATERIAL_LIST) {
       const spec = SURFACE_TEXTURES[m.id];
+      if (isMuralFinish(m.id)) {
+        expect(spec, m.id).toBeUndefined();
+        continue;
+      }
       expect(!!spec !== isFlatFinish(m.id), m.id).toBe(true);
       if (!spec) continue;
       if (spec.set && !spec.noColor) expect(existsSync(file(spec.set, 'color')), `${m.id}: ${spec.set}`).toBe(true);

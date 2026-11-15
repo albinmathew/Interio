@@ -9,6 +9,8 @@ import {
   MATERIAL_LIST,
   defaultFloorFor,
   defaultWallFor,
+  isMuralFinish,
+  resolveSurfaceFinish,
   type Id,
   type MaterialDef,
   type Room,
@@ -34,10 +36,11 @@ function isPaint(def: MaterialDef): boolean {
 /**
  * The finishes offered for a surface, in palette order. Floors and walls get their own
  * entries; a ceiling gets the ceiling entries followed by the wall paints, so it can be
- * coloured.
+ * coloured. Murals map one picture across one wall face, so they are offered for a single
+ * face (`murals: true`), not for every wall of a room.
  */
-export function finishOptions(surface: Surface, list: readonly MaterialDef[] = MATERIAL_LIST): MaterialDef[] {
-  const own = list.filter((m) => m.surface === surface);
+export function finishOptions(surface: Surface, list: readonly MaterialDef[] = MATERIAL_LIST, opts: { murals?: boolean } = {}): MaterialDef[] {
+  const own = list.filter((m) => m.surface === surface && (opts.murals || !isMuralFinish(m.id)));
   return surface === 'ceiling' ? [...own, ...list.filter(isPaint)] : own;
 }
 
@@ -56,7 +59,7 @@ export function currentFinish(room: Pick<Room, 'floorMaterial' | 'wallMaterial' 
 /** Name for a finish id, also for ids the palette no longer has. */
 export function finishName(id: string): string {
   if (/^#[0-9a-fA-F]{6}$/.test(id)) return `Custom ${id.toLowerCase()}`;
-  return MATERIALS[id]?.name ?? 'Custom';
+  return MATERIALS[id]?.name ?? (isMuralFinish(id) ? resolveSurfaceFinish(id, 'wall')!.name : 'Custom');
 }
 
 export function finishPatch(surface: Surface, id: string): FinishPatch {

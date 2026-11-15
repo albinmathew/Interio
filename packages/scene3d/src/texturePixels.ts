@@ -141,6 +141,22 @@ export const PATTERNS = {
       // A recessed panel with a bevelled edge.
       return 0.6 - Math.min(0.2, d * 25);
     },
+  /**
+   * Beadboard: vertical boards, `count` across the repeat, each starting with a narrow
+   * groove (the quirk) and a half-round bead, then a flat face with a small chamfer.
+   */
+  beadboard:
+    (count: number): HeightField =>
+    (u) => {
+      const t = (u * count) % 1;
+      if (t < 0.03) return 0.15;
+      if (t < 0.1) {
+        const x = (t - 0.065) / 0.035;
+        return 0.75 + 0.2 * Math.sqrt(Math.max(0, 1 - x * x));
+      }
+      if (t > 0.975) return 0.75 - ((t - 0.975) / 0.025) * 0.5;
+      return 0.8;
+    },
 } as const;
 
 /**

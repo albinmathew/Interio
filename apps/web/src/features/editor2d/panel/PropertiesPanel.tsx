@@ -3,6 +3,7 @@ import { getEntry } from '@interio/catalog';
 import {
   DEFAULT_WALL_MATERIAL,
   MATERIAL_LIST,
+  isMuralFinish,
   MATERIALS,
   resolveSurfaceFinish,
   OPENING_KINDS,
@@ -193,7 +194,8 @@ const customOption = (value: string | undefined) =>
   value && !MATERIALS[value] ? <option value={value}>{/^#[0-9a-fA-F]{6}$/.test(value) ? `Custom ${value.toLowerCase()}` : value}</option> : null;
 
 const FLOORS = MATERIAL_LIST.filter((m) => m.surface === 'floor');
-const WALLS = MATERIAL_LIST.filter((m) => m.surface === 'wall');
+// Murals belong on one wall face (Design mode), not on every wall of a room.
+const WALLS = MATERIAL_LIST.filter((m) => m.surface === 'wall' && !isMuralFinish(m.id));
 
 function RoomPanel({ level, room }: { level: Level; room: Room }) {
   const geom = selectRooms(level).find((r) => r.roomId === room.id);

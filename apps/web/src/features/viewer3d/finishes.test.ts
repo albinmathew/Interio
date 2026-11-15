@@ -34,7 +34,10 @@ describe('material grouping', () => {
     expect(groups.map((g) => g.surface)).toEqual(['floor', 'wall', 'ceiling']);
     expect(groups.map((g) => g.label)).toEqual(['Floor', 'Walls', 'Ceiling']);
     expect(finishOptions('floor')).toEqual(MATERIAL_LIST.filter((m) => m.surface === 'floor'));
-    expect(finishOptions('wall')).toEqual(MATERIAL_LIST.filter((m) => m.surface === 'wall'));
+    // Murals go on one wall face (the face panel offers them), not on a whole room.
+    expect(finishOptions('wall')).toEqual(MATERIAL_LIST.filter((m) => m.surface === 'wall' && !m.id.startsWith('wall.mural.')));
+    expect(finishOptions('wall', undefined, { murals: true })).toEqual(MATERIAL_LIST.filter((m) => m.surface === 'wall'));
+    expect(finishOptions('wall', undefined, { murals: true }).map((m) => m.id)).toContain('wall.mural.meadow.dado');
     // Floors and walls never mix.
     expect(finishOptions('floor').every((m) => m.id.startsWith('floor.'))).toBe(true);
     expect(finishOptions('wall').every((m) => m.id.startsWith('wall.'))).toBe(true);

@@ -19,6 +19,7 @@ import { Scene, useLiveItems, useOverlaps } from './Scene';
 import { SidePanel } from './SidePanel';
 import { DOCK_WIDTH, cameraState, entryOrPlaceholder, useRenderTier, useViewer } from './state';
 import { Toolbar } from './Toolbar';
+import { installMuralLoader } from '../../lib/murals';
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -160,6 +161,7 @@ function Overlay({ level }: { level: Level }) {
 export default function Viewer3D() {
   // Real textures for furniture materials; registered once, before the first model is built.
   installFurnitureTextures();
+  installMuralLoader();
   const level = useLevel();
   const tier = useRenderTier();
   const view = useViewer((s) => s.view);
