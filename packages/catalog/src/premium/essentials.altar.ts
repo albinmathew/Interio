@@ -12,19 +12,23 @@
 import type { CatalogEntry } from '@interio/core';
 import * as THREE from 'three';
 import { Fit, panel, place, rng, surface, twoSided, type G } from './decor.parts';
-import { Model, box, cyl, rbox, tube, type BuildContext } from './kit';
+import { Model, box, cyl, rbox, type BuildContext } from './kit';
 import { taperRod } from './seating.parts';
 
 /* ---------------------------------------------------------------- materials */
 
-/** The fixed materials. Ten meshes at most: three slots and these seven. */
-const STATUE = '#efe3c7'; // painted resin, cream; also the Bible's pages and the cream vase
+/** The fixed materials. The family allows eight meshes: three slots and these five. */
+const STATUE = '#efe1c4'; // painted resin, cream; also the Bible's pages and the cream vase
 const GOLD = 'metal.brass';
-const SKIN = '#e0bc98'; // faces, hands and feet; the pampas plumes share it
-const RED = '#a3171d'; // the Sacred Heart, the red vase, the Bible's ribbon
+const RED = '#a3171d'; // the Sacred Heart, the red vase, the Bible's cover and ribbon
 const SILVER = 'metal.steel'; // the cross and the rosary
 const GLOW = '#fff6e6'; // the dove and the LED strips (emissive)
-const DARK = '#2a1e16'; // hair, the shadow gaps, the plinth, the Bible's cover
+/** Faces, hands and feet: the statues are cream all over, with gold trim. */
+const SKIN = STATUE;
+/** Hair, beards and painted eyes take the panels' wood (a warm brown): the family's 8-mesh budget has no room for another colour. */
+const HAIR = 'wood';
+/** Dried pampas: the same warm wood tone reads as the reference's tan plumes. */
+const PLUME = 'wood';
 
 /**
  * How the lit parts glow. The niche panel is backlit: most of its look is the
@@ -38,8 +42,8 @@ interface Glow {
   /** Scales the surface colour. */
   surface: number;
 }
-const PANEL: Glow = { tint: new THREE.Color('#ffd27f'), intensity: 1.0, surface: 0.45 };
-const LED: Glow = { tint: new THREE.Color('#fff4e4'), intensity: 2, surface: 1 };
+const PANEL: Glow = { tint: new THREE.Color('#ffd27f'), intensity: 1.1, surface: 0.3 };
+const LED: Glow = { tint: new THREE.Color('#fff4e4'), intensity: 1.6, surface: 1 };
 
 const glowCopies = new WeakMap<THREE.Material, THREE.Material>();
 
@@ -189,7 +193,7 @@ function robedBody(f: Fit, h: number, opts: { feet?: boolean; slim?: number } = 
   f.fixed(SKIN, cyl(0.026 * h, 0.03 * h, 0.06 * h, 0, 0.83 * h, 0, 'y', 10));
   f.fixed(SKIN, ell(rh * 0.86, rh * 1.04, rh * 0.92, ...head, 0, 0, 0, 14, 10));
   // Painted eyes, small.
-  for (const s of [-1, 1]) f.fixed(DARK, ell(rh * 0.11, rh * 0.07, rh * 0.05, head[0] + s * rh * 0.33, head[1] + rh * 0.08, head[2] + rh * 0.85, 0, 0, 0, 6, 4));
+  for (const s of [-1, 1]) f.part(HAIR, ell(rh * 0.11, rh * 0.07, rh * 0.05, head[0] + s * rh * 0.33, head[1] + rh * 0.08, head[2] + rh * 0.85, 0, 0, 0, 6, 4));
   // Bare feet showing below the hem.
   if (opts.feet) for (const s of [-1, 1]) f.fixed(SKIN, ell(0.026 * h, 0.018 * h, 0.05 * h, s * 0.035 * h, 0.018 * h, 0.04 * h, s * 0.12, 0, 0, 8, 6));
   return { head, rh, front: (y: number) => at(y) * SZ };
@@ -206,11 +210,11 @@ function hair(f: Fit, c: V3, rh: number, beard: number, long = 1): void {
     [0.42 * rh, 1.06 * rh],
     [0, 1.12 * rh],
   ];
-  f.fixed(DARK, rev(shell, 16, 0.95, 2.3).translate(c[0], c[1], c[2] - 0.08 * rh));
+  f.part(HAIR, rev(shell, 16, 0.95, 2.3).translate(c[0], c[1], c[2] - 0.08 * rh));
   if (beard > 0) {
     // A short beard along the jaw and chin, and a moustache.
-    f.fixed(DARK, ell(0.56 * rh, 0.4 * rh * beard, 0.36 * rh, c[0], c[1] - 0.74 * rh, c[2] + 0.5 * rh, 0, 0.4, 0, 10, 6));
-    f.fixed(DARK, ell(0.3 * rh, 0.06 * rh, 0.1 * rh, c[0], c[1] - 0.36 * rh, c[2] + 0.86 * rh, 0, 0, 0, 8, 4));
+    f.part(HAIR, ell(0.56 * rh, 0.4 * rh * beard, 0.36 * rh, c[0], c[1] - 0.74 * rh, c[2] + 0.5 * rh, 0, 0.4, 0, 10, 6));
+    f.part(HAIR, ell(0.3 * rh, 0.06 * rh, 0.1 * rh, c[0], c[1] - 0.36 * rh, c[2] + 0.86 * rh, 0, 0, 0, 8, 4));
   }
 }
 
@@ -314,7 +318,7 @@ function joseph(H: number): Fit {
   b.fixed(STATUE, rev([[0, 0], [0.05 * h, 0], [0.056 * h, 0.05 * h], [0.046 * h, 0.12 * h], [0.036 * h, 0.17 * h], [0.016 * h, 0.195 * h], [0, 0.2 * h]], 14, 0.85).translate(cx, cy, cz));
   const ch: V3 = [cx + 0.005 * h, cy + 0.235 * h, cz + 0.005 * h];
   b.fixed(SKIN, ell(0.04 * h, 0.044 * h, 0.04 * h, ...ch, 0, 0, 0, 12, 8));
-  b.fixed(DARK, rev([[0.03 * h, -0.005 * h], [0.042 * h, 0.012 * h], [0.036 * h, 0.03 * h], [0.018 * h, 0.044 * h], [0, 0.047 * h]], 12, 1, 2.6).translate(ch[0], ch[1], ch[2] - 0.004 * h));
+  b.part(HAIR, rev([[0.03 * h, -0.005 * h], [0.042 * h, 0.012 * h], [0.036 * h, 0.03 * h], [0.018 * h, 0.044 * h], [0, 0.047 * h]], 12, 1, 2.6).translate(ch[0], ch[1], ch[2] - 0.004 * h));
   // The Child's right hand raised in blessing.
   b.fixed(STATUE, taperRod([cx - 0.03 * h, cy + 0.16 * h, cz + 0.02 * h], [cx - 0.05 * h, cy + 0.2 * h, cz + 0.05 * h], 0.014 * h, 0.016 * h, 8));
   b.fixed(SKIN, ell(0.011 * h, 0.018 * h, 0.007 * h, cx - 0.056 * h, cy + 0.225 * h, cz + 0.055 * h, 0, 0, 0.3, 6, 5));
@@ -449,7 +453,7 @@ function dove(w: number): G[] {
 function stThomasCross(f: Fit, h: number): void {
   const u = h / 0.2;
   // A dark wooden plinth, a silver stepped base with two curling leaves.
-  f.fixed(DARK, rbox(0.075 * u, 0.012 * u, 0.045 * u, 0.002 * u, 0, 0, 0, 1));
+  f.part('wood', rbox(0.075 * u, 0.012 * u, 0.045 * u, 0.002 * u, 0, 0, 0, 1));
   f.fixed(SILVER, rbox(0.06 * u, 0.008 * u, 0.036 * u, 0.002 * u, 0, 0.012 * u, 0, 1));
   f.fixed(SILVER, rbox(0.044 * u, 0.008 * u, 0.028 * u, 0.002 * u, 0, 0.02 * u, 0, 1));
   f.fixed(SILVER, rbox(0.028 * u, 0.01 * u, 0.02 * u, 0.002 * u, 0, 0.028 * u, 0, 1));
@@ -538,7 +542,7 @@ function bibleOnStand(m: Model, w: number, x: number, y: number, z: number): voi
     const pages = rbox(pageT, half, depth, 0.005, 0, -half / 2, 0, 2)
       .rotateZ(ang)
       .translate(...base.clone().addScaledVector(n, t / 2 + 0.004 + pageT / 2).addScaledVector(up, half / 2).toArray());
-    m.fixed(DARK, cover);
+    m.fixed(RED, cover);
     m.fixed(STATUE, pages);
   }
   // A red ribbon from the spine, over the front edge.
@@ -578,7 +582,7 @@ function pampas(m: Model, vase: G, vaseMat: string, vaseH: number, x: number, y:
     const scale = Math.min(1, room / (stem + plume));
     const base = new THREE.Vector3(x, y + vaseH - 0.01, z);
     const tip = base.clone().addScaledVector(dir, stem * scale);
-    m.fixed(SKIN, taperRod(base.toArray() as V3, tip.toArray() as V3, 0.002, 0.0015, 4));
+    m.part(PLUME, taperRod(base.toArray() as V3, tip.toArray() as V3, 0.002, 0.0015, 4));
     const prof: [number, number][] = [
       [0, 0],
       [0.012, 0.025],
@@ -598,8 +602,40 @@ function pampas(m: Model, vase: G, vaseMat: string, vaseH: number, x: number, y:
     }
     g.computeVertexNormals();
     g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir));
-    m.fixed(SKIN, g.translate(tip.x, tip.y, tip.z));
+    m.part(PLUME, g.translate(tip.x, tip.y, tip.z));
   }
+}
+
+/* -------------------------------------------------------------- the flutes */
+
+/**
+ * A fluted face `w` wide and `h` tall: slats `slat` wide with rounded fronts,
+ * `gap` apart, standing `depth` proud of a thin backing. One extrusion, so a
+ * whole panel costs a few hundred triangles. Centred on x = 0, from y = 0, its
+ * back at z = 0 and its front at z = depth.
+ */
+function flutes(w: number, h: number, depth: number, slat: number, gap: number): G {
+  const n = Math.max(3, Math.round((w + gap) / (slat + gap)));
+  const pitch = (w - slat) / (n - 1);
+  const r = Math.min(slat / 2 - 1e-4, depth * 0.45, slat * 0.32);
+  const back = 0.004;
+  // Drawn in (x, -z): the extrusion along +Z becomes the height after the turn.
+  const s = new THREE.Shape();
+  s.moveTo(-w / 2, back);
+  for (let i = 0; i < n; i++) {
+    const xl = -w / 2 + i * pitch;
+    const xr = xl + slat;
+    s.lineTo(xl, 0);
+    s.lineTo(xl, -(depth - r));
+    s.absarc(xl + r, -(depth - r), r, Math.PI, Math.PI * 1.5, false);
+    s.lineTo(xr - r, -depth);
+    s.absarc(xr - r, -(depth - r), r, Math.PI * 1.5, Math.PI * 2, false);
+    s.lineTo(xr, 0);
+  }
+  s.lineTo(w / 2, back);
+  s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 3 });
+  return g.rotateX(-Math.PI / 2);
 }
 
 /* -------------------------------------------------------------- the altar */
@@ -613,16 +649,15 @@ export function buildAltar(entry: CatalogEntry, ctx?: BuildContext): THREE.Objec
   const { W, D, H } = m;
   const back = -D / 2;
 
-  /* Base cabinet: a recessed plinth, handle-less doors under a gola groove, a wood top. */
+  /* Base cabinet: a recessed plinth, handle-less doors with a finger-pull recess under the wood top. */
   const topT = 0.032;
   const cabH = Math.min(0.55, H * 0.23);
   const plinth = 0.08;
   const groove = 0.032;
   const carcassD = D - 0.025;
   const cz = back + carcassD / 2;
-  m.fixed(DARK, panel(W - 0.02, plinth, carcassD - 0.06, 0, 0, cz - 0.03, 0.001));
+  m.part('fronts', panel(W - 0.02, plinth, carcassD - 0.06, 0, 0, cz - 0.03, 0.001));
   m.part('fronts', panel(W, cabH - topT - plinth, carcassD - 0.02, 0, plinth, cz - 0.01, 0.002));
-  m.fixed(DARK, box(W - 0.006, groove, 0.004, 0, cabH - topT - groove, back + carcassD - 0.018));
   const doors = Math.max(2, Math.round(W / 0.5));
   const gap = 0.003;
   const dw = (W - (doors + 1) * gap) / doors;
@@ -639,25 +674,16 @@ export function buildAltar(entry: CatalogEntry, ctx?: BuildContext): THREE.Objec
   const NW = W * 0.55;
   const SW = (W - NW) / 2;
   const boxD = 0.075; // the panels' body: its inner side is the niche's jamb
-  const slatD = 0.025;
+  const slatD = 0.03;
   const nicheZ = back + 0.02; // back of the niche panel
   const nicheT = 0.015;
   const nicheFace = nicheZ + nicheT;
-  m.fixed(DARK, box(W, wallH, 0.01, 0, y0, back + 0.005));
+  m.part('wood', box(W, wallH, 0.01, 0, y0, back + 0.005));
   m.part('niche', box(NW + 0.02, wallH, nicheT, 0, y0, nicheZ + nicheT / 2));
   for (const s of [-1, 1]) {
     const cx = s * (W / 2 - SW / 2);
     m.part('wood', box(SW, wallH, boxD, cx, y0, back + boxD / 2));
-    // A dark shadow line behind the slats, so the flutes read from across the room.
-    m.fixed(DARK, box(SW - 0.004, wallH, 0.002, cx, y0, back + boxD + 0.001));
-    const slat = 0.03;
-    const sGap = 0.012;
-    const n = Math.max(3, Math.round((SW + sGap) / (slat + sGap)));
-    const pitch = (SW - slat) / (n - 1);
-    for (let i = 0; i < n; i++) {
-      const x = cx - SW / 2 + slat / 2 + i * pitch;
-      m.part('wood', panel(slat, wallH, slatD, x, y0, back + boxD + slatD / 2, 0.004));
-    }
+    m.part('wood', flutes(SW, wallH, slatD, 0.03, 0.014).translate(cx, y0, back + boxD));
     // LED strip down the niche's edge, on the back panel.
     m.fixed(GLOW, box(0.008, wallH - 0.02, 0.004, s * (NW / 2 - 0.012), y0 + 0.01, nicheFace + 0.002));
   }
