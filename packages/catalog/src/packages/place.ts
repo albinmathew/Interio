@@ -479,7 +479,10 @@ function placeEntryFor(ctx: LineContext, entry: CatalogEntry, slot: PreferSlot |
   if (entry.anchor === 'floor' && entry.dims.h <= 30) return placer.floor(entry, p.centroid, [longestRunAngle(p)], { flat: true });
   // Tall storage and the rest: against a wall, out of the walkway, never in front of a window.
   const tall = entry.dims.h > 900;
-  const score = (c: WallCandidate) => door(c, 0.4) - c.cornerDist * 0.25 - (c.underWindow && tall ? 3000 : 0) - (c.run === tvRun ? 1500 : 0) - (c.run === bedRun && tall ? 800 : 0);
+  // Tall pieces keep clear of the dining chairs, which need room to pull out.
+  const nearTable = (c: WallCandidate) => !!table && tall && vec.dist(c.pose, centre(table)) < table.entry.dims.w / 2 + 1500;
+  const score = (c: WallCandidate) =>
+    door(c, 0.4) - c.cornerDist * 0.25 - (c.underWindow && tall ? 3000 : 0) - (c.run === tvRun ? 1500 : 0) - (c.run === bedRun && tall ? 800 : 0) - (nearTable(c) ? 2000 : 0);
   return placer.wall(entry, score, { clear: 550 }) ?? placer.wall(entry, score, { clear: 350 });
 }
 
