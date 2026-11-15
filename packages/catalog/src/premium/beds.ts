@@ -28,6 +28,15 @@ export const BUNK_SLOTS: FinishSlot[] = [
  * ±w/2, the length runs from z0 (head end, folded back separately) to z1 (foot).
  */
 export function duvet(w: number, z0: number, z1: number, top: number, hem: number, puff = 0.035, roll = 0.06, res: [number, number] = [28, 22]): G {
+  return twoSided(surface(res[0], res[1], duvetShape(w, z0, z1, top, hem, puff, roll).at));
+}
+
+/**
+ * The shape of `duvet` as a function of (u, v) in [0, 1], u across and v from the head
+ * to the foot, with the cloth's length across (`across`) and along (`along`) in metres:
+ * u and v are proportional to the distance along the cloth.
+ */
+export function duvetShape(w: number, z0: number, z1: number, top: number, hem: number, puff = 0.035, roll = 0.06): { at: (u: number, v: number) => [number, number, number]; across: number; along: number } {
   const drop = top - hem;
   const path = (len: number) => {
     // Distance along the cross-section: drape, roll, flat, roll, drape.
@@ -67,7 +76,7 @@ export function duvet(w: number, z0: number, z1: number, top: number, hem: numbe
     s -= arcL;
     return [z1, roll + s, 0];
   };
-  const sheet = surface(res[0], res[1], (u, v) => {
+  const at = (u: number, v: number): [number, number, number] => {
     const [x, dx, fx] = across(u);
     const [z, dz, fz] = along(v);
     const dome = puff * Math.sin((Math.PI / 2) * fx) * Math.min(1, fz * 1.5);
@@ -77,8 +86,9 @@ export function duvet(w: number, z0: number, z1: number, top: number, hem: numbe
     // Corners: where the sides and the foot both hang, pull in a little.
     const pinch = dx > 0.02 && dz > 0.02 ? 0.97 : 1;
     return [x * pinch, Math.max(hem, y), z];
-  });
-  return twoSided(sheet);
+  };
+  const arc = (Math.PI / 2) * roll;
+  return { at, across: 2 * (Math.max(0, drop - roll) + arc) + Math.max(0.01, w - 2 * roll), along: totalL };
 }
 
 /**
