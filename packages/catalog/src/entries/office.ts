@@ -11,6 +11,8 @@ const OVERHEAD_SLOTS: FinishSlot[] = [
 ];
 /** Underside of the overhead cupboards: 750 mm over a desk, clear of a monitor and a seated head. */
 export const OVERHEAD_MOUNT = 1500;
+/** Underside of the lit floating shelf between a desk and its overhead cupboards: clear of a monitor's top. */
+export const DESK_SHELF_MOUNT = 1240;
 
 export const OFFICE_ENTRIES: CatalogEntry[] = [
   gen('desk', 'Desk', 'office', ['study', 'bedroom'], 'workDesk', [1400, 700, 750], ['study table', 'work desk', 'writing desk', 'computer table'], { slots: DESK_SLOTS }),
@@ -27,6 +29,15 @@ export const OFFICE_ENTRIES: CatalogEntry[] = [
       ...wall(OVERHEAD_MOUNT),
       slots: OVERHEAD_SLOTS,
       params: { rows: [{ h: 1, cols: w > 1000 ? 3 : 2, kind: 'door' }], handles: 'bar' },
+    }),
+  ),
+  ...([900, 1200] as const).map((w) =>
+    gen(`shelf.floating.${w}`, `Lit floating shelf ${(w / 1000).toFixed(1)} m`, 'storage', ['study', 'bedroom', 'living'], 'floatingShelf', [w, 250, 40], ['shelf', 'floating shelf', 'wall shelf', 'led', 'lit', 'display'], {
+      ...wall(DESK_SHELF_MOUNT),
+      slots: [
+        { id: 'shelf', label: 'Shelf', kind: 'wood', default: 'wood.oak' },
+        { id: 'trim', label: 'Front edge', kind: 'metal', default: 'metal.brass' },
+      ],
     }),
   ),
   gen('cabinet.filing', 'Filing cabinet', 'office', ['study'], 'filingPedestal', [430, 560, 640], ['pedestal', 'drawers', 'file storage'], { slots: PEDESTAL_SLOTS }),

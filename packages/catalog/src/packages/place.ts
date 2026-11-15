@@ -11,7 +11,7 @@ import { convexOverlap, rectCorners, rotationFacing } from '../autofurnish/geome
 import { gridPoses, longestRunAngle } from '../autofurnish/placeEntry';
 import { APPROACH, stackWidth, WALL_GAP, type PlaceOptions, type Placed, type Planner, type Pose, type Run, type WallCandidate, type Zone } from '../autofurnish/planner';
 import { curtainPlans } from '../autofurnish/styling';
-import { deskSet, diningSet, slotOf, type Prefer, type PreferSlot } from '../autofurnish/templates';
+import { deskSet, deskStorage, diningSet, slotOf, type Prefer, type PreferSlot } from '../autofurnish/templates';
 import { stillWalkable, walkState, type WalkState } from '../autofurnish/walk';
 import { treatableWindows } from './check';
 
@@ -415,8 +415,15 @@ function placeEntryFor(ctx: LineContext, entry: CatalogEntry, slot: PreferSlot |
         placer.reset();
         return placed;
       }
-      const score = (c: WallCandidate) => (c.underWindow ? 700 : 0) - c.cornerDist * 0.4 + (c.run === bedRun ? -400 : 0);
-      return placer.wall(entry, score, { clear: 600 }) ?? placer.wall(entry, score, { clear: 350 });
+      // No room for the chair at it: the desk alone, still on a solid wall with its storage over it.
+      const score = (c: WallCandidate) => (c.underWindow ? -1500 : 0) - c.cornerDist * 0.4 + (c.run === bedRun ? -400 : 0);
+      const alone = placer.wall(entry, score, { clear: 600 }) ?? placer.wall(entry, score, { clear: 350 });
+      const at = alone ? runBehind(p, alone) : null;
+      if (alone && at) {
+        deskStorage(p, alone, at.run);
+        placer.reset();
+      }
+      return alone;
     }
     case 'dresser': {
       const score = (c: WallCandidate) => -c.cornerDist + (c.run === bedRun ? -800 : 0) - (c.underWindow ? 3000 : 0) + door(c, 0.1);
@@ -489,6 +496,7 @@ function placeEntryFor(ctx: LineContext, entry: CatalogEntry, slot: PreferSlot |
     return null;
   }
   if (entry.anchor === 'floor' && entry.dims.h <= 30) return placer.floor(entry, p.centroid, [longestRunAngle(p)], { flat: true });
+  if (entry.id.startsWith('crockery.')) return crockeryFor(ctx, entry, table, tvRun);
   // Tall storage and the rest: against a wall, out of the walkway, never in front of a window.
   const tall = entry.dims.h > 900;
   // Tall pieces keep clear of the dining chairs, which need room to pull out.
@@ -503,6 +511,39 @@ function placeEntryFor(ctx: LineContext, entry: CatalogEntry, slot: PreferSlot |
     (c.run === bedRun && tall ? 800 : 0) -
     (nearTable(c) ? 2000 : 0);
   return placer.wall(entry, score, { clear: 550 }) ?? placer.wall(entry, score, { clear: 350 });
+}
+
+/**
+ * The crockery unit: against the wall behind the dining table, centred on it, with room to
+ * pull the chairs out in front. It takes the place of a sideboard the layout put there, and
+ * the plants give way when it needs their wall (see `guaranteeLine`).
+ */
+function crockeryFor(ctx: LineContext, entry: CatalogEntry, table: Placed | undefined, tvRun: Run | undefined): Placed | null {
+  const placer = ctx.placer;
+  const p = placer.p;
+  if (!table) return placer.wall(entry, (c) => door(c) - c.cornerDist * 0.25 - (c.underWindow ? 3000 : 0) - (c.run === tvRun ? 1500 : 0), { clear: 600 });
+  const sideboard = p.placed.find((q) => !q.existing && q.entry.id === 'sideboard');
+  if (sideboard) p.remove(sideboard);
+  const at = centre(table);
+  // Square to the table's long side, and as close to the table as the chairs allow.
+  const along = p.facing(table.pose);
+  const score = (c: WallCandidate) =>
+    -vec.dist(c.pose, at) -
+    (Math.abs(vec.dot(c.run.normal, along)) > 0.7 ? 0 : 1200) -
+    (c.underWindow ? 3000 : 0) -
+    (besideGlazing(c, entry) ? 1500 : 0) -
+    (c.run === tvRun ? 3000 : 0);
+  const placed = placer.wall(entry, score, { clear: 600 }) ?? placer.wall(entry, score, { clear: 450 });
+  if (!placed && sideboard) {
+    // Nothing fits: the sideboard goes back where it was.
+    p.placed.push(sideboard);
+    if (sideboard.zone) p.zones.push(sideboard.zone);
+  }
+  return placed;
+}
+
+function door(c: WallCandidate, k = 0.3): number {
+  return Math.min(c.doorDist, 2500) * k;
 }
 
 /** Seats along the long sides of a dining table: a bench on the side with fewer chairs, chairs where they fit. */

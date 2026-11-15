@@ -226,7 +226,12 @@ function bedroom(p: Planner, opts: TemplateOptions): void {
   ceilingItem(p, opts, 'fan.ceiling');
 }
 
-export function deskSet(p: Planner, avoid: Run | null, chairId = 'chair.office', deskId = 'desk', solidWall = false): Run | null {
+/**
+ * A desk with its chair against a wall, and storage over it: a lit floating shelf and
+ * overhead cupboards. The desk prefers a solid wall so the storage has somewhere to go;
+ * under a window it goes without. Returns the desk's wall.
+ */
+export function deskSet(p: Planner, avoid: Run | null, chairId = 'chair.office', deskId = 'desk'): Run | null {
   const desk = E(deskId) ?? E('desk');
   const chair = E(chairId);
   if (!desk || !chair) return null;
@@ -236,19 +241,31 @@ export function deskSet(p: Planner, avoid: Run | null, chairId = 'chair.office',
   // A desk nobody can sit at is not worth placing: only poses with room for the chair count.
   const best = p.bestWall(
     desk,
-    // A desk under a window gets the daylight; one that takes overhead cupboards needs solid wall above it.
     (c) =>
-      (p.can(chair, seat(c.pose), { group: g }) ? 0 : -Infinity) +
-      (c.underWindow ? (solidWall ? -1500 : 700) : 0) -
+      (p.can(chair, seat(c.pose), { group: g }) ? 0 : -Infinity) -
+      (c.underWindow ? 1500 : 0) -
       c.cornerDist * 0.4 +
       (c.run === avoid ? -400 : 0) +
       Math.min(c.doorDist, 2000) * 0.2,
     { clear: reach, group: g },
   );
   if (!best) return null;
-  p.place(desk, best.pose, { clear: reach, group: g });
+  const placed = p.place(desk, best.pose, { clear: reach, group: g });
   p.tryPlace(chair, seat(best.pose), { group: g });
+  deskStorage(p, placed, best.run);
   return best.run;
+}
+
+/** Overhead cupboards and a lit floating shelf centred over a desk, each as wide as the desk allows. */
+export function deskStorage(p: Planner, desk: Placed, run: Run): void {
+  const t = vec.dot(vec.sub({ x: desk.pose.x, y: desk.pose.y }, run.a), run.dir);
+  for (const prefix of ['storage.overhead', 'shelf.floating']) {
+    for (const w of [1200, 900]) {
+      const entry = E(`${prefix}.${w}`);
+      if (!entry || entry.dims.w > desk.entry.dims.w + 100) continue;
+      if (p.tryPlace(entry, p.against(run, t, entry, entry.mountHeight ?? 1500, 2), { group: desk.group })) break;
+    }
+  }
 }
 
 function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
@@ -709,13 +726,13 @@ function balcony(p: Planner): void {
 }
 
 /**
- * A work-from-home desk: the desk and its chair on a solid wall, a laptop, a monitor and a
- * keyboard on it, and overhead cupboards above it. Returns the desk's wall.
+ * A work-from-home desk: the desk and its chair on a solid wall with storage over it
+ * (`deskSet`), and a laptop, a monitor and a keyboard on it. Returns the desk's wall.
  */
 function wfhDesk(p: Planner): Run | null {
   let run: Run | null = null;
   for (const id of ['desk', 'desk.writing']) {
-    run = deskSet(p, null, 'chair.office', id, true);
+    run = deskSet(p, null, 'chair.office', id);
     if (run) break;
   }
   const desk = p.placed.filter((q) => q.entry.id.startsWith('desk')).at(-1);
@@ -731,13 +748,6 @@ function wfhDesk(p: Planner): Run | null {
   // The laptop to one side of the keyboard: the left, else the right.
   const lx = laptop ? Math.min(half - laptop.dims.w / 2 - 40, 420) : 0;
   for (const side of [-1, 1]) if (p.tryPlace(laptop, p.offset(desk.pose, side * lx, -40, desk.pose.rot, top), { group: desk.group })) break;
-  // Overhead cupboards centred over the desk, as wide as it allows.
-  const t = vec.dot(vec.sub({ x: desk.pose.x, y: desk.pose.y }, run.a), run.dir);
-  for (const id of ['storage.overhead.1200', 'storage.overhead.900']) {
-    const entry = E(id);
-    if (!entry || entry.dims.w > desk.entry.dims.w + 100) continue;
-    if (p.tryPlace(entry, p.against(run, t, entry, entry.mountHeight ?? 1500, 2))) break;
-  }
   return run;
 }
 

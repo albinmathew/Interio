@@ -361,6 +361,26 @@ export function buildFilingPedestal(entry: CatalogEntry, ctx?: BuildContext): TH
   return p.build();
 }
 
+/** Warm white of the light strip under a floating shelf. */
+const SHELF_LED = '#fff1d6';
+
+/**
+ * A floating wall shelf over a desk: a thick wood slab on hidden brackets with a slim metal
+ * front edge, and a warm light strip along the front of its underside that washes the
+ * wall and the desk.
+ */
+function buildFloatingShelf(entry: CatalogEntry, ctx?: BuildContext): THREE.Object3D {
+  const m = new Model(entry, ctx);
+  const { W, D, H } = m;
+  const strip = 0.004;
+  const trim = 0.003;
+  m.part('shelf', rbox(W, H - strip, D - trim, 0.004, 0, strip, -trim / 2, 2));
+  // A slim metal edge along the front.
+  m.part('trim', box(W, H - strip, trim, 0, strip, D / 2 - trim / 2));
+  m.fixed(SHELF_LED, box(W - 0.04, strip, 0.012, 0, 0, D / 2 - 0.03));
+  return m.build();
+}
+
 /** Generators of this family, registered by `premium/index.ts`. */
 export const OFFICE_GENERATORS: Record<string, (entry: CatalogEntry, ctx?: BuildContext) => THREE.Object3D> = {
   workDesk: buildWorkDesk,
@@ -369,4 +389,5 @@ export const OFFICE_GENERATORS: Record<string, (entry: CatalogEntry, ctx?: Build
   laptopComputer: buildLaptopComputer,
   computerKeyboard: buildComputerKeyboard,
   filingPedestal: buildFilingPedestal,
+  floatingShelf: buildFloatingShelf,
 };

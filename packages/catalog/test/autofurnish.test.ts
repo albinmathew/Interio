@@ -399,12 +399,20 @@ describe('autoFurnish scales with the room', () => {
     expect(ids(foyer).some((id) => id === 'table.console' || id === 'shoe.cabinet')).toBe(true);
   });
 
-  it('keeps tall pieces away from windows and puts the desk under one', () => {
-    const { level, roomId } = boxLevel(3600, 3800, 'bedroom', [door(600, 0), windowAt(1800, 3800, 1800)]);
+  it('keeps tall pieces away from windows; a desk on a solid wall gets a lit shelf and overhead cupboards over it', () => {
+    const { level, roomId } = boxLevel(4500, 4500, 'bedroom', [door(600, 0), windowAt(2250, 4500, 1800)]);
     const items = autoFurnish(level, roomId);
     checkLayout(level, roomId, items);
-    const desk = items.find((i) => i.catalogId === 'desk');
-    if (desk) expect(desk.y).toBeGreaterThan(3000);
+    const desk = items.find((i) => i.catalogId === 'desk')!;
+    expect(desk).toBeDefined();
+    for (const prefix of ['storage.overhead.', 'shelf.floating.']) {
+      const over = items.find((i) => i.catalogId.startsWith(prefix));
+      expect(over, prefix).toBeDefined();
+      // Centred over the desk, on its wall, above its top.
+      expect(over!.rotationDeg).toBe(desk.rotationDeg);
+      expect(Math.hypot(over!.x - desk.x, over!.y - desk.y)).toBeLessThan(getEntry('desk')!.dims.d);
+      expect(over!.z).toBeGreaterThan(getEntry('desk')!.dims.h + 400);
+    }
   });
 
   it('handles an L-shaped living room', () => {
