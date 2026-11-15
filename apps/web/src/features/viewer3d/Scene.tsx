@@ -257,7 +257,7 @@ function CameraRig({ box }: { box: Box }) {
   // Frame one item (the package checklist's "show me"): from the current heading, close in on its box.
   useLayoutEffect(() => {
     const c = controls.current;
-    if (!c || !focus) return;
+    if (!c || !focus || first.current) return;
     const size = latest.current.size;
     const free = freeView(size.width, size.height, FOV[view], insetsFor(size, useViewer.getState().dock !== null));
     const dir = camera.position.clone().sub(c.target).normalize();

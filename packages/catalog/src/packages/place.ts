@@ -280,7 +280,8 @@ function placeOne(ctx: LineContext): One {
     if (!entry) continue;
     const placed = placeEntryFor(ctx, entry, slot);
     if (placed) return { placed };
-    last ??= noRoomReason(p, entry);
+    const diningSide = entry.id === 'basin.vanity' && find(p, /^sofa\./).length > 0 && find(p, /^table\.dining/).length > 0;
+    last ??= noRoomReason(p, entry, diningSide ? 'No free wall on the dining side' : undefined);
   }
   return { reason: last ?? 'Not in the catalog' };
 }
@@ -441,18 +442,16 @@ function placeEntryFor(ctx: LineContext, entry: CatalogEntry, slot: PreferSlot |
   if (entry.id === 'basin.vanity' || entry.category === 'bathroom') {
     // The common wash: against a wall, tucked into a corner away from the doors and the seating, near the dining table.
     const seat = sofa ? centre(sofa) : null;
-    return placer.wall(
-      entry,
-      (c) =>
+    const score = (c: WallCandidate) =>
         -c.cornerDist * 0.6 +
         door(c, 0.3) -
         (table ? vec.dist(c.pose, centre(table)) * 0.5 : 0) -
-        (seat && table && vec.dist(c.pose, seat) < vec.dist(c.pose, centre(table)) ? 2500 : 0) -
+        // In a living room with a dining area: on the dining side only, never on the TV wall.
+        (seat && table && (vec.dist(c.pose, seat) < vec.dist(c.pose, centre(table)) || c.run === tvRun) ? Infinity : 0) -
         (seat && vec.dist(c.pose, seat) < 2500 ? 2000 : 0) -
         (c.run === tvRun ? 3000 : 0) -
-        (c.underWindow ? 300 : 0),
-      { clear: 550 },
-    );
+        (c.underWindow ? 300 : 0);
+    return placer.wall(entry, score, { clear: 550 }) ?? placer.wall(entry, score, { clear: 400 });
   }
   if (entry.anchor === 'wall') {
     // Wall pieces (a clock, a mirror): on a long free wall, not over the screen or the bed, not across a window.

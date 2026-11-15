@@ -165,7 +165,7 @@ export default function Viewer3D() {
   const view = useViewer((s) => s.view);
   useKeyboard();
   // Leaving the view drops any half-finished placement.
-  useEffect(() => () => useViewer.setState({ placing: null, ghost: null, drag: null }), []);
+  useEffect(() => () => useViewer.setState({ placing: null, ghost: null, drag: null, focus: null }), []);
   if (!level) return null;
   if (Object.keys(level.walls).length === 0)
     return (
