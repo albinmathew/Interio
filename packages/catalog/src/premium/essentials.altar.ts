@@ -55,14 +55,22 @@ const glowCopies = new WeakMap<THREE.Material, THREE.Material>();
 function glowOf(source: THREE.Material, glow: Glow): THREE.Material {
   let m = glowCopies.get(source);
   if (!m) {
-    const copy = source.clone() as THREE.MeshStandardMaterial;
-    copy.name = source.name;
-    if (copy.emissive && copy.color) {
-      copy.emissive.copy(copy.color).lerp(new THREE.Color('#ffffff'), 0.3).multiply(glow.tint);
-      copy.emissiveIntensity = glow.intensity;
-      copy.color.multiplyScalar(glow.surface);
-    }
-    glowCopies.set(source, (m = copy));
+    // A standard material, not a physical clone: the renderer's lite mode swaps physical
+    // materials for plain ones without emissive, which would leave a dim, unlit panel.
+    const src = source as THREE.MeshStandardMaterial;
+    const base = src.color?.clone() ?? new THREE.Color('#ffffff');
+    m = new THREE.MeshStandardMaterial({
+      name: source.name,
+      color: base.clone().multiplyScalar(glow.surface),
+      map: src.map ?? null,
+      normalMap: src.normalMap ?? null,
+      roughnessMap: src.roughnessMap ?? null,
+      roughness: src.roughness ?? 0.5,
+      metalness: src.metalness ?? 0,
+      emissive: base.lerp(new THREE.Color('#ffffff'), 0.3).multiply(glow.tint),
+      emissiveIntensity: glow.intensity,
+    });
+    glowCopies.set(source, m);
   }
   return m;
 }
