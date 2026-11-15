@@ -17,11 +17,11 @@ import { KIDS_STORAGE_GENERATORS } from './kids.storage';
 export const KIDS_BED_SLOTS: FinishSlot[] = [
   { id: 'frame', label: 'Frame', kind: 'lacquer', default: 'lacquer.cream' },
   { id: 'headboard', label: 'Headboard', kind: 'fabric', default: 'fabric.boucle.cream' },
-  { id: 'bedding', label: 'Quilt and cushion', kind: 'fabric', default: 'fabric.cotton.blush' },
-  { id: 'pillows', label: 'Pillow', kind: 'fabric', default: 'fabric.linen.ivory' },
+  { id: 'bedding', label: 'Quilt', kind: 'fabric', default: 'fabric.cotton.blush' },
+  { id: 'pillows', label: 'Pillow and cushion', kind: 'fabric', default: 'fabric.linen.ivory' },
 ];
 
-export const KIDS_TEDDY_SLOTS: FinishSlot[] = [{ id: 'fur', label: 'Fur', kind: 'fabric', default: 'woven.jute' }];
+export const KIDS_TEDDY_SLOTS: FinishSlot[] = [{ id: 'fur', label: 'Fur', kind: 'fabric', default: 'fabric.linen.sand' }];
 
 /** The fitted sheet and mattress. */
 const SHEET = 'fabric.cotton.white';
@@ -127,7 +127,7 @@ export function quiltedDuvet(w: number, z0: number, z1: number, top: number, hem
  * Kids' single bed. A low frame on short tapered legs, a scalloped headboard of
  * upholstered arches on a lacquered backing, a mattress in a white sheet, a
  * quilted cover that falls nearly to the floor, folded back at the head, one
- * plump pillow and a smaller cushion in the cover's fabric. Head at -Z.
+ * plump pillow and a smaller cushion in front of it. Head at -Z.
  *
  * Params: `scallops` across the headboard (default one per 330 mm of width).
  */
@@ -179,13 +179,13 @@ export function buildKidsBed(entry: CatalogEntry, ctx?: BuildContext): THREE.Obj
   m.fixed(SHEET, rbox(mattW, mattH, mattLen, 0.05, 0, mattY, bedBack + 0.005 + mattLen / 2, 4));
   const top = mattY + mattH;
 
-  /* Pillow leaning on the headboard, a smaller cushion in the cover's fabric in front. */
+  /* Pillow leaning on the headboard, a smaller cushion in front. */
   const pw = Math.min(0.66, mattW - 0.14);
   const pz = bedBack + 0.2;
   m.part('pillows', turn(pillow(pw, 0.2, 0.44, 0, top - 0.03, pz), -0.62, 0, 0, 0, top, pz));
   const cwid = Math.min(0.44, pw * 0.68);
   const cz = bedBack + 0.36;
-  m.part('bedding', turn(pillow(cwid, 0.13, 0.32, 0, top + 0.005, cz), -1.05, 0, 0, 0, top, cz));
+  m.part('pillows', turn(pillow(cwid, 0.13, 0.32, 0, top + 0.005, cz), -1.05, 0, 0, 0, top, cz));
 
   /* The quilted cover: from below the cushion to the foot, nearly to the floor; folded back at the head. */
   const start = bedBack + 0.52;
