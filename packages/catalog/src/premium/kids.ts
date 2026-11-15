@@ -98,7 +98,9 @@ export function quiltedDuvet(w: number, z0: number, z1: number, top: number, hem
       const stitch = j === 0 || j === nv || i === 0 || i === nu ? 0 : depth * (1 - fu * fv);
       // Soft folds in the drop, growing towards the hem; always inwards, so the cover keeps its size.
       const fall = Math.min(1, Math.max(0, (shoulder - p.getY(k)) / Math.max(0.01, shoulder - hem)));
-      const fold = 0.007 * fall ** 1.3 * (1 - Math.cos(((p.getX(k) + p.getZ(k)) * 2 * Math.PI) / 0.31 + 0.8));
+      // The hem line itself stays put, so the corners, folded flat into it, do not tear.
+      const atHem = p.getY(k) <= hem + 0.002;
+      const fold = atHem ? 0 : 0.007 * fall ** 1.3 * (1 - Math.cos(((p.getX(k) + p.getZ(k)) * 2 * Math.PI) / 0.31 + 0.8));
       const d = outward * (stitch + fold);
       p.setXYZ(k, p.getX(k) - n.getX(k) * d, p.getY(k) - n.getY(k) * d, p.getZ(k) - n.getZ(k) * d);
     }
@@ -139,8 +141,8 @@ export function buildKidsBed(entry: CatalogEntry, ctx?: BuildContext): THREE.Obj
   const railH = 0.17;
   const railT = 0.03;
   const frameTop = legH + railH;
-  const FW = W - 0.08; // frame width; the cover hangs over it
-  const foot = D / 2 - 0.03; // the foot rail's face, inside the cover's fall
+  const FW = W - 0.12; // frame width: the cover hangs over it, its stitches and folds clear of the rails
+  const foot = D / 2 - 0.055; // the foot rail's face, well inside the cover's fall
   const bedLen = foot - bedBack;
   const zMid = bedBack + bedLen / 2;
 
@@ -170,7 +172,7 @@ export function buildKidsBed(entry: CatalogEntry, ctx?: BuildContext): THREE.Obj
   }
 
   /* Mattress in its sheet, sitting into the frame. */
-  const mattW = FW - 2 * railT - 0.01;
+  const mattW = FW - 0.012; // sitting into the frame, just inside the rails' faces
   const mattH = 0.2;
   const mattY = frameTop - 0.05;
   const mattLen = bedLen - railT - 0.01;
