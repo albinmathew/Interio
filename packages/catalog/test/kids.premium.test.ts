@@ -42,6 +42,8 @@ describe('kids bedroom set', () => {
       'nightstand.baskets': [1100, 400, 650],
       'study.storage.kids.2100': [2100, 600, 2400],
       'study.storage.kids.2400': [2400, 600, 2400],
+      'study.storage.kids.2100.r': [2100, 600, 2400],
+      'study.storage.kids.2400.r': [2400, 600, 2400],
       'toy.teddy': [260, 200, 300],
     });
     for (const e of KIDS_ENTRIES) {
