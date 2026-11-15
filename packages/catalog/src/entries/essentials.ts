@@ -9,6 +9,7 @@
  */
 import type { CatalogEntry } from '@interio/core';
 import { BED_SLOTS } from '../premium/beds';
+import { ESS_BLIND_SLOTS } from '../premium/essentials.parts';
 import { sofaSlots } from '../premium/seating';
 import { gen, wall } from './helpers';
 
@@ -44,6 +45,6 @@ export const ESSENTIALS_ENTRIES: CatalogEntry[] = [
   }),
   gen('bed.queen.storage', 'Queen bed with bottom storage', 'beds', ['bedroom'], 'essentialsBedBox', [1700, 2150, 1100], ['bed', 'queen', 'storage', 'hydraulic', 'box bed'], { slots: BED_SLOTS }),
   ...BLIND_WIDTHS.map((w) =>
-    gen(`blind.roman.${w}`, `Roman blind, ${(w / 1000).toFixed(1)} m`, 'decor', ['bedroom', 'living', 'study', 'dining', 'kitchen'], 'essentialsPlaceholder', [w, 80, 1500], ['blind', 'roman blind', 'window', 'shade'], wall(850)),
+    gen(`blind.roman.${w}`, `Roman blind, ${(w / 1000).toFixed(1)} m`, 'decor', ['bedroom', 'living', 'study', 'dining', 'kitchen'], 'essentialsRomanBlind', [w, 80, 1500], ['blind', 'roman blind', 'window', 'shade'], { ...wall(850), slots: ESS_BLIND_SLOTS }),
   ),
 ];
