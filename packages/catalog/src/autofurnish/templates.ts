@@ -9,6 +9,52 @@ import { rectCorners, rotationFacing } from './geometry';
 import { WALL_GAP, type Placed, type Planner, type Pose, type Run, type WallCandidate } from './planner';
 import type { RoomSeed } from './seed';
 
+/**
+ * Pieces a furnishing package asks for, by the role they play in a room. A template that
+ * would place a piece of that role tries the package's choice first and falls back to its
+ * own when it does not fit.
+ */
+export type PreferSlot =
+  | 'bed'
+  | 'nightstand'
+  | 'wardrobe'
+  | 'desk'
+  | 'dresser'
+  | 'sofa'
+  | 'tvUnit'
+  | 'coffeeTable'
+  | 'rug'
+  | 'diningTable'
+  | 'diningChair'
+  | 'bench'
+  | 'shoe'
+  | 'mirror';
+export type Prefer = Partial<Record<PreferSlot, string>>;
+
+/** The role a catalog id plays in a room, for package preferences. */
+export function slotOf(catalogId: string): PreferSlot | null {
+  const rules: [RegExp, PreferSlot][] = [
+    [/^bed\./, 'bed'],
+    [/^nightstand/, 'nightstand'],
+    [/^wardrobe\./, 'wardrobe'],
+    [/^desk/, 'desk'],
+    [/^(dresser|dressing\.)/, 'dresser'],
+    [/^sofa\./, 'sofa'],
+    [/^tv\.unit/, 'tvUnit'],
+    [/^table\.coffee/, 'coffeeTable'],
+    [/^rug\./, 'rug'],
+    [/^table\.dining/, 'diningTable'],
+    [/^chair\.dining/, 'diningChair'],
+    [/^bench\.dining/, 'bench'],
+    [/^shoe\./, 'shoe'],
+    [/^mirror\./, 'mirror'],
+  ];
+  return rules.find(([re]) => re.test(catalogId))?.[1] ?? null;
+}
+
+/** `list` with the preferred id first. */
+const first = (prefer: string | undefined, list: string[]): string[] => (prefer ? [prefer, ...list.filter((id) => id !== prefer)] : list);
+
 export interface TemplateOptions {
   /** Include wall-mounted and ceiling pieces. */
   mounted: boolean;
@@ -18,6 +64,8 @@ export interface TemplateOptions {
    */
   styled?: boolean;
   seed?: RoomSeed;
+  /** A furnishing package's pieces, tried before the template's own. */
+  prefer?: Prefer;
 }
 
 const E = (id: string): CatalogEntry | undefined => getEntry(id);
@@ -52,19 +100,24 @@ function cornerPlant(p: Planner, id = 'plant.potted'): void {
   if (best && best.cornerDist < 400) p.place(entry, best.pose);
 }
 
-/** Table with chairs as one block. Returns the table, or null when no size fits. */
-function diningSet(p: Planner, opts: TemplateOptions, sizes: string[], target: (centre: Pt) => number): Placed | null {
-  const chair = E('chair.dining.cushion');
+/**
+ * Table with chairs as one block. Returns the table, or null when no size fits. A package's
+ * table may stand with a narrower walkway round the block before a smaller table is taken.
+ */
+export function diningSet(p: Planner, opts: TemplateOptions, sizes: string[], target: (centre: Pt) => number): Placed | null {
+  const chair = E(opts.prefer?.diningChair ?? 'chair.dining.cushion') ?? E('chair.dining.cushion');
+  // A package with a bench seats one long side on it.
+  const bench = opts.prefer?.bench ? E(opts.prefer.bench) : undefined;
   if (!chair) return null;
   const main = [...p.runs].sort((a, b) => b.len - a.len)[0];
   if (!main) return null;
   const baseRot = (Math.atan2(main.dir.y, main.dir.x) * 180) / Math.PI;
   const bounds = vec.polygonBounds(p.polygon);
-  for (const id of sizes) {
+  const tries = first(opts.prefer?.diningTable, sizes).flatMap((id) => (id === opts.prefer?.diningTable ? [250, 120] : [250]).map((walk) => ({ id, walk })));
+  for (const { id, walk } of tries) {
     const table = E(id);
     if (!table) continue;
     const seatDepth = chair.dims.d + 40;
-    const walk = 250;
     const heads = table.dims.w >= 2200;
     const blockW = table.dims.w + (heads ? 2 * seatDepth : 0) + 2 * walk;
     const blockD = table.dims.d + 2 * seatDepth + 2 * walk;
@@ -89,10 +142,12 @@ function diningSet(p: Planner, opts: TemplateOptions, sizes: string[], target: (
     const perSide = table.dims.w >= 1600 ? 3 : 2;
     const pitch = table.dims.w / perSide;
     const off = table.dims.d / 2 + 40 + chair.dims.d / 2;
+    const benchPose = bench && bench.dims.w <= table.dims.w + 100 ? p.offset(pose, 0, table.dims.d / 2 + 40 + bench.dims.d / 2, pose.rot) : null;
+    const benched = benchPose !== null && p.tryPlace(bench, benchPose, { group: g }) !== null;
     for (let i = 0; i < perSide; i++) {
       const lx = -table.dims.w / 2 + pitch * (i + 0.5);
       p.tryPlace(chair, p.offset(pose, lx, -off, pose.rot + 180), { group: g });
-      p.tryPlace(chair, p.offset(pose, lx, off, pose.rot), { group: g });
+      if (!benched) p.tryPlace(chair, p.offset(pose, lx, off, pose.rot), { group: g });
     }
     if (heads) {
       const hx = table.dims.w / 2 + 40 + chair.dims.d / 2;
@@ -109,12 +164,13 @@ function diningSet(p: Planner, opts: TemplateOptions, sizes: string[], target: (
 
 function bedroom(p: Planner, opts: TemplateOptions): void {
   const order = ['bed.king', 'bed.queen', 'bed.double', 'bed.single'];
-  const first = p.area >= 13.5 ? 0 : p.area >= 10.5 ? 1 : p.area >= 8 ? 2 : 3;
-  const night = E('nightstand.drawer');
+  const from = p.area >= 13.5 ? 0 : p.area >= 10.5 ? 1 : p.area >= 8 ? 2 : 3;
+  const prefer = opts.prefer ?? {};
+  const night = E(prefer.nightstand ?? 'nightstand.drawer') ?? E('nightstand.drawer');
   let bedRun: Run | null = null;
 
   if (!p.has('bed.')) {
-    for (const id of order.slice(first)) {
+    for (const id of first(prefer.bed, order.slice(from))) {
       const bed = E(id);
       if (!bed) continue;
       const single = id === 'bed.single';
@@ -149,8 +205,8 @@ function bedroom(p: Planner, opts: TemplateOptions): void {
   }
 
   if (!p.has('wardrobe.')) {
-    const options = p.area >= 12.5 ? ['wardrobe.sliding', 'wardrobe.3door', 'wardrobe.2door'] : p.area >= 9.5 ? ['wardrobe.3door', 'wardrobe.2door'] : ['wardrobe.2door'];
-    for (const id of options) {
+    const sized = p.area >= 12.5 ? ['wardrobe.sliding', 'wardrobe.3door', 'wardrobe.2door'] : p.area >= 9.5 ? ['wardrobe.3door', 'wardrobe.2door'] : ['wardrobe.2door'];
+    for (const id of first(prefer.wardrobe, sized)) {
       const wardrobe = E(id);
       const clear = id === 'wardrobe.sliding' ? 500 : 650;
       const best = p.bestWall(wardrobe, (c) => -c.cornerDist * 1.5 + (c.run === bedRun ? -1500 : 0) + Math.min(c.doorDist, 2000) * 0.1, { clear });
@@ -161,17 +217,17 @@ function bedroom(p: Planner, opts: TemplateOptions): void {
     }
   }
 
-  if (p.area >= 9.5 && !p.has('desk')) deskSet(p, bedRun);
-  if (p.area >= 15) {
-    const dresser = E('dresser');
+  if (p.area >= 9.5 && !p.has('desk')) deskSet(p, bedRun, 'chair.office', prefer.desk);
+  if (p.area >= 15 && !p.has('dresser', 'dressing.')) {
+    const dresser = E(prefer.dresser ?? 'dresser');
     const best = p.bestWall(dresser, (c) => -c.cornerDist + (c.run === bedRun ? -800 : 0), { clear: 600 });
     if (dresser && best) p.place(dresser, best.pose, { clear: 600 });
   }
   ceilingItem(p, opts, 'fan.ceiling');
 }
 
-function deskSet(p: Planner, avoid: Run | null, chairId = 'chair.office'): Run | null {
-  const desk = E('desk');
+export function deskSet(p: Planner, avoid: Run | null, chairId = 'chair.office', deskId = 'desk'): Run | null {
+  const desk = E(deskId) ?? E('desk');
   const chair = E(chairId);
   if (!desk || !chair) return null;
   const g = p.group();
@@ -190,11 +246,19 @@ function deskSet(p: Planner, avoid: Run | null, chairId = 'chair.office'): Run |
 }
 
 function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
-  const unit = E('tv.unit');
+  const prefer = opts.prefer ?? {};
+  const unit = E(prefer.tvUnit ?? 'tv.unit') ?? E('tv.unit');
   const tv = E('tv.wall.55');
-  const sofas = [E('sofa.3seat'), E('sofa.2seat')].filter((e): e is CatalogEntry => !!e);
-  let seatCentre: Pt | null = null;
+  const sofas = first(prefer.sofa, ['sofa.3seat', 'sofa.2seat'])
+    .map(E)
+    .filter((e): e is CatalogEntry => !!e);
+  // A package's dining set in the same room comes before the armchair, the lamp and the
+  // rest; when it does not fit, the seating group moves towards one end of the room.
+  const packageDining = !!prefer.diningTable && !p.has('table.dining');
+  let extras: (() => void) | null = null;
 
+  const seating = (bias: number): Pt | null => {
+  let seatCentre: Pt | null = null;
   if (unit && tv && sofas.length > 0 && !p.has('sofa.')) {
     interface Plan {
       run: Run;
@@ -222,19 +286,21 @@ function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
           const dist = WALL_GAP + unit.dims.d + gap + sofa.dims.d / 2;
           const backed = Math.abs(gap - Math.floor(toWall)) < 2;
           // The sofa may sit a little off the screen's axis when a doorway is in the way.
-          for (const shift of [0, -250, 250, -500, 500]) {
+          const shifts = sofa.id === prefer.sofa ? [0, -250, 250, -500, 500, -750, 750, -1000, 1000] : [0, -250, 250, -500, 500];
+          for (const shift of shifts) {
             const centre = vec.add(vec.add(c.run.a, vec.scale(c.run.dir, c.t + shift)), vec.scale(c.run.normal, dist));
             const sofaPose: Pose = { x: centre.x, y: centre.y, rot: rotationFacing(vec.scale(c.run.normal, -1)), z: 0 };
             if (!p.can(sofa, sofaPose, { clear: 450 })) continue;
             const score =
               (tvOk ? 2500 : 0) +
-              (sofa.id === 'sofa.3seat' ? 700 : 0) +
+              (sofa.id === prefer.sofa ? 1500 : sofa.id === 'sofa.3seat' ? 700 : 0) +
               (backed ? 500 : 0) -
               Math.abs(gap - 2700) * 0.35 -
               Math.abs(shift) * 0.8 -
               c.centreOffset * 0.15 -
               (c.underWindow ? 600 : 0) +
-              Math.min(p.doorDistance(centre), 2500) * 0.25;
+              Math.min(p.doorDistance(centre), 2500) * 0.25 +
+              bias * vec.dist(centre, p.centroid) * 0.8;
             if (!best || score > best.score + 1e-6) best = { run: c.run, t: c.t, unitPose: c.pose, sofa, sofaPose, gap, tvOk, score };
           }
         }
@@ -255,22 +321,31 @@ function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
       seatCentre = { x: (sofaPose.x + best.unitPose.x) / 2, y: (sofaPose.y + best.unitPose.y) / 2 };
 
       // Coffee table and rug between the sofa and the screen.
-      const table = E(best.gap >= 1900 ? 'table.coffee' : 'table.coffee.square');
+      let table: CatalogEntry | undefined;
       let tablePose: Pose | null = null;
-      if (table && best.gap >= table.dims.d + 950) {
-        tablePose = p.offset(sofaPose, 0, -(best.sofa.dims.d / 2 + 420 + table.dims.d / 2));
-        if (!p.tryPlace(table, tablePose, { group: g })) tablePose = null;
+      for (const id of first(prefer.coffeeTable, [best.gap >= 1900 ? 'table.coffee' : 'table.coffee.square'])) {
+        table = E(id);
+        if (!table || best.gap < table.dims.d + 950) continue;
+        const pose = p.offset(sofaPose, 0, -(best.sofa.dims.d / 2 + 420 + table.dims.d / 2));
+        if (p.tryPlace(table, pose, { group: g })) {
+          tablePose = pose;
+          break;
+        }
       }
-      if (opts.styled && opts.seed) seatingRug(p, opts.seed, best.sofa, sofaPose, tablePose);
+      if (opts.styled && opts.seed) seatingRug(p, opts.seed, best.sofa, sofaPose, tablePose, prefer.rug);
       else if (tablePose) {
         for (const id of ['rug.rectangle', 'rug.square', 'rug.round']) if (p.tryPlace(E(id), tablePose, { flat: true })) break;
       }
 
+      const sofaFinal = best.sofa;
+      const runOfUnit = best.run;
+      const fanAt = seatCentre;
+      extras = () => {
       // Armchair at one end of the coffee table, turned towards it.
       const arm = E('armchair');
       const anchor = tablePose ?? p.offset(sofaPose, 0, -(best.sofa.dims.d / 2 + 700));
       if (arm) {
-        const reach = Math.max(best.sofa.dims.w / 2 + 100, (table?.dims.w ?? 0) / 2 + 450) + arm.dims.d / 2;
+        const reach = Math.max(sofaFinal.dims.w / 2 + 100, (table?.dims.w ?? 0) / 2 + 450) + arm.dims.d / 2;
         const sides = [-1, 1].sort((a, b) => p.doorDistance(p.offset(anchor, b * reach, 0)) - p.doorDistance(p.offset(anchor, a * reach, 0)));
         for (const side of sides) {
           const pose = p.offset(anchor, side * reach, 0, sofaPose.rot - side * 90);
@@ -280,18 +355,42 @@ function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
       const lamp = E(opts.styled && opts.seed ? opts.seed.pick('floor-lamp', ['lamp.floor.round', 'lamp.floor.square']) : 'lamp.floor.round');
       if (lamp) {
         for (const side of [1, -1]) {
-          if (p.tryPlace(lamp, p.offset(sofaPose, side * (best.sofa.dims.w / 2 + 60 + lamp.dims.w / 2), (best.sofa.dims.d - lamp.dims.d) / 2))) break;
+          if (p.tryPlace(lamp, p.offset(sofaPose, side * (sofaFinal.dims.w / 2 + 60 + lamp.dims.w / 2), (sofaFinal.dims.d - lamp.dims.d) / 2))) break;
         }
       }
-      wallItem(p, opts, 'ac.split', undefined, (c) => -c.centreOffset * 0.5 - (c.underWindow ? 300 : 0) - Math.abs(vec.dot(c.run.normal, best.run.normal)) * 600);
-      ceilingItem(p, opts, 'fan.ceiling', seatCentre);
+      wallItem(p, opts, 'ac.split', undefined, (c) => -c.centreOffset * 0.5 - (c.underWindow ? 300 : 0) - Math.abs(vec.dot(c.run.normal, runOfUnit.normal)) * 600);
+      ceilingItem(p, opts, 'fan.ceiling', fanAt);
+      };
+      if (!packageDining) {
+        extras();
+        extras = null;
+      }
     }
   }
+  return seatCentre;
+  };
 
-  if ((withDining || p.area >= 18) && !p.has('table.dining')) {
-    const away = seatCentre;
-    const sizes = p.area >= 34 ? ['table.dining8', 'table.dining6', 'table.dining4'] : p.area >= 22 ? ['table.dining6', 'table.dining4'] : ['table.dining4'];
-    diningSet(p, opts, sizes, (c) => (away ? Math.min(vec.dist(c, away), 6000) : -vec.dist(c, p.centroid)) + Math.min(p.wallDistance(c), 1500) * 0.3);
+  const sizes = p.area >= 34 ? ['table.dining8', 'table.dining6', 'table.dining4'] : p.area >= 22 ? ['table.dining6', 'table.dining4'] : ['table.dining4'];
+  const diningNear = (away: Pt | null) => diningSet(p, opts, sizes, (c) => (away ? Math.min(vec.dist(c, away), 6000) : -vec.dist(c, p.centroid)) + Math.min(p.wallDistance(c), 1500) * 0.3);
+  const start = p.mark();
+  const seatCentre = seating(0);
+  if (packageDining) {
+    const table = diningNear(seatCentre);
+    if (table?.entry.id !== prefer.diningTable && seatCentre) {
+      // Move the seating group towards one end; keep that only if it makes room for the package's table.
+      p.rollback(start);
+      extras = null;
+      const moved = diningNear(seating(1));
+      if (!(moved?.entry.id === prefer.diningTable || (!table && moved))) {
+        p.rollback(start);
+        extras = null;
+        diningNear(seating(0));
+      }
+    }
+    const rest = extras as (() => void) | null;
+    rest?.();
+  } else if ((withDining || p.area >= 18) && !p.has('table.dining')) {
+    diningNear(seatCentre);
   }
   cornerPlant(p);
 }
@@ -300,8 +399,8 @@ function living(p: Planner, opts: TemplateOptions, withDining: boolean): void {
  * The rug of a seating group: under the front legs of the sofa, reaching past the coffee
  * table towards the screen. The shape varies from home to home; the first that fits wins.
  */
-function seatingRug(p: Planner, seed: RoomSeed, sofa: CatalogEntry, sofaPose: Pose, tablePose: Pose | null): void {
-  const shapes = seed.order('living-rug', ['rug.large', 'rug.rectangle', 'rug.rounded', 'rug.square']);
+function seatingRug(p: Planner, seed: RoomSeed, sofa: CatalogEntry, sofaPose: Pose, tablePose: Pose | null, prefer?: string): void {
+  const shapes = first(prefer, seed.order('living-rug', ['rug.large', 'rug.rectangle', 'rug.rounded', 'rug.square']));
   // Slide along the sofa towards the middle of the room when a doorway is in the way.
   const towards = vec.dot(vec.sub(p.centroid, sofaPose), vec.rotate({ x: 1, y: 0 }, sofaPose.rot)) >= 0 ? 1 : -1;
   for (const id of [...shapes, 'rug.round']) {
@@ -590,17 +689,27 @@ function study(p: Planner, opts: TemplateOptions): void {
 }
 
 function foyer(p: Planner, opts: TemplateOptions): void {
+  const prefer = opts.prefer ?? {};
   let consoleRun: Run | null = null;
-  for (const id of ['table.console', 'shoe.cabinet']) {
+  // A package's shoe rack comes first; the console and its mirror follow when there is room.
+  if (prefer.shoe && !p.has('shoe.')) {
+    const rack = E(prefer.shoe);
+    const best = p.bestWall(rack, (c) => -c.cornerDist * 0.5 + Math.min(c.doorDist, 2000) * 0.2 - (c.underWindow ? 2000 : 0), { clear: 400 });
+    if (rack && best) p.place(rack, best.pose, { clear: 400 });
+  }
+  for (const id of prefer.shoe ? ['table.console'] : ['table.console', 'shoe.cabinet']) {
     const entry = E(id);
     const best = p.bestWall(entry, (c) => -c.centreOffset * 0.5 + c.run.len * 0.1 - (c.underWindow ? 200 : 0), { clear: 350 });
     if (!entry || !best) continue;
     p.place(entry, best.pose, { clear: 350 });
     consoleRun = best.run;
-    if (id === 'table.console') wallItem(p, opts, 'mirror.round', { run: best.run, t: best.t }, null);
+    if (id === 'table.console') {
+      const mirror = prefer.mirror && E(prefer.mirror) ? prefer.mirror : 'mirror.round';
+      if (!wallItem(p, opts, mirror, { run: best.run, t: best.t }, null) && mirror !== 'mirror.round') wallItem(p, opts, 'mirror.round', { run: best.run, t: best.t }, null);
+    }
     break;
   }
-  if (p.area >= 3.2 && !p.has('shoe.cabinet')) {
+  if (p.area >= 3.2 && !p.has('shoe.')) {
     const shoe = E('shoe.cabinet');
     const best = p.bestWall(shoe, (c) => (c.run === consoleRun ? -1000 : 0) - c.cornerDist * 0.5, { clear: 400 });
     if (shoe && best) p.place(shoe, best.pose, { clear: 400 });

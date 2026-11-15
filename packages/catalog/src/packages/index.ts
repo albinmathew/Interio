@@ -10,3 +10,6 @@ export function getPackage(id: string | undefined): FurnishingPackage | undefine
 }
 
 export { ESSENTIALS_3BHK };
+export { applyPackage, preferencesFor, type ApplyPackageOptions, type ApplyPackageResult, type RoomPatch, type WallPatch } from './apply';
+export { checkPackage, lineKey, type PackageCheck, type PackageLine, type PackageSection } from './check';
+export { ROLE_LABELS, bedroomRoles, missingBedroomRoles, roleSequence } from './roles';

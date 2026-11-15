@@ -1,9 +1,9 @@
-import { deriveRooms, type Item, type Level } from '@interio/core';
+import { deriveRooms, type Item, type Level, type RoomGeom } from '@interio/core';
 import { Planner } from './planner';
 import { homeScheme } from './schemes';
 import { RoomSeed } from './seed';
 import { applyScheme, releaseCurtains, reserveCurtains, stylePass, type StylingLevel } from './styling';
-import { TEMPLATES } from './templates';
+import { TEMPLATES, type Prefer } from './templates';
 
 export type { StylingLevel } from './styling';
 export { SCHEMES, type Scheme } from './schemes';
@@ -20,12 +20,36 @@ export interface AutoFurnishOptions {
   styling?: StylingLevel;
 }
 
-function plannerFor(level: Level, roomId: string): Planner | null {
+/** The layout engine for one room, or null when the room has no usable floor. Pass `geoms` to reuse a `deriveRooms` result. */
+export function plannerFor(level: Level, roomId: string, geoms?: RoomGeom[]): Planner | null {
   const room = level.rooms[roomId];
-  const geom = room && deriveRooms(level).find((g) => g.roomId === roomId);
+  const geom = room && (geoms ?? deriveRooms(level)).find((g) => g.roomId === roomId);
   if (!room || !geom || geom.interior.length < 3) return null;
   const planner = new Planner(level, room, geom);
   return planner.runs.length < 3 ? null : planner;
+}
+
+export interface LayoutOptions {
+  mounted: boolean;
+  styling: StylingLevel;
+  /** A package's pieces, tried before the template's own. */
+  prefer?: Prefer;
+  /** False when the windows get blinds instead of curtains. */
+  curtained?: boolean;
+}
+
+/** The main pieces of a room: its template, with the wall beside the windows kept for curtains. */
+export function layoutRoom(planner: Planner, seed: RoomSeed, opts: LayoutOptions): void {
+  const curtained = opts.curtained ?? true;
+  const reserved = opts.styling === 'none' || !curtained ? [] : reserveCurtains(planner, opts.mounted);
+  TEMPLATES[planner.room.type](planner, { mounted: opts.mounted, styled: opts.styling !== 'none', seed, prefer: opts.prefer });
+  releaseCurtains(planner, reserved);
+}
+
+/** The styling layer and the colour scheme, on top of what the planner holds. */
+export function finishRoom(planner: Planner, seed: RoomSeed, opts: LayoutOptions): void {
+  if (opts.styling !== 'none') stylePass(planner, seed, opts.styling, opts.mounted, opts.curtained ?? true);
+  applyScheme(planner, homeScheme(seed), seed);
 }
 
 /**
@@ -41,16 +65,10 @@ function plannerFor(level: Level, roomId: string): Planner | null {
 export function autoFurnish(level: Level, roomId: string, options: AutoFurnishOptions = {}): Omit<Item, 'id'>[] {
   const planner = plannerFor(level, roomId);
   if (!planner) return [];
-  const mounted = options.mounted ?? true;
-  const styling = options.styling ?? 'full';
+  const opts: LayoutOptions = { mounted: options.mounted ?? true, styling: options.styling ?? 'full' };
   const seed = new RoomSeed(level, planner.room);
-  const reserved = styling === 'none' ? [] : reserveCurtains(planner, mounted);
-  TEMPLATES[planner.room.type](planner, { mounted, styled: styling !== 'none', seed });
-  releaseCurtains(planner, reserved);
-  if (styling !== 'none') {
-    stylePass(planner, seed, styling, mounted);
-    applyScheme(planner, homeScheme(seed), seed);
-  }
+  layoutRoom(planner, seed, opts);
+  if (opts.styling !== 'none') finishRoom(planner, seed, opts);
   return planner.result();
 }
 
